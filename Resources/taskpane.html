@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Attensam Signatur</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@5.18.0/lib/msal-browser.min.js"></script>
+  <script defer src="taskpane.js"></script>
+  <style>
+    :root { --red:#cb2525; --ink:#222220; --muted:#6f6d68; --line:#deddd7; --paper:#f7f6f1; }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--paper); font-family:Arial,sans-serif; }
+    header { display:flex; align-items:center; gap:12px; padding:18px; background:#fff; border-bottom:1px solid var(--line); }
+    .logo { display:grid; place-items:center; width:36px; height:36px; color:#fff; background:var(--red); font-size:20px; font-weight:800; }
+    .eyebrow { margin:0 0 2px; color:var(--red); font-size:9px; font-weight:800; letter-spacing:.16em; }
+    h1 { margin:0; font-size:18px; }
+    main { padding:20px 18px 92px; }
+    .section-title { display:flex; align-items:end; justify-content:space-between; margin:0 0 14px; }
+    h2 { margin:0; font-size:17px; }
+    .step { color:var(--red); font-size:9px; font-weight:800; letter-spacing:.15em; }
+    .fields { display:grid; gap:12px; }
+    label { display:grid; gap:5px; }
+    label span { color:var(--muted); font-size:9px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+    input { width:100%; height:38px; padding:0 10px; border:1px solid #cbc9c2; border-radius:4px; background:#fff; outline:none; }
+    input:focus { border-color:var(--red); box-shadow:0 0 0 3px rgba(203,37,37,.1); }
+    button { border:0; border-radius:4px; font:inherit; font-weight:700; cursor:pointer; }
+    button:disabled { opacity:.5; cursor:not-allowed; }
+    .secondary { padding:8px 10px; border:1px solid var(--line); background:#fff; font-size:11px; }
+    .preview-section { margin-top:28px; }
+    .preview { min-height:220px; padding:18px; overflow:auto; border:1px solid var(--line); border-top:3px solid var(--red); background:#fff; box-shadow:0 10px 30px rgba(30,29,25,.06); }
+    #signature-preview { min-width:470px; }
+    #signature-preview p { margin:0 0 12px; }
+    #signature-preview img { max-width:100%; height:auto; }
+    footer { position:fixed; inset:auto 0 0; padding:12px 18px; border-top:1px solid var(--line); background:rgba(255,255,255,.96); }
+    #status { margin:0 0 8px; color:var(--muted); font-size:10px; line-height:1.4; }
+    .primary { width:100%; padding:12px; color:#fff; background:var(--red); font-size:12px; }
+    .primary:hover:not(:disabled) { background:#a91c1c; }
+    .hidden { display:none; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo" aria-hidden="true">A</div>
+    <div><p class="eyebrow">ATTENSAM</p><h1>Signatur erstellen</h1></div>
+  </header>
+
+  <main>
+    <div class="section-title">
+      <div><span class="step">01</span><h2>Ihre Daten</h2></div>
+      <button id="refresh-button" class="secondary" type="button">↻ Laden</button>
+    </div>
+    <div id="fields" class="fields"></div>
+
+    <section class="preview-section">
+      <div class="section-title"><div><span class="step">02</span><h2>Vorschau</h2></div></div>
+      <div class="preview"><div id="signature-preview">Vorlage wird geladen …</div></div>
+    </section>
+  </main>
+
+  <footer>
+    <p id="status" role="status" aria-live="polite">Outlook wird initialisiert …</p>
+    <button id="insert-button" class="primary" type="button" disabled>Signatur einfügen</button>
+  </footer>
+</body>
+</html>
