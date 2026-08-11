@@ -19,15 +19,10 @@
     .section-title { display:flex; align-items:end; justify-content:space-between; margin:0 0 14px; }
     h2 { margin:0; font-size:17px; }
     .step { color:var(--red); font-size:9px; font-weight:800; letter-spacing:.15em; }
-    .fields { display:grid; gap:12px; }
-    label { display:grid; gap:5px; }
-    label span { color:var(--muted); font-size:9px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
-    input { width:100%; height:38px; padding:0 10px; border:1px solid #cbc9c2; border-radius:4px; background:#fff; outline:none; }
-    input:focus { border-color:var(--red); box-shadow:0 0 0 3px rgba(203,37,37,.1); }
     button { border:0; border-radius:4px; font:inherit; font-weight:700; cursor:pointer; }
     button:disabled { opacity:.5; cursor:not-allowed; }
-    .secondary { padding:8px 10px; border:1px solid var(--line); background:#fff; font-size:11px; }
-    .preview-section { margin-top:28px; }
+    .profile-source { margin:0 0 16px; color:var(--muted); font-size:11px; line-height:1.5; }
+    .preview-section { margin-top:0; }
     .preview { min-height:220px; padding:18px; overflow:auto; border:1px solid var(--line); border-top:3px solid var(--red); background:#fff; box-shadow:0 10px 30px rgba(30,29,25,.06); }
     #signature-preview { min-width:470px; }
     #signature-preview p { margin:0 0 12px; }
@@ -46,14 +41,9 @@
   </header>
 
   <main>
-    <div class="section-title">
-      <div><span class="step">01</span><h2>Ihre Daten</h2></div>
-      <button id="refresh-button" class="secondary" type="button">↻ Laden</button>
-    </div>
-    <div id="fields" class="fields"></div>
-
     <section class="preview-section">
-      <div class="section-title"><div><span class="step">02</span><h2>Vorschau</h2></div></div>
+      <div class="section-title"><div><span class="step">MICROSOFT 365</span><h2>Ihre Signatur</h2></div></div>
+      <p class="profile-source">Die Signatur wird automatisch aus Ihrem Microsoft-365-Profil erstellt.</p>
       <div class="preview"><div id="signature-preview">Vorlage wird geladen …</div></div>
     </section>
   </main>

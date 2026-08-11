@@ -1,27 +1,23 @@
 /* global Office, msal */
 
 const CONFIG = {
-  clientId: "89659501-37e7-4916-abeb-4dc5178e3034",
-  tenantId: "https://login.microsoftonline.com/1333c2c2-fdf6-4fdc-8559-3dc12559d264",
+  clientId: "YOUR_ENTRA_APP_CLIENT_ID",
+  tenantId: "common",
 };
 
-const fields = [
-  ["firstName", "Vorname"], ["lastName", "Nachname"],
-  ["jobTitle", "Position"], ["company", "Unternehmen"],
-  ["email", "E-Mail"], ["phone", "Telefon"], ["mobile", "Mobil"],
-  ["street", "Straße"], ["postalCode", "PLZ"], ["city", "Ort"],
-  ["customAttribute10", "CustomAttribute10"],
-  ["customAttribute11", "CustomAttribute11"],
-];
-
-const profile = Object.fromEntries(fields.map(([key]) => [key, ""]));
+const profile = {
+  firstName: "", lastName: "", jobTitle: "", company: "",
+  email: "", phone: "", mobile: "", street: "",
+  postalCode: "", city: "", customAttribute10: "",
+  customAttribute11: "",
+};
 let signatureTemplate = "";
 let msalInstance;
+let profileLoaded = false;
 
 const statusElement = document.getElementById("status");
 const previewElement = document.getElementById("signature-preview");
 const insertButton = document.getElementById("insert-button");
-const refreshButton = document.getElementById("refresh-button");
 
 function setStatus(message) {
   statusElement.textContent = message;
@@ -70,31 +66,11 @@ function renderSignature() {
     return Object.hasOwn(values, key) ? escapeHtml(values[key]) : match;
   });
   previewElement.innerHTML = html;
-  insertButton.disabled = !html;
+  insertButton.disabled = !html || !profileLoaded;
   return html;
 }
 
-function buildFields() {
-  const container = document.getElementById("fields");
-  fields.forEach(([key, label]) => {
-    const wrapper = document.createElement("label");
-    wrapper.innerHTML = `<span>${label}</span>`;
-    const input = document.createElement("input");
-    input.id = key;
-    input.autocomplete = "off";
-    input.addEventListener("input", () => {
-      profile[key] = input.value;
-      renderSignature();
-    });
-    wrapper.appendChild(input);
-    container.appendChild(wrapper);
-  });
-}
-
 function showProfile() {
-  fields.forEach(([key]) => {
-    document.getElementById(key).value = profile[key] || "";
-  });
   renderSignature();
 }
 
@@ -133,8 +109,7 @@ async function acquireGraphToken() {
 }
 
 async function loadProfile() {
-  refreshButton.disabled = true;
-  setStatus("Microsoft-365-Profil wird geladen …");
+  setStatus("Microsoft-365-Profil wird automatisch geladen …");
   try {
     const token = await acquireGraphToken();
     const select = [
@@ -162,12 +137,13 @@ async function loadProfile() {
       customAttribute10: user.onPremisesExtensionAttributes?.extensionAttribute10 || "",
       customAttribute11: user.onPremisesExtensionAttributes?.extensionAttribute11 || "",
     });
+    profileLoaded = true;
     showProfile();
-    setStatus("Profildaten wurden geladen.");
+    setStatus("Microsoft-365-Profil wurde automatisch geladen.");
   } catch (error) {
+    profileLoaded = false;
+    insertButton.disabled = true;
     setStatus(error.message || "Profildaten konnten nicht geladen werden.");
-  } finally {
-    refreshButton.disabled = false;
   }
 }
 
@@ -193,20 +169,18 @@ function insertSignature() {
 }
 
 async function initialize() {
-  buildFields();
   try {
     signatureTemplate = await fetch("template.html", { cache: "no-store" }).then((response) => {
       if (!response.ok) throw new Error("template.html konnte nicht geladen werden.");
       return response.text();
     });
     applyMailboxBasics();
-    setStatus("Bereit. Laden Sie das vollständige Microsoft-365-Profil.");
+    await loadProfile();
   } catch (error) {
     setStatus(error.message);
   }
 }
 
-refreshButton.addEventListener("click", loadProfile);
 insertButton.addEventListener("click", insertSignature);
 Office.onReady((info) => {
   if (info.host === Office.HostType.Outlook) initialize();
