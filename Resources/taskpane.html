@@ -23,14 +23,16 @@
     button:disabled { opacity:.5; cursor:not-allowed; }
     .profile-source { margin:0 0 16px; color:var(--muted); font-size:11px; line-height:1.5; }
     .preview-section { margin-top:0; }
-    .preview { min-height:220px; padding:18px; overflow:auto; border:1px solid var(--line); border-top:3px solid var(--red); background:#fff; box-shadow:0 10px 30px rgba(30,29,25,.06); }
-    #signature-preview { min-width:470px; }
+    .preview { width:100%; min-height:220px; padding:18px; overflow:auto; border:1px solid var(--line); border-radius:3px; background:#fff; box-shadow:0 10px 30px rgba(30,29,25,.06); color:var(--ink); text-align:left; transition:border-color .15s, box-shadow .15s; }
+    .preview.ready:hover, .preview.ready:focus-visible { border:1px solid var(--red); box-shadow:0 10px 30px rgba(203,37,37,.12); outline:none; }
+    .preview.ready { cursor:pointer; }
+    .preview[aria-disabled="true"] { cursor:wait; }
+    #signature-preview { min-width:470px; user-select:none; -webkit-user-select:none; -ms-user-select:none; pointer-events:none; }
+    #signature-preview img { -webkit-user-drag:none; }
     #signature-preview p { margin:0 0 12px; }
     #signature-preview img { max-width:100%; height:auto; }
     footer { position:fixed; inset:auto 0 0; padding:12px 18px; border-top:1px solid var(--line); background:rgba(255,255,255,.96); }
-    #status { margin:0 0 8px; color:var(--muted); font-size:10px; line-height:1.4; }
-    .primary { width:100%; padding:12px; color:#fff; background:var(--red); font-size:12px; }
-    .primary:hover:not(:disabled) { background:#a91c1c; }
+    #status { margin:0; color:var(--muted); font-size:10px; line-height:1.4; }
     .hidden { display:none; }
   </style>
 </head>
@@ -44,13 +46,14 @@
     <section class="preview-section">
       <div class="section-title"><div><span class="step">MICROSOFT 365</span><h2>Ihre Signatur</h2></div></div>
       <p class="profile-source">Die Signatur wird automatisch aus Ihrem Microsoft-365-Profil erstellt.</p>
-      <div class="preview"><div id="signature-preview">Vorlage wird geladen …</div></div>
+      <div id="signature-button" class="preview" role="button" tabindex="-1" aria-disabled="true" aria-label="Signatur in Outlook einfügen">
+        <div id="signature-preview">Vorlage wird geladen …</div>
+      </div>
     </section>
   </main>
 
   <footer>
     <p id="status" role="status" aria-live="polite">Outlook wird initialisiert …</p>
-    <button id="insert-button" class="primary" type="button" disabled>Signatur einfügen</button>
   </footer>
 </body>
 </html>
