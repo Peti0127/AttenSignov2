@@ -17,7 +17,7 @@ let profileLoaded = false;
 
 const statusElement = document.getElementById("status");
 const previewElement = document.getElementById("signature-preview");
-const insertButton = document.getElementById("insert-button");
+const signatureButton = document.getElementById("signature-button");
 
 function setStatus(message) {
   statusElement.textContent = message;
@@ -42,10 +42,10 @@ function phoneLine() {
 function bannerForCity() {
   const city = profile.city.trim().toLocaleLowerCase("de-AT");
   if (city === "wien") {
-    return '<p style="font-size: 12pt; font-family: Aptos, Arial, sans-serif; color: rgb(0, 0, 0);"><a href="https://www.attensam.at/banner_w.png" title="" style="font-family: Arial; font-size: 10pt;"><img src="https://storage.googleapis.com/signaturen-attensam-at/images/banner_w.png" border="0" alt="Banner Wien"></a></p>';
+    return '<p style="font-size: 12pt; font-family: Aptos, Arial, sans-serif; color: rgb(0, 0, 0);"><a href="https://ASD.com/banner_w" title="" style="font-family: Arial; font-size: 10pt;"><img src="https://ASD.com/images/banner_w.png" border="0" alt="Banner Wien"></a></p>';
   }
   if (city === "st. pölten-radlberg" || city === "krems an der donau") {
-    return '<p style="font-size: 12pt; font-family: Aptos, Arial, sans-serif; color: rgb(0, 0, 0);"><a href="https://www.attensam.at/banner_noe_nord" title="" style="font-family: Arial; font-size: 10pt;"><img src="https://storage.googleapis.com/signaturen-attensam-at/images/banner_noe_nord.png" border="0" alt="Banner Niederösterreich Nord"></a></p>';
+    return '<p style="font-size: 12pt; font-family: Aptos, Arial, sans-serif; color: rgb(0, 0, 0);"><a href="https://ASD.com/banner_noe_nord" title="" style="font-family: Arial; font-size: 10pt;"><img src="https://ASD.com/images/banner_noe_nord.png" border="0" alt="Banner Niederösterreich Nord"></a></p>';
   }
   return "";
 }
@@ -66,7 +66,10 @@ function renderSignature() {
     return Object.hasOwn(values, key) ? escapeHtml(values[key]) : match;
   });
   previewElement.innerHTML = html;
-  insertButton.disabled = !html || !profileLoaded;
+  const ready = Boolean(html && profileLoaded);
+  signatureButton.setAttribute("aria-disabled", String(!ready));
+  signatureButton.tabIndex = ready ? 0 : -1;
+  signatureButton.classList.toggle("ready", ready);
   return html;
 }
 
@@ -142,12 +145,15 @@ async function loadProfile() {
     setStatus("Microsoft-365-Profil wurde automatisch geladen.");
   } catch (error) {
     profileLoaded = false;
-    insertButton.disabled = true;
+    signatureButton.setAttribute("aria-disabled", "true");
+    signatureButton.tabIndex = -1;
+    signatureButton.classList.remove("ready");
     setStatus(error.message || "Profildaten konnten nicht geladen werden.");
   }
 }
 
 function insertSignature() {
+  if (!profileLoaded || signatureButton.getAttribute("aria-disabled") === "true") return;
   const html = renderSignature();
   const body = Office.context.mailbox.item?.body;
   if (!body) {
@@ -181,7 +187,13 @@ async function initialize() {
   }
 }
 
-insertButton.addEventListener("click", insertSignature);
+signatureButton.addEventListener("click", insertSignature);
+signatureButton.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    insertSignature();
+  }
+});
 Office.onReady((info) => {
   if (info.host === Office.HostType.Outlook) initialize();
   else setStatus("Diese Seite muss als Outlook-Add-In geöffnet werden.");
