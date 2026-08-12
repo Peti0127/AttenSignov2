@@ -42,10 +42,10 @@ function phoneLine() {
 function bannerForCity() {
   const city = profile.city.trim().toLocaleLowerCase("de-AT");
   if (city === "wien") {
-    return '<p style="font-size: 12pt; font-family: Aptos, Arial, sans-serif; color: rgb(0, 0, 0);"><a href="https://ASD.com/banner_w" title="" style="font-family: Arial; font-size: 10pt;"><img src="https://ASD.com/images/banner_w.png" border="0" alt="Banner Wien"></a></p>';
+    return '<p style="font-size: 12pt; font-family: Aptos, Arial, sans-serif; color: rgb(0, 0, 0);"><a href="https://storage.googleapis.com/signaturen-attensam-at/images/banner_w.png" title="" style="font-family: Arial; font-size: 10pt;"><img src="https://ASD.com/images/banner_w.png" border="0" alt="Banner Wien"></a></p>';
   }
   if (city === "st. pölten-radlberg" || city === "krems an der donau") {
-    return '<p style="font-size: 12pt; font-family: Aptos, Arial, sans-serif; color: rgb(0, 0, 0);"><a href="https://ASD.com/banner_noe_nord" title="" style="font-family: Arial; font-size: 10pt;"><img src="https://ASD.com/images/banner_noe_nord.png" border="0" alt="Banner Niederösterreich Nord"></a></p>';
+    return '<p style="font-size: 12pt; font-family: Aptos, Arial, sans-serif; color: rgb(0, 0, 0);"><a href="https://storage.googleapis.com/signaturen-attensam-at/images/banner_noe_nord" title="" style="font-family: Arial; font-size: 10pt;"><img src="https://ASD.com/images/banner_noe_nord.png" border="0" alt="Banner Niederösterreich Nord"></a></p>';
   }
   return "";
 }
