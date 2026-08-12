@@ -1,8 +1,8 @@
 /* global Office, msal */
 
 const CONFIG = {
-  clientId: "YOUR_ENTRA_APP_CLIENT_ID",
-  tenantId: "common",
+  clientId: "89659501-37e7-4916-abeb-4dc5178e3034",
+  tenantId: "https://login.microsoftonline.com/1333c2c2-fdf6-4fdc-8559-3dc12559d264",
 };
 
 const profile = {
