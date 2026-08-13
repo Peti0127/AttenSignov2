@@ -23,11 +23,11 @@
     button:disabled { opacity:.5; cursor:not-allowed; }
     .profile-source { margin:0 0 16px; color:var(--muted); font-size:11px; line-height:1.5; }
     .preview-section { margin-top:0; }
-    .preview { width:100%; max-height:200px; padding:18px; overflow:auto; border:1px solid var(--line); border-radius:3px; background:#fff; box-shadow:0 10px 30px rgba(30,29,25,.06); color:var(--ink); text-align:left; transition:border-color .15s, box-shadow .15s; }
+    .preview { width:100%; height:200px; padding:12px; overflow:hidden; position:relative; border:1px solid var(--line); border-radius:3px; background:#fff; box-shadow:0 10px 30px rgba(30,29,25,.06); color:var(--ink); text-align:left; transition:border-color .15s, box-shadow .15s; }
     .preview.ready:hover, .preview.ready:focus-visible { border:1px solid var(--red); box-shadow:0 10px 30px rgba(203,37,37,.12); outline:none; }
     .preview.ready { cursor:pointer; }
     .preview[aria-disabled="true"] { cursor:wait; }
-    #signature-preview { min-width:470px; user-select:none; -webkit-user-select:none; -ms-user-select:none; pointer-events:none; }
+    #signature-preview { display:inline-block; min-width:470px; transform-origin:top left; user-select:none; -webkit-user-select:none; -ms-user-select:none; pointer-events:none; }
     #signature-preview img { -webkit-user-drag:none; }
     #signature-preview p { margin:0 0 12px; }
     #signature-preview img { max-width:100%; height:auto; }

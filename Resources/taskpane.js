@@ -47,31 +47,24 @@ function bannerForCity() {
   if (city === "st. pölten-radlberg" || city === "Krems an der Donau") {
     return '<p style="font-size: 12pt; font-family: Aptos, Arial, sans-serif; color: rgb(0, 0, 0);"><a href="https://www.attensam.at/banner_noe_nord" title="" style="font-family: Arial; font-size: 10pt;"><img src="https://storage.googleapis.com/signaturen-attensam-at/images/banner_noe_nord.png" border="0" alt="Banner Niederösterreich Nord"></a></p>';
   }
- 
   if (city === "Wr. Neustadt") {
     return '<p style="font-size: 12pt; font-family: Aptos, Arial, sans-serif; color: rgb(0, 0, 0);"><a href="https://www.attensam.at/banner_noe_sued" title="" style="font-family: Arial; font-size: 10pt;"><img src="https://storage.googleapis.com/signaturen-attensam-at/images/banner_noe_sued.png" border="0" alt="Banner Niederösterreich Nord"></a></p>';
   }
-  
   if (city === "Neusiedl am See" || city === "Oberwart") {
     return '<p style="font-size: 12pt; font-family: Aptos, Arial, sans-serif; color: rgb(0, 0, 0);"><a href="https://www.attensam.at/banner_bgld" title="" style="font-family: Arial; font-size: 10pt;"><img src="https://storage.googleapis.com/signaturen-attensam-at/images/banner_bgld.png" border="0" alt="Banner Niederösterreich Nord"></a></p>';
   }
-  
   if (city === "Klagenfurt") {
     return '<p style="font-size: 12pt; font-family: Aptos, Arial, sans-serif; color: rgb(0, 0, 0);"><a href="https://www.attensam.at/banner_ktn" title="" style="font-family: Arial; font-size: 10pt;"><img src="https://storage.googleapis.com/signaturen-attensam-at/images/banner_ktn.png" border="0" alt="Banner Niederösterreich Nord"></a></p>';
   }
-  
   if (city === "Kalsdorf" || city === "Graz" || city == "Leoben") {
     return '<p style="font-size: 12pt; font-family: Aptos, Arial, sans-serif; color: rgb(0, 0, 0);"><a href="https://www.attensam.at/banner_stmk" title="" style="font-family: Arial; font-size: 10pt;"><img src="https://storage.googleapis.com/signaturen-attensam-at/images/banner_stmk.png" border="0" alt="Banner Niederösterreich Nord"></a></p>';
   }
-  
   if (city === "Linz" || city === "Regau") {
     return '<p style="font-size: 12pt; font-family: Aptos, Arial, sans-serif; color: rgb(0, 0, 0);"><a href="https://www.attensam.at/banner_ooe" title="" style="font-family: Arial; font-size: 10pt;"><img src="https://storage.googleapis.com/signaturen-attensam-at/images/banner_ooe.png" border="0" alt="Banner Niederösterreich Nord"></a></p>';
   }
-  
   if (city === "Salzburg" || city === "Bruck an der Großglocknerstraße") {
     return '<p style="font-size: 12pt; font-family: Aptos, Arial, sans-serif; color: rgb(0, 0, 0);"><a href="https://www.attensam.at/banner_sbg" title="" style="font-family: Arial; font-size: 10pt;"><img src="https://storage.googleapis.com/signaturen-attensam-at/images/banner_sbg.png" border="0" alt="Banner Niederösterreich Nord"></a></p>';
   }
-  
   if (city === "Innsbruck") {
     return '<p style="font-size: 12pt; font-family: Aptos, Arial, sans-serif; color: rgb(0, 0, 0);"><a href="https://www.attensam.at/banner_t" title="" style="font-family: Arial; font-size: 10pt;"><img src="https://storage.googleapis.com/signaturen-attensam-at/images/banner_t.png" border="0" alt="Banner Niederösterreich Nord"></a></p>';
   }
@@ -79,6 +72,30 @@ function bannerForCity() {
     return '<p style="font-size: 12pt; font-family: Aptos, Arial, sans-serif; color: rgb(0, 0, 0);"><a href="https://www.attensam.at/banner_vbg" title="" style="font-family: Arial; font-size: 10pt;"><img src="https://storage.googleapis.com/signaturen-attensam-at/images/banner_vbg.png" border="0" alt="Banner Niederösterreich Nord"></a></p>';
   }
   return "";
+}
+
+function scaleSignaturePreview() {
+  // Reset before measuring so the previous scale doesn't affect the result.
+  previewElement.style.transform = "none";
+
+  const styles = getComputedStyle(signatureButton);
+  const availableWidth = signatureButton.clientWidth
+    - parseFloat(styles.paddingLeft)
+    - parseFloat(styles.paddingRight);
+  const availableHeight = signatureButton.clientHeight
+    - parseFloat(styles.paddingTop)
+    - parseFloat(styles.paddingBottom);
+  const naturalWidth = previewElement.scrollWidth;
+  const naturalHeight = previewElement.scrollHeight;
+
+  if (!naturalWidth || !naturalHeight) return;
+
+  const scale = Math.min(
+    1,
+    availableWidth / naturalWidth,
+    availableHeight / naturalHeight,
+  );
+  previewElement.style.transform = `scale(${scale})`;
 }
 
 function renderSignature() {
@@ -97,6 +114,10 @@ function renderSignature() {
     return Object.hasOwn(values, key) ? escapeHtml(values[key]) : match;
   });
   previewElement.innerHTML = html;
+  previewElement.querySelectorAll("img").forEach((image) => {
+    if (!image.complete) image.addEventListener("load", scaleSignaturePreview, { once: true });
+  });
+  requestAnimationFrame(scaleSignaturePreview);
   const ready = Boolean(html && profileLoaded);
   signatureButton.setAttribute("aria-disabled", String(!ready));
   signatureButton.tabIndex = ready ? 0 : -1;
@@ -125,10 +146,13 @@ async function acquireGraphToken() {
     throw new Error("Dieser Outlook-Client unterstützt Nested App Authentication 1.1 nicht.");
   }
   if (!msalInstance) {
+    const authority = CONFIG.tenantId.startsWith("https://")
+      ? CONFIG.tenantId
+      : `https://login.microsoftonline.com/${CONFIG.tenantId}`;
     msalInstance = await msal.createNestablePublicClientApplication({
       auth: {
         clientId: CONFIG.clientId,
-        authority: `https://login.microsoftonline.com/${CONFIG.tenantId}`,
+        authority,
       },
       cache: { cacheLocation: "localStorage" },
     });
@@ -225,6 +249,7 @@ signatureButton.addEventListener("keydown", (event) => {
     insertSignature();
   }
 });
+window.addEventListener("resize", scaleSignaturePreview);
 Office.onReady((info) => {
   if (info.host === Office.HostType.Outlook) initialize();
   else setStatus("Diese Seite muss als Outlook-Add-In geöffnet werden.");
