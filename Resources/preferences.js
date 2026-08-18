@@ -4,9 +4,15 @@
   const ROAMING_KEY = "attensam.signature.settings.v2";
   const CACHE_PREFIX = "attensam.signature.settings.v2";
   const LEGACY_PHONE_PREFIX = "attensam.signature.phone-mode";
-  const DEFAULT_SETTINGS = Object.freeze({ Nummer: "Alles", MfG: "MfG1" });
+  const DEFAULT_SETTINGS = Object.freeze({
+    Nummer: "Alles",
+    MfG: "MfG1",
+    AutoInsert: false,
+    AutoInsertMode: "NewMail",
+  });
   const ALLOWED_NUMBERS = new Set(["Alles", "Handy", "Festnetz", "Office"]);
   const ALLOWED_GREETINGS = new Set(["MfG0", "MfG1", "MfG2", "MfG3"]);
+  const ALLOWED_AUTO_MODES = new Set(["NewMail", "AllMail"]);
   const LEGACY_NUMBER_MAP = Object.freeze({
     both: "Alles",
     mobile: "Handy",
@@ -32,6 +38,10 @@
     return {
       Nummer: ALLOWED_NUMBERS.has(value?.Nummer) ? value.Nummer : DEFAULT_SETTINGS.Nummer,
       MfG: ALLOWED_GREETINGS.has(value?.MfG) ? value.MfG : DEFAULT_SETTINGS.MfG,
+      AutoInsert: value.AutoInsert === true,
+      AutoInsertMode: ALLOWED_AUTO_MODES.has(value?.AutoInsertMode)
+        ? value.AutoInsertMode
+        : DEFAULT_SETTINGS.AutoInsertMode,
       updatedAt: Number.isFinite(Date.parse(value.updatedAt)) ? value.updatedAt : "",
     };
   }
@@ -53,7 +63,12 @@
   }
 
   function publicSettings(record) {
-    return { Nummer: record.Nummer, MfG: record.MfG };
+    return {
+      Nummer: record.Nummer,
+      MfG: record.MfG,
+      AutoInsert: record.AutoInsert,
+      AutoInsertMode: record.AutoInsertMode,
+    };
   }
 
   async function getSettings() {
@@ -75,16 +90,25 @@
     return {
       Nummer: LEGACY_NUMBER_MAP[legacy] || DEFAULT_SETTINGS.Nummer,
       MfG: DEFAULT_SETTINGS.MfG,
+      AutoInsert: DEFAULT_SETTINGS.AutoInsert,
+      AutoInsertMode: DEFAULT_SETTINGS.AutoInsertMode,
     };
   }
 
   async function saveSettings(settings) {
-    if (!ALLOWED_NUMBERS.has(settings?.Nummer) || !ALLOWED_GREETINGS.has(settings?.MfG)) {
+    if (
+      !ALLOWED_NUMBERS.has(settings?.Nummer)
+      || !ALLOWED_GREETINGS.has(settings?.MfG)
+      || typeof settings?.AutoInsert !== "boolean"
+      || !ALLOWED_AUTO_MODES.has(settings?.AutoInsertMode)
+    ) {
       throw new Error("Ungültige Einstellung.");
     }
     const record = {
       Nummer: settings.Nummer,
       MfG: settings.MfG,
+      AutoInsert: settings.AutoInsert,
+      AutoInsertMode: settings.AutoInsertMode,
       updatedAt: new Date().toISOString(),
     };
     const roamingSettings = Office.context.roamingSettings;

@@ -24,6 +24,10 @@
     label { display:block; margin-bottom:8px; font-size:13px; font-weight:700; }
     select { width:100%; height:42px; padding:0 11px; border:1px solid #cbc9c2; border-radius:4px; background:#fff; color:var(--ink); font:inherit; }
     select:focus { border-color:var(--red); box-shadow:0 0 0 3px rgba(203,37,37,.1); outline:none; }
+    .checkbox-row { display:flex; align-items:center; gap:10px; margin:0; cursor:pointer; }
+    .checkbox-row input { width:18px; height:18px; margin:0; accent-color:var(--red); }
+    .checkbox-row span { font-size:13px; font-weight:700; }
+    [hidden] { display:none !important; }
     .hint { margin:10px 0 0; color:var(--muted); font-size:11px; line-height:1.5; }
     #settings-status { margin:18px 0 0; color:var(--muted); font-size:11px; }
   </style>
@@ -54,6 +58,19 @@
         <option value="MfG1">Mit freundlichen Grüßen</option>
         <option value="MfG2">Freundliche Grüße</option>
         <option value="MfG3">LG</option>
+      </select>
+    </div>
+    <div class="field">
+      <label class="checkbox-row" for="auto-insert">
+        <input id="auto-insert" type="checkbox" disabled>
+        <span>Signatur automatisch einfügen</span>
+      </label>
+    </div>
+    <div id="auto-insert-mode-field" class="field" hidden>
+      <label for="auto-insert-mode">Automatisch einfügen</label>
+      <select id="auto-insert-mode" disabled>
+        <option value="NewMail">Einfügen bei neuen Emails</option>
+        <option value="AllMail">Einfügen bei allen Emails</option>
       </select>
     </div>
     <p class="hint">Die Auswahl wird für Ihr Microsoft-365-Benutzerkonto gespeichert.</p>

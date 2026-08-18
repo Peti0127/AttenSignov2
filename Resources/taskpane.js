@@ -5,6 +5,7 @@ const CONFIG = {
   tenantId: "https://login.microsoftonline.com/1333c2c2-fdf6-4fdc-8559-3dc12559d264",
   officeNumber: "05 7999 100",
 };
+const AUTO_RENDER_DATA_KEY = "attensam.signature.render-data.v1";
 
 const profile = {
   firstName: "", lastName: "", jobTitle: "", company: "",
@@ -161,6 +162,23 @@ function renderSignature() {
   return html;
 }
 
+async function saveAutoRenderData() {
+  const roamingSettings = Office.context.roamingSettings;
+  if (!roamingSettings || !signatureTemplate || !profileLoaded) return;
+  roamingSettings.set(AUTO_RENDER_DATA_KEY, {
+    profile: { ...profile },
+    template: signatureTemplate,
+    officeNumber: CONFIG.officeNumber,
+    updatedAt: new Date().toISOString(),
+  });
+  await new Promise((resolve, reject) => {
+    roamingSettings.saveAsync((result) => {
+      if (result.status === Office.AsyncResultStatus.Succeeded) resolve();
+      else reject(new Error(result.error?.message || "Signaturdaten konnten nicht gespeichert werden."));
+    });
+  });
+}
+
 function showProfile() {
   renderSignature();
 }
@@ -233,6 +251,7 @@ async function loadProfile() {
     });
     profileLoaded = true;
     showProfile();
+    await saveAutoRenderData().catch(() => {});
     setStatus("Microsoft-365-Profil wurde automatisch geladen.");
   } catch (error) {
     profileLoaded = false;
