@@ -3,7 +3,7 @@
 const CONFIG = {
   clientId: "89659501-37e7-4916-abeb-4dc5178e3034",
   tenantId: "https://login.microsoftonline.com/1333c2c2-fdf6-4fdc-8559-3dc12559d264",
-  officeNumber: "YOUR_FIXED_OFFICE_NUMBER",
+  officeNumber: "05 7999 100",
 };
 
 const profile = {
@@ -55,6 +55,7 @@ function phoneLine() {
 }
 
 function greetingHtml() {
+  if (signatureSettings.MfG === "MfG0") return "";
   let greeting = "";
   if (signatureSettings.MfG === "MfG1") {
     greeting = "Mit freundlichen Grüßen";
@@ -64,7 +65,7 @@ function greetingHtml() {
     greeting = "LG";
   }
   if (!greeting) return "";
-  return `<p style="font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);">${escapeHtml(greeting)}</p>`;
+  return `<p style="margin: 0; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);">${escapeHtml(greeting)}<br><br></p>`;
 }
 
 function bannerForCity() {

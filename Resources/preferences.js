@@ -1,11 +1,12 @@
 /* global Office */
 
 (function exposeSignaturePreferences(global) {
-  const STORAGE_PREFIX = "attensam.signature.settings.v2";
+  const ROAMING_KEY = "attensam.signature.settings.v2";
+  const CACHE_PREFIX = "attensam.signature.settings.v2";
   const LEGACY_PHONE_PREFIX = "attensam.signature.phone-mode";
   const DEFAULT_SETTINGS = Object.freeze({ Nummer: "Alles", MfG: "MfG1" });
   const ALLOWED_NUMBERS = new Set(["Alles", "Handy", "Festnetz", "Office"]);
-  const ALLOWED_GREETINGS = new Set(["MfG1", "MfG2", "MfG3"]);
+  const ALLOWED_GREETINGS = new Set(["MfG0", "MfG1", "MfG2", "MfG3"]);
   const LEGACY_NUMBER_MAP = Object.freeze({
     both: "Alles",
     mobile: "Handy",
@@ -23,42 +24,82 @@
   }
 
   function storageKey() {
-    return `${STORAGE_PREFIX}:${currentUserKey()}`;
+    return `${CACHE_PREFIX}:${currentUserKey()}`;
   }
 
-  function normalizeSettings(value) {
+  function normalizeRecord(value) {
+    if (!value || typeof value !== "object") return null;
     return {
       Nummer: ALLOWED_NUMBERS.has(value?.Nummer) ? value.Nummer : DEFAULT_SETTINGS.Nummer,
       MfG: ALLOWED_GREETINGS.has(value?.MfG) ? value.MfG : DEFAULT_SETTINGS.MfG,
+      updatedAt: Number.isFinite(Date.parse(value.updatedAt)) ? value.updatedAt : "",
     };
   }
 
-  async function getSettings() {
-    // Temporary adapter. Replace this block with GET /api/user-settings when the
-    // authenticated SQL API is available. The API should return { Nummer, MfG }.
+  function readCachedRecord() {
     const stored = localStorage.getItem(storageKey());
-    if (stored) {
-      try {
-        return normalizeSettings(JSON.parse(stored));
-      } catch {
-        localStorage.removeItem(storageKey());
-      }
+    if (!stored) return null;
+    try {
+      return normalizeRecord(JSON.parse(stored));
+    } catch {
+      localStorage.removeItem(storageKey());
+      return null;
+    }
+  }
+
+  function recordTime(record) {
+    const timestamp = Date.parse(record?.updatedAt || "");
+    return Number.isFinite(timestamp) ? timestamp : 0;
+  }
+
+  function publicSettings(record) {
+    return { Nummer: record.Nummer, MfG: record.MfG };
+  }
+
+  async function getSettings() {
+    const cached = readCachedRecord();
+    const roaming = normalizeRecord(
+      Office.context.roamingSettings?.get(ROAMING_KEY),
+    );
+
+    // Outlook can expose an older in-memory roaming snapshot immediately after
+    // navigating between pages. Timestamps let the local cache bridge that gap.
+    const newest = recordTime(cached) > recordTime(roaming) ? cached : (roaming || cached);
+    if (newest) {
+      localStorage.setItem(storageKey(), JSON.stringify(newest));
+      return publicSettings(newest);
     }
 
     // Preserve an existing phone choice from the previous add-in version.
     const legacy = localStorage.getItem(`${LEGACY_PHONE_PREFIX}:${currentUserKey()}`);
-    return normalizeSettings({ Nummer: LEGACY_NUMBER_MAP[legacy], MfG: DEFAULT_SETTINGS.MfG });
+    return {
+      Nummer: LEGACY_NUMBER_MAP[legacy] || DEFAULT_SETTINGS.Nummer,
+      MfG: DEFAULT_SETTINGS.MfG,
+    };
   }
 
   async function saveSettings(settings) {
     if (!ALLOWED_NUMBERS.has(settings?.Nummer) || !ALLOWED_GREETINGS.has(settings?.MfG)) {
       throw new Error("Ungültige Einstellung.");
     }
-    // Temporary adapter. Replace this line with PUT /api/user-settings and send
-    // the same { Nummer, MfG } object when the authenticated SQL API is available.
-    const normalized = normalizeSettings(settings);
-    localStorage.setItem(storageKey(), JSON.stringify(normalized));
-    return normalized;
+    const record = {
+      Nummer: settings.Nummer,
+      MfG: settings.MfG,
+      updatedAt: new Date().toISOString(),
+    };
+    const roamingSettings = Office.context.roamingSettings;
+    if (!roamingSettings) throw new Error("Outlook RoamingSettings ist nicht verfügbar.");
+
+    roamingSettings.set(ROAMING_KEY, record);
+    await new Promise((resolve, reject) => {
+      roamingSettings.saveAsync((result) => {
+        if (result.status === Office.AsyncResultStatus.Succeeded) resolve();
+        else reject(new Error(result.error?.message || "Einstellungen konnten nicht gespeichert werden."));
+      });
+    });
+
+    localStorage.setItem(storageKey(), JSON.stringify(record));
+    return publicSettings(record);
   }
 
   global.SignaturePreferences = Object.freeze({ getSettings, saveSettings });
