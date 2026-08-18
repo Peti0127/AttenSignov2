@@ -6,6 +6,7 @@
   <title>Attensam Signatur</title>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@5.18.0/lib/msal-browser.min.js"></script>
+  <script defer src="preferences.js"></script>
   <script defer src="taskpane.js"></script>
   <style>
     :root { --red:#cb2525; --ink:#222220; --muted:#6f6d68; --line:#deddd7; --paper:#f7f6f1; }
@@ -14,6 +15,8 @@
     header { display:flex; align-items:center; gap:12px; padding:18px; background:#fff; border-bottom:1px solid var(--line); }
     .logo { display:grid; place-items:center; width:36px; height:36px; color:#fff; background:var(--red); font-size:20px; font-weight:800; }
     .eyebrow { margin:0 0 2px; color:var(--red); font-size:9px; font-weight:800; letter-spacing:.16em; }
+    .settings-link { margin-left:auto; padding:8px 10px; border:1px solid var(--line); border-radius:4px; color:var(--ink); background:#fff; font-size:11px; font-weight:700; text-decoration:none; }
+    .settings-link:hover, .settings-link:focus-visible { border-color:var(--red); outline:none; }
     h1 { margin:0; font-size:18px; }
     main { padding:20px 18px 92px; }
     .section-title { display:flex; align-items:end; justify-content:space-between; margin:0 0 14px; }
@@ -40,6 +43,7 @@
   <header>
     <div class="logo" aria-hidden="true">A</div>
     <div><p class="eyebrow">ATTENSAM</p><h1>Signatur erstellen</h1></div>
+    <a class="settings-link" href="settings.html" aria-label="Einstellungen öffnen">⚙ Einstellungen</a>
   </header>
 
   <main>

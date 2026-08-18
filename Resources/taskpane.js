@@ -1,8 +1,9 @@
-/* global Office, msal */
+/* global Office, msal, SignaturePreferences */
 
 const CONFIG = {
   clientId: "89659501-37e7-4916-abeb-4dc5178e3034",
   tenantId: "https://login.microsoftonline.com/1333c2c2-fdf6-4fdc-8559-3dc12559d264",
+  officeNumber: "YOUR_FIXED_OFFICE_NUMBER",
 };
 
 const profile = {
@@ -14,6 +15,7 @@ const profile = {
 let signatureTemplate = "";
 let msalInstance;
 let profileLoaded = false;
+let signatureSettings = { Nummer: "Alles", MfG: "MfG1" };
 
 const statusElement = document.getElementById("status");
 const previewElement = document.getElementById("signature-preview");
@@ -33,10 +35,36 @@ function escapeHtml(value) {
 function phoneLine() {
   const phone = escapeHtml(profile.phone.trim());
   const mobile = escapeHtml(profile.mobile.trim());
-  if (phone && mobile) return `Tel.: ${phone}&nbsp;&nbsp;Mobil: ${mobile}`;
-  if (mobile) return `Mobil ${mobile}`;
-  if (phone) return `Tel.: ${phone}`;
-  return "";
+  const officeNumber = CONFIG.officeNumber.includes("YOUR_")
+    ? ""
+    : escapeHtml(CONFIG.officeNumber.trim());
+
+  switch (signatureSettings.Nummer) {
+    case "Handy":
+      return mobile ? `Mobil ${mobile}` : "";
+    case "Festnetz":
+      return phone ? `Tel.: ${phone}` : "";
+    case "Office":
+      return officeNumber ? `Office: ${officeNumber}` : "";
+    default:
+      if (phone && mobile) return `Tel.: ${phone}&nbsp;&nbsp;Mobil: ${mobile}`;
+      if (mobile) return `Mobil ${mobile}`;
+      if (phone) return `Tel.: ${phone}`;
+      return "";
+  }
+}
+
+function greetingHtml() {
+  let greeting = "";
+  if (signatureSettings.MfG === "MfG1") {
+    greeting = "Mit freundlichen Grüßen";
+  } else if (signatureSettings.MfG === "MfG2") {
+    greeting = "Freundliche Grüße";
+  } else if (signatureSettings.MfG === "MfG3") {
+    greeting = "LG";
+  }
+  if (!greeting) return "";
+  return `<p style="font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);">${escapeHtml(greeting)}</p>`;
 }
 
 function bannerForCity() {
@@ -47,24 +75,31 @@ function bannerForCity() {
   if (city === "st. pölten-radlberg" || city === "Krems an der Donau") {
     return '<p style="font-size: 12pt; font-family: Aptos, Arial, sans-serif; color: rgb(0, 0, 0);"><a href="https://www.attensam.at/banner_noe_nord" title="" style="font-family: Arial; font-size: 10pt;"><img src="https://storage.googleapis.com/signaturen-attensam-at/images/banner_noe_nord.png" border="0" alt="Banner Niederösterreich Nord"></a></p>';
   }
+ 
   if (city === "Wr. Neustadt") {
     return '<p style="font-size: 12pt; font-family: Aptos, Arial, sans-serif; color: rgb(0, 0, 0);"><a href="https://www.attensam.at/banner_noe_sued" title="" style="font-family: Arial; font-size: 10pt;"><img src="https://storage.googleapis.com/signaturen-attensam-at/images/banner_noe_sued.png" border="0" alt="Banner Niederösterreich Nord"></a></p>';
   }
+  
   if (city === "Neusiedl am See" || city === "Oberwart") {
     return '<p style="font-size: 12pt; font-family: Aptos, Arial, sans-serif; color: rgb(0, 0, 0);"><a href="https://www.attensam.at/banner_bgld" title="" style="font-family: Arial; font-size: 10pt;"><img src="https://storage.googleapis.com/signaturen-attensam-at/images/banner_bgld.png" border="0" alt="Banner Niederösterreich Nord"></a></p>';
   }
+  
   if (city === "Klagenfurt") {
     return '<p style="font-size: 12pt; font-family: Aptos, Arial, sans-serif; color: rgb(0, 0, 0);"><a href="https://www.attensam.at/banner_ktn" title="" style="font-family: Arial; font-size: 10pt;"><img src="https://storage.googleapis.com/signaturen-attensam-at/images/banner_ktn.png" border="0" alt="Banner Niederösterreich Nord"></a></p>';
   }
+  
   if (city === "Kalsdorf" || city === "Graz" || city == "Leoben") {
     return '<p style="font-size: 12pt; font-family: Aptos, Arial, sans-serif; color: rgb(0, 0, 0);"><a href="https://www.attensam.at/banner_stmk" title="" style="font-family: Arial; font-size: 10pt;"><img src="https://storage.googleapis.com/signaturen-attensam-at/images/banner_stmk.png" border="0" alt="Banner Niederösterreich Nord"></a></p>';
   }
+  
   if (city === "Linz" || city === "Regau") {
     return '<p style="font-size: 12pt; font-family: Aptos, Arial, sans-serif; color: rgb(0, 0, 0);"><a href="https://www.attensam.at/banner_ooe" title="" style="font-family: Arial; font-size: 10pt;"><img src="https://storage.googleapis.com/signaturen-attensam-at/images/banner_ooe.png" border="0" alt="Banner Niederösterreich Nord"></a></p>';
   }
+  
   if (city === "Salzburg" || city === "Bruck an der Großglocknerstraße") {
     return '<p style="font-size: 12pt; font-family: Aptos, Arial, sans-serif; color: rgb(0, 0, 0);"><a href="https://www.attensam.at/banner_sbg" title="" style="font-family: Arial; font-size: 10pt;"><img src="https://storage.googleapis.com/signaturen-attensam-at/images/banner_sbg.png" border="0" alt="Banner Niederösterreich Nord"></a></p>';
   }
+  
   if (city === "Innsbruck") {
     return '<p style="font-size: 12pt; font-family: Aptos, Arial, sans-serif; color: rgb(0, 0, 0);"><a href="https://www.attensam.at/banner_t" title="" style="font-family: Arial; font-size: 10pt;"><img src="https://storage.googleapis.com/signaturen-attensam-at/images/banner_t.png" border="0" alt="Banner Niederösterreich Nord"></a></p>';
   }
@@ -107,12 +142,12 @@ function renderSignature() {
     CustomAttribute10: profile.customAttribute10,
     CustomAttribute11: profile.customAttribute11,
   };
-  const html = signatureTemplate.replace(/\{([^{}]+)\}/g, (match, key) => {
+  const signatureBody = signatureTemplate.replace(/\{([^{}]+)\}/g, (match, key) => {
     if (key === "Phone Mobile Office Number") return phoneLine();
     if (key === "Banner") return bannerForCity();
-    if (key === "MfG") return match;
     return Object.hasOwn(values, key) ? escapeHtml(values[key]) : match;
   });
+  const html = greetingHtml() + signatureBody;
   previewElement.innerHTML = html;
   previewElement.querySelectorAll("img").forEach((image) => {
     if (!image.complete) image.addEventListener("load", scaleSignaturePreview, { once: true });
@@ -235,6 +270,7 @@ async function initialize() {
       if (!response.ok) throw new Error("template.html konnte nicht geladen werden.");
       return response.text();
     });
+    signatureSettings = await SignaturePreferences.getSettings();
     applyMailboxBasics();
     await loadProfile();
   } catch (error) {
