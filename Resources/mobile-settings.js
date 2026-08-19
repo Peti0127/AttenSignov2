@@ -10,6 +10,10 @@ const AUTO_RENDER_DATA_KEY = "attensam.signature.render-data.v1";
 const phoneModeSelect = document.getElementById("phone-mode");
 const edvHotlineOption = document.getElementById("edv-hotline-option");
 const greetingModeSelect = document.getElementById("greeting-mode");
+const titleBeforeField = document.getElementById("title-before-field");
+const insertTitleBeforeCheckbox = document.getElementById("insert-title-before");
+const titleAfterField = document.getElementById("title-after-field");
+const insertTitleAfterCheckbox = document.getElementById("insert-title-after");
 const autoInsertCheckbox = document.getElementById("auto-insert");
 const autoInsertModeField = document.getElementById("auto-insert-mode-field");
 const autoInsertModeSelect = document.getElementById("auto-insert-mode");
@@ -28,6 +32,8 @@ function setSettingsStatus(message) {
 function setControlsDisabled(disabled) {
   phoneModeSelect.disabled = disabled;
   greetingModeSelect.disabled = disabled;
+  insertTitleBeforeCheckbox.disabled = disabled;
+  insertTitleAfterCheckbox.disabled = disabled;
   autoInsertCheckbox.disabled = disabled;
   autoInsertModeSelect.disabled = disabled;
 }
@@ -46,12 +52,16 @@ function updateDepartmentOption(department) {
   return canUseEdvHotline;
 }
 
-function showSettings(settings, department) {
+function showSettings(settings, department, titleAttributes) {
   const canUseEdvHotline = updateDepartmentOption(department);
   phoneModeSelect.value = settings.Nummer === "EDVHotline" && !canUseEdvHotline
     ? "Alles"
     : settings.Nummer;
   greetingModeSelect.value = settings.MfG;
+  titleBeforeField.hidden = !titleAttributes.customAttribute10;
+  titleAfterField.hidden = !titleAttributes.customAttribute11;
+  insertTitleBeforeCheckbox.checked = settings.InsertTitleBefore;
+  insertTitleAfterCheckbox.checked = settings.InsertTitleAfter;
   autoInsertCheckbox.checked = settings.AutoInsert;
   autoInsertModeSelect.value = settings.AutoInsertMode;
   updateAutoInsertVisibility();
@@ -136,7 +146,11 @@ async function initializeSettings() {
   setControlsDisabled(true);
   try {
     currentSettings = await SignaturePreferences.getSettings();
-    showSettings(currentSettings, SignaturePreferences.getDepartment());
+    showSettings(
+      currentSettings,
+      SignaturePreferences.getDepartment(),
+      SignaturePreferences.getTitleAttributes(),
+    );
     setSettingsStatus("Microsoft-365-Profil wird geladen …");
     [signatureTemplate, currentProfile] = await Promise.all([
       fetch("template.html", { cache: "no-store" }).then((response) => {
@@ -146,7 +160,11 @@ async function initializeSettings() {
       loadProfile(),
     ]);
     SignaturePreferences.setDepartment(currentProfile.department);
-    showSettings(currentSettings, currentProfile.department);
+    SignaturePreferences.setTitleAttributes(
+      currentProfile.customAttribute10,
+      currentProfile.customAttribute11,
+    );
+    showSettings(currentSettings, currentProfile.department, currentProfile);
     await saveAutomaticRenderData();
     setControlsDisabled(false);
     setSettingsStatus("Profil und Einstellungen sind bereit.");
@@ -164,6 +182,8 @@ async function saveSettings() {
       MfG: greetingModeSelect.value,
       AutoInsert: autoInsertCheckbox.checked,
       AutoInsertMode: autoInsertModeSelect.value,
+      InsertTitleBefore: insertTitleBeforeCheckbox.checked,
+      InsertTitleAfter: insertTitleAfterCheckbox.checked,
     });
     setSettingsStatus("Einstellungen gespeichert.");
   } catch (error) {
@@ -175,6 +195,8 @@ async function saveSettings() {
 
 phoneModeSelect.addEventListener("change", saveSettings);
 greetingModeSelect.addEventListener("change", saveSettings);
+insertTitleBeforeCheckbox.addEventListener("change", saveSettings);
+insertTitleAfterCheckbox.addEventListener("change", saveSettings);
 autoInsertCheckbox.addEventListener("change", () => {
   updateAutoInsertVisibility();
   saveSettings();

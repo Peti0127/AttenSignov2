@@ -5,12 +5,15 @@
   const RENDER_DATA_KEY = "attensam.signature.render-data.v1";
   const CACHE_PREFIX = "attensam.signature.settings.v2";
   const DEPARTMENT_CACHE_PREFIX = "attensam.signature.department.v1";
+  const TITLE_ATTRIBUTES_CACHE_PREFIX = "attensam.signature.title-attributes.v1";
   const LEGACY_PHONE_PREFIX = "attensam.signature.phone-mode";
   const DEFAULT_SETTINGS = Object.freeze({
     Nummer: "Alles",
     MfG: "MfG1",
     AutoInsert: false,
     AutoInsertMode: "NewMail",
+    InsertTitleBefore: false,
+    InsertTitleAfter: false,
   });
   const ALLOWED_NUMBERS = new Set(["Alles", "Handy", "Festnetz", "Office", "EDVHotline"]);
   const ALLOWED_GREETINGS = new Set(["MfG0", "MfG1", "MfG2", "MfG3"]);
@@ -39,6 +42,10 @@
     return `${DEPARTMENT_CACHE_PREFIX}:${currentUserKey()}`;
   }
 
+  function titleAttributesStorageKey() {
+    return `${TITLE_ATTRIBUTES_CACHE_PREFIX}:${currentUserKey()}`;
+  }
+
   function setDepartment(department) {
     localStorage.setItem(departmentStorageKey(), String(department || "").trim());
   }
@@ -52,6 +59,37 @@
     return department;
   }
 
+  function setTitleAttributes(customAttribute10, customAttribute11) {
+    localStorage.setItem(titleAttributesStorageKey(), JSON.stringify({
+      customAttribute10: String(customAttribute10 || "").trim(),
+      customAttribute11: String(customAttribute11 || "").trim(),
+    }));
+  }
+
+  function getTitleAttributes() {
+    const cached = localStorage.getItem(titleAttributesStorageKey());
+    if (cached) {
+      try {
+        const value = JSON.parse(cached);
+        return {
+          customAttribute10: String(value?.customAttribute10 || "").trim(),
+          customAttribute11: String(value?.customAttribute11 || "").trim(),
+        };
+      } catch {
+        localStorage.removeItem(titleAttributesStorageKey());
+      }
+    }
+    const renderData = Office.context.roamingSettings?.get(RENDER_DATA_KEY);
+    const result = {
+      customAttribute10: String(renderData?.profile?.customAttribute10 || "").trim(),
+      customAttribute11: String(renderData?.profile?.customAttribute11 || "").trim(),
+    };
+    if (result.customAttribute10 || result.customAttribute11) {
+      setTitleAttributes(result.customAttribute10, result.customAttribute11);
+    }
+    return result;
+  }
+
   function normalizeRecord(value) {
     if (!value || typeof value !== "object") return null;
     return {
@@ -61,6 +99,8 @@
       AutoInsertMode: ALLOWED_AUTO_MODES.has(value?.AutoInsertMode)
         ? value.AutoInsertMode
         : DEFAULT_SETTINGS.AutoInsertMode,
+      InsertTitleBefore: value.InsertTitleBefore === true,
+      InsertTitleAfter: value.InsertTitleAfter === true,
       updatedAt: Number.isFinite(Date.parse(value.updatedAt)) ? value.updatedAt : "",
     };
   }
@@ -87,6 +127,8 @@
       MfG: record.MfG,
       AutoInsert: record.AutoInsert,
       AutoInsertMode: record.AutoInsertMode,
+      InsertTitleBefore: record.InsertTitleBefore,
+      InsertTitleAfter: record.InsertTitleAfter,
     };
   }
 
@@ -111,6 +153,8 @@
       MfG: DEFAULT_SETTINGS.MfG,
       AutoInsert: DEFAULT_SETTINGS.AutoInsert,
       AutoInsertMode: DEFAULT_SETTINGS.AutoInsertMode,
+      InsertTitleBefore: DEFAULT_SETTINGS.InsertTitleBefore,
+      InsertTitleAfter: DEFAULT_SETTINGS.InsertTitleAfter,
     };
   }
 
@@ -120,6 +164,8 @@
       || !ALLOWED_GREETINGS.has(settings?.MfG)
       || typeof settings?.AutoInsert !== "boolean"
       || !ALLOWED_AUTO_MODES.has(settings?.AutoInsertMode)
+      || typeof settings?.InsertTitleBefore !== "boolean"
+      || typeof settings?.InsertTitleAfter !== "boolean"
     ) {
       throw new Error("Ungültige Einstellung.");
     }
@@ -128,6 +174,8 @@
       MfG: settings.MfG,
       AutoInsert: settings.AutoInsert,
       AutoInsertMode: settings.AutoInsertMode,
+      InsertTitleBefore: settings.InsertTitleBefore,
+      InsertTitleAfter: settings.InsertTitleAfter,
       updatedAt: new Date().toISOString(),
     };
     const roamingSettings = Office.context.roamingSettings;
@@ -158,5 +206,7 @@
     saveSettings,
     getDepartment,
     setDepartment,
+    getTitleAttributes,
+    setTitleAttributes,
   });
 })(window);

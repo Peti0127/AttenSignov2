@@ -13,6 +13,8 @@ Key: `attensam.signature.settings.v2`
   "MfG": "MfG1",
   "AutoInsert": false,
   "AutoInsertMode": "NewMail",
+  "InsertTitleBefore": false,
+  "InsertTitleAfter": false,
   "updatedAt": "2026-08-18T12:00:00.000Z"
 }
 ```
@@ -23,9 +25,17 @@ Allowed values:
 - `MfG`: `MfG0`, `MfG1`, `MfG2`, `MfG3`
 - `AutoInsert`: `true` or `false`
 - `AutoInsertMode`: `NewMail` or `AllMail`
+- `InsertTitleBefore`: `true` or `false`
+- `InsertTitleAfter`: `true` or `false`
 
 `MfG0` means no greeting. The other values render the configured greeting and
 one blank line before the signature details.
+
+`InsertTitleBefore` inserts `extensionAttribute10` before the first name, and
+`InsertTitleAfter` inserts `extensionAttribute11` after the last name. Each
+checkbox is shown only when the corresponding Microsoft 365 profile attribute
+contains a value. The add-in normalizes the surrounding spaces, so titles are
+separated cleanly from the name regardless of whitespace stored in Graph.
 
 `EDVHotline` is shown in the settings only when the Microsoft 365 profile's
 `department` value equals `IT`. It renders `Tel. 05 7999 9999 Mobil {Mobile}`;
@@ -48,15 +58,29 @@ cross-client source of truth.
 The task pane stores the profile and unrendered signature template under
 `attensam.signature.render-data.v1`. The lightweight event runtime renders that
 data with the user's current settings whenever Outlook creates a compose item.
+The same render-data record also contains a timestamped copy of all preferences.
+Every settings save updates both roaming records in one `saveAsync` operation.
+The automatic runtime selects the newest timestamped copy, preventing an older
+`Nummer` value from falling back to `Alles` while the task pane already shows
+the new selection.
 
 - `NewMail` inserts only when `getComposeTypeAsync()` returns `newMail`.
 - `AllMail` inserts for new messages, replies, reply-all messages, and forwards.
 - Editing an existing draft doesn't trigger `OnNewMessageCompose`.
 
-The automatic feature requires Mailbox requirement set 1.10 and the
-`VersionOverridesV1_1` launch-event configuration in `manifest.xml`. Upload
+The automatic feature uses APIs introduced after Mailbox requirement set 1.5.
+Outlook Mobile exposes the required launch-event, `setSignatureAsync`, and
+`getComposeTypeAsync` APIs as documented mobile exceptions. The
+`VersionOverridesV1_1` configuration in `manifest.xml` registers the event for
+both desktop and mobile. Upload
 `autorun.html` and `autorun.js` to the same GitHub Pages `Resources` directory
 as the task-pane files before installing the updated manifest.
+
+On Outlook Mobile, open the `Einstellungen` command while reading a message.
+The full-screen `mobile-settings.html` page retrieves the same Microsoft Graph
+profile and template as the desktop task pane, then refreshes
+`attensam.signature.render-data.v1`. This means a user can initialize and
+manage automatic insertion entirely from Outlook Mobile.
 
 The event runtime intentionally avoids `async`/`await` and the conditional
 operator so it can load in classic Outlook builds that use the older event

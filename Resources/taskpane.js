@@ -16,7 +16,12 @@ const profile = {
 let signatureTemplate = "";
 let msalInstance;
 let profileLoaded = false;
-let signatureSettings = { Nummer: "Alles", MfG: "MfG1" };
+let signatureSettings = {
+  Nummer: "Alles",
+  MfG: "MfG1",
+  InsertTitleBefore: false,
+  InsertTitleAfter: false,
+};
 
 const statusElement = document.getElementById("status");
 const previewElement = document.getElementById("signature-preview");
@@ -141,13 +146,19 @@ function scaleSignaturePreview() {
 }
 
 function renderSignature() {
+  const titleBefore = signatureSettings.InsertTitleBefore && profile.customAttribute10.trim()
+    ? `${profile.customAttribute10.trim()} `
+    : "";
+  const titleAfter = signatureSettings.InsertTitleAfter && profile.customAttribute11.trim()
+    ? ` ${profile.customAttribute11.trim()}`
+    : "";
   const values = {
     FirstName: profile.firstName, LastName: profile.lastName,
     Company: profile.company, City: profile.city, Street: profile.street,
     PostalCode: profile.postalCode, JobTitle: profile.jobTitle,
     "E-mail": profile.email, Mobile: profile.mobile, Phone: profile.phone,
-    CustomAttribute10: profile.customAttribute10,
-    CustomAttribute11: profile.customAttribute11,
+    CustomAttribute10: titleBefore,
+    CustomAttribute11: titleAfter,
   };
   const signatureBody = signatureTemplate.replace(/\{([^{}]+)\}/g, (match, key) => {
     if (key === "Phone Mobile Office Number") return phoneLine();
@@ -258,6 +269,7 @@ async function loadProfile() {
       customAttribute11: user.onPremisesExtensionAttributes?.extensionAttribute11 || "",
     });
     SignaturePreferences.setDepartment(profile.department);
+    SignaturePreferences.setTitleAttributes(profile.customAttribute10, profile.customAttribute11);
     profileLoaded = true;
     showProfile();
     try {

@@ -89,6 +89,14 @@ function bannerForCity(cityValue) {
 
 function renderSignature(renderData, settings) {
   const profile = renderData.profile;
+  let titleBefore = "";
+  let titleAfter = "";
+  if (settings.InsertTitleBefore === true && String(profile.customAttribute10 || "").trim()) {
+    titleBefore = `${String(profile.customAttribute10).trim()} `;
+  }
+  if (settings.InsertTitleAfter === true && String(profile.customAttribute11 || "").trim()) {
+    titleAfter = ` ${String(profile.customAttribute11).trim()}`;
+  }
   const values = {
     FirstName: profile.firstName,
     LastName: profile.lastName,
@@ -100,8 +108,8 @@ function renderSignature(renderData, settings) {
     "E-mail": profile.email,
     Mobile: profile.mobile,
     Phone: profile.phone,
-    CustomAttribute10: profile.customAttribute10,
-    CustomAttribute11: profile.customAttribute11,
+    CustomAttribute10: titleBefore,
+    CustomAttribute11: titleAfter,
   };
   const signatureBody = renderData.template.replace(/\{([^{}]+)\}/g, (match, key) => {
     if (key === "Phone Mobile Office Number") {
