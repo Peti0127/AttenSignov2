@@ -13,13 +13,23 @@ function escapeHtml(value) {
 function phoneLine(profile, settings, officeNumberValue) {
   const phone = escapeHtml(String(profile.phone || "").trim());
   const mobile = escapeHtml(String(profile.mobile || "").trim());
-  const officeNumber = String(officeNumberValue || "").includes("YOUR_")
-    ? ""
-    : escapeHtml(String(officeNumberValue || "").trim());
+  let officeNumber = "";
+  if (!String(officeNumberValue || "").includes("YOUR_")) {
+    officeNumber = escapeHtml(String(officeNumberValue || "").trim());
+  }
 
-  if (settings.Nummer === "Handy") return mobile ? `Mobil ${mobile}` : "";
-  if (settings.Nummer === "Festnetz") return phone ? `Tel.: ${phone}` : "";
-  if (settings.Nummer === "Office") return officeNumber ? `Office: ${officeNumber}` : "";
+  if (settings.Nummer === "Handy") {
+    if (mobile) return `Mobil ${mobile}`;
+    return "";
+  }
+  if (settings.Nummer === "Festnetz") {
+    if (phone) return `Tel.: ${phone}`;
+    return "";
+  }
+  if (settings.Nummer === "Office") {
+    if (officeNumber) return `Office: ${officeNumber}`;
+    return "";
+  }
   if (phone && mobile) return `Tel.: ${phone}&nbsp;&nbsp;Mobil: ${mobile}`;
   if (mobile) return `Mobil ${mobile}`;
   if (phone) return `Tel.: ${phone}`;
@@ -91,50 +101,77 @@ function renderSignature(renderData, settings) {
       return phoneLine(profile, settings, renderData.officeNumber);
     }
     if (key === "Banner") return bannerForCity(profile.city);
-    return Object.prototype.hasOwnProperty.call(values, key) ? escapeHtml(values[key]) : match;
+    if (Object.prototype.hasOwnProperty.call(values, key)) return escapeHtml(values[key]);
+    return match;
   });
   return greetingHtml(settings) + signatureBody;
 }
 
-function getComposeType() {
-  return new Promise((resolve, reject) => {
-    Office.context.mailbox.item.getComposeTypeAsync((result) => {
-      if (result.status === Office.AsyncResultStatus.Succeeded) resolve(result.value.composeType);
-      else reject(result.error);
-    });
-  });
+function completeEvent(event) {
+  event.completed();
 }
 
-function setSignature(html) {
-  return new Promise((resolve, reject) => {
+function insertCachedSignature(event, settings) {
+  let renderData;
+  let html;
+  try {
+    renderData = Office.context.roamingSettings.get(RENDER_DATA_KEY);
+    if (!renderData || !renderData.profile || typeof renderData.template !== "string") {
+      completeEvent(event);
+      return;
+    }
+    html = renderSignature(renderData, settings);
+  } catch (error) {
+    console.error("Automatische Signatur konnte nicht erstellt werden.", error);
+    completeEvent(event);
+    return;
+  }
+
+  try {
     Office.context.mailbox.item.body.setSignatureAsync(
       html,
       { coercionType: Office.CoercionType.Html },
-      (result) => {
-        if (result.status === Office.AsyncResultStatus.Succeeded) resolve();
-        else reject(result.error);
-      },
+      function onSignatureSet(result) {
+        if (result.status !== Office.AsyncResultStatus.Succeeded) {
+          console.error("Automatische Signatur konnte nicht eingefügt werden.", result.error);
+        }
+        completeEvent(event);
+      }
     );
-  });
-}
-
-async function autoInsertSignature(event) {
-  try {
-    const settings = Office.context.roamingSettings.get(SETTINGS_KEY);
-    if (!settings || settings.AutoInsert !== true) return;
-
-    if (settings.AutoInsertMode !== "AllMail") {
-      const composeType = await getComposeType();
-      if (composeType !== "newMail") return;
-    }
-
-    const renderData = Office.context.roamingSettings.get(RENDER_DATA_KEY);
-    if (!renderData || !renderData.profile || typeof renderData.template !== "string") return;
-    await setSignature(renderSignature(renderData, settings));
   } catch (error) {
     console.error("Automatische Signatur konnte nicht eingefügt werden.", error);
-  } finally {
-    event.completed();
+    completeEvent(event);
+  }
+}
+
+function autoInsertSignature(event) {
+  let settings;
+  try {
+    settings = Office.context.roamingSettings.get(SETTINGS_KEY);
+    if (!settings || settings.AutoInsert !== true) {
+      completeEvent(event);
+      return;
+    }
+
+    if (settings.AutoInsertMode === "AllMail") {
+      insertCachedSignature(event, settings);
+      return;
+    }
+
+    Office.context.mailbox.item.getComposeTypeAsync(function onComposeType(result) {
+      if (
+        result.status !== Office.AsyncResultStatus.Succeeded
+        || !result.value
+        || result.value.composeType !== "newMail"
+      ) {
+        completeEvent(event);
+        return;
+      }
+      insertCachedSignature(event, settings);
+    });
+  } catch (error) {
+    console.error("Automatische Signatur konnte nicht eingefügt werden.", error);
+    completeEvent(event);
   }
 }
 
