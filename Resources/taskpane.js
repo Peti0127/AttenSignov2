@@ -174,6 +174,8 @@ async function saveAutoRenderData() {
     profile: { ...profile },
     template: signatureTemplate,
     officeNumber: CONFIG.officeNumber,
+    settings: { ...signatureSettings },
+    settingsUpdatedAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   });
   await new Promise((resolve, reject) => {

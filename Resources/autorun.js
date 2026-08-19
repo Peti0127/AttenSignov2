@@ -118,11 +118,28 @@ function completeEvent(event) {
   event.completed();
 }
 
-function insertCachedSignature(event, settings) {
-  let renderData;
+function settingsTime(value) {
+  const parsed = Date.parse(value || "");
+  if (Number.isFinite(parsed)) return parsed;
+  return 0;
+}
+
+function synchronizedSettings(savedSettings, renderData) {
+  let result = savedSettings;
+  if (renderData && renderData.settings) {
+    if (
+      !result
+      || settingsTime(renderData.settingsUpdatedAt) >= settingsTime(result.updatedAt)
+    ) {
+      result = renderData.settings;
+    }
+  }
+  return result;
+}
+
+function insertCachedSignature(event, settings, renderData) {
   let html;
   try {
-    renderData = Office.context.roamingSettings.get(RENDER_DATA_KEY);
     if (!renderData || !renderData.profile || typeof renderData.template !== "string") {
       completeEvent(event);
       return;
@@ -153,15 +170,20 @@ function insertCachedSignature(event, settings) {
 
 function autoInsertSignature(event) {
   let settings;
+  let renderData;
   try {
-    settings = Office.context.roamingSettings.get(SETTINGS_KEY);
+    renderData = Office.context.roamingSettings.get(RENDER_DATA_KEY);
+    settings = synchronizedSettings(
+      Office.context.roamingSettings.get(SETTINGS_KEY),
+      renderData
+    );
     if (!settings || settings.AutoInsert !== true) {
       completeEvent(event);
       return;
     }
 
     if (settings.AutoInsertMode === "AllMail") {
-      insertCachedSignature(event, settings);
+      insertCachedSignature(event, settings, renderData);
       return;
     }
 
@@ -174,7 +196,7 @@ function autoInsertSignature(event) {
         completeEvent(event);
         return;
       }
-      insertCachedSignature(event, settings);
+      insertCachedSignature(event, settings, renderData);
     });
   } catch (error) {
     console.error("Automatische Signatur konnte nicht eingefügt werden.", error);

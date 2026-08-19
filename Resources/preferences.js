@@ -134,6 +134,14 @@
     if (!roamingSettings) throw new Error("Outlook RoamingSettings ist nicht verfügbar.");
 
     roamingSettings.set(ROAMING_KEY, record);
+    const existingRenderData = roamingSettings.get(RENDER_DATA_KEY);
+    if (existingRenderData && typeof existingRenderData === "object") {
+      roamingSettings.set(RENDER_DATA_KEY, {
+        ...existingRenderData,
+        settings: publicSettings(record),
+        settingsUpdatedAt: record.updatedAt,
+      });
+    }
     await new Promise((resolve, reject) => {
       roamingSettings.saveAsync((result) => {
         if (result.status === Office.AsyncResultStatus.Succeeded) resolve();
