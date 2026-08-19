@@ -30,10 +30,10 @@ function phoneLine(profile, settings, officeNumberValue) {
     if (officeNumber) return `Office: ${officeNumber}`;
     return "";
   }
-  if (
-    settings.Nummer === "EDVHotline"
-    && String(profile.department || "").trim().toLocaleUpperCase("de-AT") === "IT"
-  ) {
+  // The settings page already restricts this value to users in department IT.
+  // Don't re-check an older cached profile here, because it may predate the
+  // addition of the department field.
+  if (settings.Nummer === "EDVHotline") {
     if (mobile) return `Tel. 05 7999 9999 Mobil ${mobile}`;
     return "Tel. 05 7999 9999";
   }

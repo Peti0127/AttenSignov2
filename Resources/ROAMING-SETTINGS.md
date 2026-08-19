@@ -19,13 +19,21 @@ Key: `attensam.signature.settings.v2`
 
 Allowed values:
 
-- `Nummer`: `Alles`, `Handy`, `Festnetz`, `Office`
+- `Nummer`: `Alles`, `Handy`, `Festnetz`, `Office`, `EDVHotline`
 - `MfG`: `MfG0`, `MfG1`, `MfG2`, `MfG3`
 - `AutoInsert`: `true` or `false`
 - `AutoInsertMode`: `NewMail` or `AllMail`
 
 `MfG0` means no greeting. The other values render the configured greeting and
 one blank line before the signature details.
+
+`EDVHotline` is shown in the settings only when the Microsoft 365 profile's
+`department` value equals `IT`. It renders `Tel. 05 7999 9999 Mobil {Mobile}`;
+if the profile has no mobile number, only `Tel. 05 7999 9999` is rendered. If a
+user's department later changes away from IT, the option is no longer offered
+in Settings. The automatic runtime treats an already saved `EDVHotline` value
+as authoritative so that an older cached profile can't incorrectly replace it
+with the standard `Alles` phone line.
 
 ## Local cache
 
@@ -49,6 +57,12 @@ The automatic feature requires Mailbox requirement set 1.10 and the
 `VersionOverridesV1_1` launch-event configuration in `manifest.xml`. Upload
 `autorun.html` and `autorun.js` to the same GitHub Pages `Resources` directory
 as the task-pane files before installing the updated manifest.
+
+The event runtime intentionally avoids `async`/`await` and the conditional
+operator so it can load in classic Outlook builds that use the older event
+runtime. After changing the manifest, remove the installed add-in, sideload the
+new manifest, and restart Outlook so the launch-event registration and runtime
+bundle are refreshed.
 
 No SQL database, API endpoint, database credentials, or additional Microsoft
 Graph permission is required for these preferences.
