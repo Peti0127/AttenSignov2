@@ -1,6 +1,7 @@
 /* global Office, SignaturePreferences */
 
 const phoneModeSelect = document.getElementById("phone-mode");
+const edvHotlineOption = document.getElementById("edv-hotline-option");
 const greetingModeSelect = document.getElementById("greeting-mode");
 const autoInsertCheckbox = document.getElementById("auto-insert");
 const autoInsertModeField = document.getElementById("auto-insert-mode-field");
@@ -19,7 +20,13 @@ function updateAutoInsertVisibility() {
 async function initializeSettings() {
   try {
     currentSettings = await SignaturePreferences.getSettings();
-    phoneModeSelect.value = currentSettings.Nummer;
+    const department = SignaturePreferences.getDepartment();
+    const canUseEdvHotline = department.trim().toLocaleUpperCase("de-AT") === "IT";
+    edvHotlineOption.hidden = !canUseEdvHotline;
+    edvHotlineOption.disabled = !canUseEdvHotline;
+    phoneModeSelect.value = currentSettings.Nummer === "EDVHotline" && !canUseEdvHotline
+      ? "Alles"
+      : currentSettings.Nummer;
     greetingModeSelect.value = currentSettings.MfG;
     autoInsertCheckbox.checked = currentSettings.AutoInsert;
     autoInsertModeSelect.value = currentSettings.AutoInsertMode;

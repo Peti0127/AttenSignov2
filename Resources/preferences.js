@@ -2,7 +2,9 @@
 
 (function exposeSignaturePreferences(global) {
   const ROAMING_KEY = "attensam.signature.settings.v2";
+  const RENDER_DATA_KEY = "attensam.signature.render-data.v1";
   const CACHE_PREFIX = "attensam.signature.settings.v2";
+  const DEPARTMENT_CACHE_PREFIX = "attensam.signature.department.v1";
   const LEGACY_PHONE_PREFIX = "attensam.signature.phone-mode";
   const DEFAULT_SETTINGS = Object.freeze({
     Nummer: "Alles",
@@ -10,7 +12,7 @@
     AutoInsert: false,
     AutoInsertMode: "NewMail",
   });
-  const ALLOWED_NUMBERS = new Set(["Alles", "Handy", "Festnetz", "Office"]);
+  const ALLOWED_NUMBERS = new Set(["Alles", "Handy", "Festnetz", "Office", "EDVHotline"]);
   const ALLOWED_GREETINGS = new Set(["MfG0", "MfG1", "MfG2", "MfG3"]);
   const ALLOWED_AUTO_MODES = new Set(["NewMail", "AllMail"]);
   const LEGACY_NUMBER_MAP = Object.freeze({
@@ -31,6 +33,23 @@
 
   function storageKey() {
     return `${CACHE_PREFIX}:${currentUserKey()}`;
+  }
+
+  function departmentStorageKey() {
+    return `${DEPARTMENT_CACHE_PREFIX}:${currentUserKey()}`;
+  }
+
+  function setDepartment(department) {
+    localStorage.setItem(departmentStorageKey(), String(department || "").trim());
+  }
+
+  function getDepartment() {
+    const cached = localStorage.getItem(departmentStorageKey());
+    if (cached) return cached;
+    const renderData = Office.context.roamingSettings?.get(RENDER_DATA_KEY);
+    const department = String(renderData?.profile?.department || "").trim();
+    if (department) setDepartment(department);
+    return department;
   }
 
   function normalizeRecord(value) {
@@ -126,5 +145,10 @@
     return publicSettings(record);
   }
 
-  global.SignaturePreferences = Object.freeze({ getSettings, saveSettings });
+  global.SignaturePreferences = Object.freeze({
+    getSettings,
+    saveSettings,
+    getDepartment,
+    setDepartment,
+  });
 })(window);

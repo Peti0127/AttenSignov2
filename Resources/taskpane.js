@@ -10,7 +10,7 @@ const AUTO_RENDER_DATA_KEY = "attensam.signature.render-data.v1";
 const profile = {
   firstName: "", lastName: "", jobTitle: "", company: "",
   email: "", phone: "", mobile: "", street: "",
-  postalCode: "", city: "", customAttribute10: "",
+  postalCode: "", city: "", department: "", customAttribute10: "",
   customAttribute11: "",
 };
 let signatureTemplate = "";
@@ -47,6 +47,11 @@ function phoneLine() {
       return phone ? `Tel.: ${phone}` : "";
     case "Office":
       return officeNumber ? `Office: ${officeNumber}` : "";
+    case "EDVHotline":
+      if (profile.department.trim().toLocaleUpperCase("de-AT") === "IT") {
+        return mobile ? `Tel. 05 7999 9999 Mobil ${mobile}` : "Tel. 05 7999 9999";
+      }
+      // If the department changed, fall back to the standard phone line.
     default:
       if (phone && mobile) return `Tel.: ${phone}&nbsp;&nbsp;Mobil: ${mobile}`;
       if (mobile) return `Mobil ${mobile}`;
@@ -227,7 +232,7 @@ async function loadProfile() {
     const select = [
       "givenName", "surname", "displayName", "mail", "userPrincipalName",
       "companyName", "city", "streetAddress", "postalCode", "jobTitle",
-      "mobilePhone", "businessPhones", "onPremisesExtensionAttributes",
+      "department", "mobilePhone", "businessPhones", "onPremisesExtensionAttributes",
     ].join(",");
     const response = await fetch(
       `https://graph.microsoft.com/v1.0/me?$select=${encodeURIComponent(select)}`,
@@ -244,14 +249,21 @@ async function loadProfile() {
       street: user.streetAddress || "",
       postalCode: user.postalCode || "",
       jobTitle: user.jobTitle || "",
+      department: user.department || "",
       mobile: user.mobilePhone || "",
       phone: user.businessPhones?.[0] || "",
       customAttribute10: user.onPremisesExtensionAttributes?.extensionAttribute10 || "",
       customAttribute11: user.onPremisesExtensionAttributes?.extensionAttribute11 || "",
     });
+    SignaturePreferences.setDepartment(profile.department);
     profileLoaded = true;
     showProfile();
-    await saveAutoRenderData().catch(() => {});
+    try {
+      await saveAutoRenderData();
+    } catch (cacheError) {
+      setStatus(`Profil geladen, aber automatische Signaturdaten konnten nicht gespeichert werden: ${cacheError.message}`);
+      return;
+    }
     setStatus("Microsoft-365-Profil wurde automatisch geladen.");
   } catch (error) {
     profileLoaded = false;

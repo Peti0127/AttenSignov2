@@ -30,6 +30,13 @@ function phoneLine(profile, settings, officeNumberValue) {
     if (officeNumber) return `Office: ${officeNumber}`;
     return "";
   }
+  if (
+    settings.Nummer === "EDVHotline"
+    && String(profile.department || "").trim().toLocaleUpperCase("de-AT") === "IT"
+  ) {
+    if (mobile) return `Tel. 05 7999 9999 Mobil ${mobile}`;
+    return "Tel. 05 7999 9999";
+  }
   if (phone && mobile) return `Tel.: ${phone}&nbsp;&nbsp;Mobil: ${mobile}`;
   if (mobile) return `Mobil ${mobile}`;
   if (phone) return `Tel.: ${phone}`;
