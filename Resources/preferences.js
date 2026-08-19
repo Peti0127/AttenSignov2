@@ -14,6 +14,8 @@
     AutoInsertMode: "NewMail",
     InsertTitleBefore: false,
     InsertTitleAfter: false,
+    MobileUsage: false,
+    Confidentiality: false,
   });
   const ALLOWED_NUMBERS = new Set(["Alles", "Handy", "Festnetz", "Office", "EDVHotline"]);
   const ALLOWED_GREETINGS = new Set(["MfG0", "MfG1", "MfG2", "MfG3"]);
@@ -101,6 +103,8 @@
         : DEFAULT_SETTINGS.AutoInsertMode,
       InsertTitleBefore: value.InsertTitleBefore === true,
       InsertTitleAfter: value.InsertTitleAfter === true,
+      MobileUsage: value.MobileUsage === true,
+      Confidentiality: value.Confidentiality === true,
       updatedAt: Number.isFinite(Date.parse(value.updatedAt)) ? value.updatedAt : "",
     };
   }
@@ -129,6 +133,8 @@
       AutoInsertMode: record.AutoInsertMode,
       InsertTitleBefore: record.InsertTitleBefore,
       InsertTitleAfter: record.InsertTitleAfter,
+      MobileUsage: record.MobileUsage,
+      Confidentiality: record.Confidentiality,
     };
   }
 
@@ -155,6 +161,8 @@
       AutoInsertMode: DEFAULT_SETTINGS.AutoInsertMode,
       InsertTitleBefore: DEFAULT_SETTINGS.InsertTitleBefore,
       InsertTitleAfter: DEFAULT_SETTINGS.InsertTitleAfter,
+      MobileUsage: DEFAULT_SETTINGS.MobileUsage,
+      Confidentiality: DEFAULT_SETTINGS.Confidentiality,
     };
   }
 
@@ -166,6 +174,8 @@
       || !ALLOWED_AUTO_MODES.has(settings?.AutoInsertMode)
       || typeof settings?.InsertTitleBefore !== "boolean"
       || typeof settings?.InsertTitleAfter !== "boolean"
+      || typeof settings?.MobileUsage !== "boolean"
+      || typeof settings?.Confidentiality !== "boolean"
     ) {
       throw new Error("Ungültige Einstellung.");
     }
@@ -176,6 +186,8 @@
       AutoInsertMode: settings.AutoInsertMode,
       InsertTitleBefore: settings.InsertTitleBefore,
       InsertTitleAfter: settings.InsertTitleAfter,
+      MobileUsage: settings.MobileUsage,
+      Confidentiality: settings.Confidentiality,
       updatedAt: new Date().toISOString(),
     };
     const roamingSettings = Office.context.roamingSettings;

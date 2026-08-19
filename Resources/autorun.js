@@ -52,6 +52,17 @@ function greetingHtml(settings) {
   return `<p style="margin: 0; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);">${escapeHtml(greeting)}<br><br></p>`;
 }
 
+function noticesHtml(settings) {
+  let html = "";
+  if (settings.MobileUsage === true) {
+    html += '<p style="margin: 12px 0 0; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);">Diese E-Mail wurde über Outlook Mobile versendet.</p>';
+  }
+  if (settings.Confidentiality === true) {
+    html += '<p style="margin: 6px 0 0; font-family: Aptos, Arial, sans-serif; font-size: 9pt; color: rgb(0, 0, 0);">Diese E-Mail ist vertraulich.</p>';
+  }
+  return html;
+}
+
 function bannerForCity(cityValue) {
   const city = String(cityValue || "").trim();
   if (city === "Wien") {
@@ -119,7 +130,7 @@ function renderSignature(renderData, settings) {
     if (Object.prototype.hasOwnProperty.call(values, key)) return escapeHtml(values[key]);
     return match;
   });
-  return greetingHtml(settings) + signatureBody;
+  return greetingHtml(settings) + signatureBody + noticesHtml(settings);
 }
 
 function completeEvent(event) {

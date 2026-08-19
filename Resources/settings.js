@@ -7,6 +7,8 @@ const titleBeforeField = document.getElementById("title-before-field");
 const insertTitleBeforeCheckbox = document.getElementById("insert-title-before");
 const titleAfterField = document.getElementById("title-after-field");
 const insertTitleAfterCheckbox = document.getElementById("insert-title-after");
+const mobileUsageCheckbox = document.getElementById("mobile-usage");
+const confidentialityCheckbox = document.getElementById("confidentiality");
 const autoInsertCheckbox = document.getElementById("auto-insert");
 const autoInsertModeField = document.getElementById("auto-insert-mode-field");
 const autoInsertModeSelect = document.getElementById("auto-insert-mode");
@@ -26,6 +28,8 @@ function setControlsDisabled(disabled) {
   greetingModeSelect.disabled = disabled;
   insertTitleBeforeCheckbox.disabled = disabled;
   insertTitleAfterCheckbox.disabled = disabled;
+  mobileUsageCheckbox.disabled = disabled;
+  confidentialityCheckbox.disabled = disabled;
   autoInsertCheckbox.disabled = disabled;
   autoInsertModeSelect.disabled = disabled;
 }
@@ -46,6 +50,8 @@ async function initializeSettings() {
     titleAfterField.hidden = !titleAttributes.customAttribute11;
     insertTitleBeforeCheckbox.checked = currentSettings.InsertTitleBefore;
     insertTitleAfterCheckbox.checked = currentSettings.InsertTitleAfter;
+    mobileUsageCheckbox.checked = currentSettings.MobileUsage;
+    confidentialityCheckbox.checked = currentSettings.Confidentiality;
     autoInsertCheckbox.checked = currentSettings.AutoInsert;
     autoInsertModeSelect.value = currentSettings.AutoInsertMode;
     updateAutoInsertVisibility();
@@ -67,6 +73,8 @@ async function saveSettings() {
       AutoInsertMode: autoInsertModeSelect.value,
       InsertTitleBefore: insertTitleBeforeCheckbox.checked,
       InsertTitleAfter: insertTitleAfterCheckbox.checked,
+      MobileUsage: mobileUsageCheckbox.checked,
+      Confidentiality: confidentialityCheckbox.checked,
     });
     setSettingsStatus("Einstellungen gespeichert.");
   } catch (error) {
@@ -80,6 +88,8 @@ phoneModeSelect.addEventListener("change", saveSettings);
 greetingModeSelect.addEventListener("change", saveSettings);
 insertTitleBeforeCheckbox.addEventListener("change", saveSettings);
 insertTitleAfterCheckbox.addEventListener("change", saveSettings);
+mobileUsageCheckbox.addEventListener("change", saveSettings);
+confidentialityCheckbox.addEventListener("change", saveSettings);
 autoInsertCheckbox.addEventListener("change", () => {
   updateAutoInsertVisibility();
   saveSettings();

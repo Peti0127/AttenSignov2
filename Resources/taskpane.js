@@ -21,6 +21,8 @@ let signatureSettings = {
   MfG: "MfG1",
   InsertTitleBefore: false,
   InsertTitleAfter: false,
+  MobileUsage: false,
+  Confidentiality: false,
 };
 
 const statusElement = document.getElementById("status");
@@ -77,6 +79,17 @@ function greetingHtml() {
   }
   if (!greeting) return "";
   return `<p style="margin: 0; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);">${escapeHtml(greeting)}<br><br></p>`;
+}
+
+function noticesHtml() {
+  let html = "";
+  if (signatureSettings.MobileUsage) {
+    html += '<p style="margin: 12px 0 0; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);">Diese E-Mail wurde über Outlook Mobile versendet.</p>';
+  }
+  if (signatureSettings.Confidentiality) {
+    html += '<p style="margin: 6px 0 0; font-family: Aptos, Arial, sans-serif; font-size: 9pt; color: rgb(0, 0, 0);">Diese E-Mail ist vertraulich.</p>';
+  }
+  return html;
 }
 
 function bannerForCity() {
@@ -165,7 +178,7 @@ function renderSignature() {
     if (key === "Banner") return bannerForCity();
     return Object.hasOwn(values, key) ? escapeHtml(values[key]) : match;
   });
-  const html = greetingHtml() + signatureBody;
+  const html = greetingHtml() + signatureBody + noticesHtml();
   previewElement.innerHTML = html;
   previewElement.querySelectorAll("img").forEach((image) => {
     if (!image.complete) image.addEventListener("load", scaleSignaturePreview, { once: true });

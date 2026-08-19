@@ -15,6 +15,8 @@ Key: `attensam.signature.settings.v2`
   "AutoInsertMode": "NewMail",
   "InsertTitleBefore": false,
   "InsertTitleAfter": false,
+  "MobileUsage": false,
+  "Confidentiality": false,
   "updatedAt": "2026-08-18T12:00:00.000Z"
 }
 ```
@@ -27,6 +29,8 @@ Allowed values:
 - `AutoInsertMode`: `NewMail` or `AllMail`
 - `InsertTitleBefore`: `true` or `false`
 - `InsertTitleAfter`: `true` or `false`
+- `MobileUsage`: `true` or `false`
+- `Confidentiality`: `true` or `false`
 
 `MfG0` means no greeting. The other values render the configured greeting and
 one blank line before the signature details.
@@ -36,6 +40,11 @@ one blank line before the signature details.
 checkbox is shown only when the corresponding Microsoft 365 profile attribute
 contains a value. The add-in normalizes the surrounding spaces, so titles are
 separated cleanly from the name regardless of whitespace stored in Graph.
+
+`MobileUsage` appends “Diese E-Mail wurde über Outlook Mobile versendet.” in
+12 pt beneath the signature. `Confidentiality` appends “Diese E-Mail ist
+vertraulich.” in 9 pt. When both are enabled, the mobile notice is rendered
+first and the confidentiality notice second.
 
 `EDVHotline` is shown in the settings only when the Microsoft 365 profile's
 `department` value equals `IT`. It renders `Tel. 05 7999 9999 Mobil {Mobile}`;

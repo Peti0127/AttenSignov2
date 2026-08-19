@@ -8,7 +8,7 @@ files isn't enough. Complete these steps in order.
 2. Wait until GitHub Pages has published the new files.
 3. Remove the currently sideloaded Attensam add-in from Outlook.
 4. Close Outlook completely.
-5. Sideload the included `manifest.xml` version `1.3.1.0`.
+5. Sideload the included `manifest.xml` version `1.3.2.0`.
 6. Restart Outlook.
 7. Open a compose window and open the task pane once. Wait for the status
    `Microsoft-365-Profil wurde automatisch geladen.` This stores the profile
@@ -26,7 +26,7 @@ event runtime intentionally skips insertion instead of inserting stale data.
 
 ## Outlook Mobile
 
-Manifest version `1.3.1.0` includes both the mobile settings command and the mobile
+Manifest version `1.3.2.0` includes both the mobile settings command and the mobile
 `OnNewMessageCompose` launch event.
 
 1. Use Outlook for Android or iOS version `4.2352.0` or later.
