@@ -7,6 +7,7 @@ const CONFIG = {
 };
 const AUTO_RENDER_DATA_KEY = "attensam.signature.render-data.v1";
 const SIGNATURE_MARKER_ID = "attensam-signature-root";
+const SIGNATURE_MARKER_TEXT = "ATTENSAM-SIGNATURE-V2";
 
 const profile = {
   id: "", firstName: "", lastName: "", jobTitle: "", company: "",
@@ -202,7 +203,7 @@ function renderSignature() {
     return Object.hasOwn(values, key) ? escapeHtml(values[key]) : match;
   });
   const signatureContent = greetingHtml() + delegationHtml() + signatureBody + noticesHtml();
-  const html = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v1">${signatureContent}</div>`;
+  const html = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2"><span style="display:none!important;mso-hide:all;max-height:0;overflow:hidden;font-size:0;line-height:0;color:transparent;">${SIGNATURE_MARKER_TEXT}</span>${signatureContent}</div>`;
   previewElement.innerHTML = html;
   previewElement.querySelectorAll("img").forEach((image) => {
     if (!image.complete) image.addEventListener("load", scaleSignaturePreview, { once: true });

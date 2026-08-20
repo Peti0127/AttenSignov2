@@ -79,10 +79,10 @@ signed-in profile, the runtime requests a `User.Read.All` token silently and
 loads the selected sender’s display name plus `extensionAttribute10` and
 `extensionAttribute11`. The token itself is never written to roaming settings.
 
-Rendered signatures include the marker `attensam-signature-root`. The desktop
-settings page uses it to distinguish an existing Attensam signature from other
-message content. After a preference is saved, only a marked signature is
-re-rendered; settings changes never insert a signature into an unsigned item.
+Rendered signatures include the `attensam-signature-root` element and a hidden
+`ATTENSAM-SIGNATURE-V2` text marker. After a preference is saved, the desktop
+settings page uses Outlook's native signature replacement when available. On
+older clients, it replaces the marked element through the compose body API.
 
 - `NewMail` inserts only when `getComposeTypeAsync()` returns `newMail`.
 - `AllMail` inserts for new messages, replies, reply-all messages, and forwards.

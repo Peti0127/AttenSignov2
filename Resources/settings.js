@@ -1,7 +1,8 @@
-/* global Office, SignaturePreferences, AttensamSignatureRuntime */
+/* global Office, SignaturePreferences, AttensamSignatureRuntime, DOMParser */
 
 const AUTO_RENDER_DATA_KEY = "attensam.signature.render-data.v1";
 const SETTINGS_SIGNATURE_MARKER_ID = "attensam-signature-root";
+const SETTINGS_SIGNATURE_MARKER_TEXT = "ATTENSAM-SIGNATURE-V2";
 
 const phoneModeSelect = document.getElementById("phone-mode");
 const edvHotlineOption = document.getElementById("edv-hotline-option");
@@ -59,18 +60,35 @@ function setCurrentSignature(body, html) {
   });
 }
 
-function hasAttensamSignature(bodyHtml) {
-  return bodyHtml.includes(`id="${SETTINGS_SIGNATURE_MARKER_ID}"`)
-    || bodyHtml.includes(`id='${SETTINGS_SIGNATURE_MARKER_ID}'`)
-    || bodyHtml.includes('data-attensam-signature="v1"')
-    || bodyHtml.includes("data-attensam-signature='v1'");
+function setBodyHtml(body, html) {
+  return new Promise((resolve, reject) => {
+    body.setAsync(
+      html,
+      { coercionType: Office.CoercionType.Html },
+      (result) => {
+        if (result.status === Office.AsyncResultStatus.Succeeded) resolve();
+        else reject(new Error(result.error?.message || "Nachrichtentext konnte nicht aktualisiert werden."));
+      },
+    );
+  });
+}
+
+function replaceMarkedSignature(bodyHtml, signatureHtml) {
+  const document = new DOMParser().parseFromString(bodyHtml, "text/html");
+  const hiddenMarker = Array.from(document.querySelectorAll("span"))
+    .find((element) => element.textContent?.includes(SETTINGS_SIGNATURE_MARKER_TEXT));
+  const existingSignature = document.getElementById(SETTINGS_SIGNATURE_MARKER_ID)
+    || document.querySelector('[data-attensam-signature="v1"]')
+    || document.querySelector('[data-attensam-signature="v2"]')
+    || hiddenMarker?.parentElement;
+  if (!existingSignature) return null;
+  existingSignature.outerHTML = signatureHtml;
+  return document.body.innerHTML;
 }
 
 async function updateInsertedSignature() {
   const body = Office.context.mailbox.item?.body;
-  if (!body?.getAsync || !body?.setSignatureAsync) return false;
-  const bodyHtml = await getBodyHtml(body);
-  if (!hasAttensamSignature(bodyHtml)) return false;
+  if (!body?.getAsync) return false;
   const renderData = Office.context.roamingSettings?.get(AUTO_RENDER_DATA_KEY);
   if (!renderData?.profile || typeof renderData.template !== "string") return false;
   const delegation = await new Promise((resolve) => {
@@ -81,8 +99,17 @@ async function updateInsertedSignature() {
     currentSettings,
     delegation,
   );
-  await setCurrentSignature(body, html);
-  return true;
+  const bodyHtml = await getBodyHtml(body);
+  if (body.setSignatureAsync) {
+    await setCurrentSignature(body, html);
+    return true;
+  }
+  const replacedBodyHtml = replaceMarkedSignature(bodyHtml, html);
+  if (replacedBodyHtml !== null && body.setAsync) {
+    await setBodyHtml(body, replacedBodyHtml);
+    return true;
+  }
+  return false;
 }
 
 async function initializeSettings() {

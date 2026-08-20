@@ -3,6 +3,7 @@
 const SETTINGS_KEY = "attensam.signature.settings.v2";
 const RENDER_DATA_KEY = "attensam.signature.render-data.v1";
 const SIGNATURE_MARKER_ID = "attensam-signature-root";
+const SIGNATURE_MARKER_TEXT = "ATTENSAM-SIGNATURE-V2";
 let eventMsalInstance;
 
 function escapeHtml(value) {
@@ -163,7 +164,7 @@ function renderSignature(renderData, settings, delegation) {
     return match;
   });
   const signatureContent = greetingHtml(settings) + delegationHtml(delegation) + signatureBody + noticesHtml(settings);
-  return `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v1">${signatureContent}</div>`;
+  return `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2"><span style="display:none!important;mso-hide:all;max-height:0;overflow:hidden;font-size:0;line-height:0;color:transparent;">${SIGNATURE_MARKER_TEXT}</span>${signatureContent}</div>`;
 }
 
 function completeEvent(event) {
