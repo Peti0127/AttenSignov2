@@ -79,6 +79,11 @@ signed-in profile, the runtime requests a `User.Read.All` token silently and
 loads the selected sender’s display name plus `extensionAttribute10` and
 `extensionAttribute11`. The token itself is never written to roaming settings.
 
+Rendered signatures include the marker `attensam-signature-root`. The desktop
+settings page uses it to distinguish an existing Attensam signature from other
+message content. After a preference is saved, only a marked signature is
+re-rendered; settings changes never insert a signature into an unsigned item.
+
 - `NewMail` inserts only when `getComposeTypeAsync()` returns `newMail`.
 - `AllMail` inserts for new messages, replies, reply-all messages, and forwards.
 - Editing an existing draft doesn't trigger `OnNewMessageCompose`.

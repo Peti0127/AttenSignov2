@@ -1,4 +1,7 @@
-/* global Office, SignaturePreferences */
+/* global Office, SignaturePreferences, AttensamSignatureRuntime */
+
+const AUTO_RENDER_DATA_KEY = "attensam.signature.render-data.v1";
+const SETTINGS_SIGNATURE_MARKER_ID = "attensam-signature-root";
 
 const phoneModeSelect = document.getElementById("phone-mode");
 const edvHotlineOption = document.getElementById("edv-hotline-option");
@@ -32,6 +35,54 @@ function setControlsDisabled(disabled) {
   confidentialityCheckbox.disabled = disabled;
   autoInsertCheckbox.disabled = disabled;
   autoInsertModeSelect.disabled = disabled;
+}
+
+function getBodyHtml(body) {
+  return new Promise((resolve, reject) => {
+    body.getAsync(Office.CoercionType.Html, (result) => {
+      if (result.status === Office.AsyncResultStatus.Succeeded) resolve(String(result.value || ""));
+      else reject(new Error(result.error?.message || "Nachrichtentext konnte nicht gelesen werden."));
+    });
+  });
+}
+
+function setCurrentSignature(body, html) {
+  return new Promise((resolve, reject) => {
+    body.setSignatureAsync(
+      html,
+      { coercionType: Office.CoercionType.Html },
+      (result) => {
+        if (result.status === Office.AsyncResultStatus.Succeeded) resolve();
+        else reject(new Error(result.error?.message || "Signatur konnte nicht aktualisiert werden."));
+      },
+    );
+  });
+}
+
+function hasAttensamSignature(bodyHtml) {
+  return bodyHtml.includes(`id="${SETTINGS_SIGNATURE_MARKER_ID}"`)
+    || bodyHtml.includes(`id='${SETTINGS_SIGNATURE_MARKER_ID}'`)
+    || bodyHtml.includes('data-attensam-signature="v1"')
+    || bodyHtml.includes("data-attensam-signature='v1'");
+}
+
+async function updateInsertedSignature() {
+  const body = Office.context.mailbox.item?.body;
+  if (!body?.getAsync || !body?.setSignatureAsync) return false;
+  const bodyHtml = await getBodyHtml(body);
+  if (!hasAttensamSignature(bodyHtml)) return false;
+  const renderData = Office.context.roamingSettings?.get(AUTO_RENDER_DATA_KEY);
+  if (!renderData?.profile || typeof renderData.template !== "string") return false;
+  const delegation = await new Promise((resolve) => {
+    AttensamSignatureRuntime.resolveDelegation(renderData, resolve);
+  });
+  const html = AttensamSignatureRuntime.renderSignature(
+    renderData,
+    currentSettings,
+    delegation,
+  );
+  await setCurrentSignature(body, html);
+  return true;
 }
 
 async function initializeSettings() {
@@ -76,7 +127,15 @@ async function saveSettings() {
       MobileUsage: mobileUsageCheckbox.checked,
       Confidentiality: confidentialityCheckbox.checked,
     });
-    setSettingsStatus("Einstellungen gespeichert.");
+    try {
+      const signatureUpdated = await updateInsertedSignature();
+      setSettingsStatus(signatureUpdated
+        ? "Einstellungen gespeichert und Signatur aktualisiert."
+        : "Einstellungen gespeichert.");
+    } catch (updateError) {
+      console.error("Die Einstellungen wurden gespeichert, aber die Signatur konnte nicht aktualisiert werden.", updateError);
+      setSettingsStatus("Einstellungen gespeichert; Signatur konnte nicht aktualisiert werden.");
+    }
   } catch (error) {
     setSettingsStatus(error.message || "Einstellungen konnten nicht gespeichert werden.");
   } finally {

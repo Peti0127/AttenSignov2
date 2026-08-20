@@ -2,6 +2,7 @@
 
 const SETTINGS_KEY = "attensam.signature.settings.v2";
 const RENDER_DATA_KEY = "attensam.signature.render-data.v1";
+const SIGNATURE_MARKER_ID = "attensam-signature-root";
 let eventMsalInstance;
 
 function escapeHtml(value) {
@@ -161,7 +162,8 @@ function renderSignature(renderData, settings, delegation) {
     if (Object.prototype.hasOwnProperty.call(values, key)) return escapeHtml(values[key]);
     return match;
   });
-  return greetingHtml(settings) + delegationHtml(delegation) + signatureBody + noticesHtml(settings);
+  const signatureContent = greetingHtml(settings) + delegationHtml(delegation) + signatureBody + noticesHtml(settings);
+  return `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v1">${signatureContent}</div>`;
 }
 
 function completeEvent(event) {
@@ -400,6 +402,13 @@ function updateSignatureForFrom(event) {
     console.error("Signatur konnte nach dem Absenderwechsel nicht aktualisiert werden.", error);
     completeEvent(event);
   }
+}
+
+if (typeof window !== "undefined") {
+  window.AttensamSignatureRuntime = Object.freeze({
+    renderSignature,
+    resolveDelegation,
+  });
 }
 
 Office.onReady();

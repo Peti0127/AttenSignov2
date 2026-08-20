@@ -6,6 +6,7 @@ const CONFIG = {
   officeNumber: "05 7999 100",
 };
 const AUTO_RENDER_DATA_KEY = "attensam.signature.render-data.v1";
+const SIGNATURE_MARKER_ID = "attensam-signature-root";
 
 const profile = {
   id: "", firstName: "", lastName: "", jobTitle: "", company: "",
@@ -200,7 +201,8 @@ function renderSignature() {
     if (key === "Banner") return bannerForCity();
     return Object.hasOwn(values, key) ? escapeHtml(values[key]) : match;
   });
-  const html = greetingHtml() + delegationHtml() + signatureBody + noticesHtml();
+  const signatureContent = greetingHtml() + delegationHtml() + signatureBody + noticesHtml();
+  const html = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v1">${signatureContent}</div>`;
   previewElement.innerHTML = html;
   previewElement.querySelectorAll("img").forEach((image) => {
     if (!image.complete) image.addEventListener("load", scaleSignaturePreview, { once: true });
