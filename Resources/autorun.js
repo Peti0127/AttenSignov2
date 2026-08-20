@@ -51,6 +51,7 @@ function greetingHtml(settings) {
   if (settings.MfG === "MfG1") greeting = "Mit freundlichen Grüßen";
   else if (settings.MfG === "MfG2") greeting = "Freundliche Grüße";
   else if (settings.MfG === "MfG3") greeting = "LG";
+  else if (settings.MfG === "MfGCustom") greeting = String(settings.CustomGreeting || "").trim();
   if (!greeting) return "";
   return `<p style="margin: 0; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);">${escapeHtml(greeting)}<br><br></p>`;
 }

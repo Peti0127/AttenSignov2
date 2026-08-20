@@ -7,6 +7,8 @@ const SETTINGS_SIGNATURE_MARKER_TEXT = "ATTENSAM-SIGNATURE-V2";
 const phoneModeSelect = document.getElementById("phone-mode");
 const edvHotlineOption = document.getElementById("edv-hotline-option");
 const greetingModeSelect = document.getElementById("greeting-mode");
+const customGreetingField = document.getElementById("custom-greeting-field");
+const customGreetingInput = document.getElementById("custom-greeting");
 const titleBeforeField = document.getElementById("title-before-field");
 const insertTitleBeforeCheckbox = document.getElementById("insert-title-before");
 const titleAfterField = document.getElementById("title-after-field");
@@ -27,9 +29,16 @@ function updateAutoInsertVisibility() {
   autoInsertModeField.hidden = !autoInsertCheckbox.checked;
 }
 
+function updateGreetingVisibility() {
+  const isCustom = greetingModeSelect.value === "MfGCustom";
+  customGreetingField.hidden = !isCustom;
+  customGreetingInput.disabled = greetingModeSelect.disabled || !isCustom;
+}
+
 function setControlsDisabled(disabled) {
   phoneModeSelect.disabled = disabled;
   greetingModeSelect.disabled = disabled;
+  customGreetingInput.disabled = disabled || greetingModeSelect.value !== "MfGCustom";
   insertTitleBeforeCheckbox.disabled = disabled;
   insertTitleAfterCheckbox.disabled = disabled;
   mobileUsageCheckbox.disabled = disabled;
@@ -124,6 +133,8 @@ async function initializeSettings() {
       ? "Alles"
       : currentSettings.Nummer;
     greetingModeSelect.value = currentSettings.MfG;
+    customGreetingInput.value = currentSettings.CustomGreeting;
+    updateGreetingVisibility();
     titleBeforeField.hidden = !titleAttributes.customAttribute10;
     titleAfterField.hidden = !titleAttributes.customAttribute11;
     insertTitleBeforeCheckbox.checked = currentSettings.InsertTitleBefore;
@@ -147,6 +158,7 @@ async function saveSettings() {
     currentSettings = await SignaturePreferences.saveSettings({
       Nummer: phoneModeSelect.value,
       MfG: greetingModeSelect.value,
+      CustomGreeting: customGreetingInput.value,
       AutoInsert: autoInsertCheckbox.checked,
       AutoInsertMode: autoInsertModeSelect.value,
       InsertTitleBefore: insertTitleBeforeCheckbox.checked,
@@ -171,7 +183,11 @@ async function saveSettings() {
 }
 
 phoneModeSelect.addEventListener("change", saveSettings);
-greetingModeSelect.addEventListener("change", saveSettings);
+greetingModeSelect.addEventListener("change", () => {
+  updateGreetingVisibility();
+  saveSettings();
+});
+customGreetingInput.addEventListener("change", saveSettings);
 insertTitleBeforeCheckbox.addEventListener("change", saveSettings);
 insertTitleAfterCheckbox.addEventListener("change", saveSettings);
 mobileUsageCheckbox.addEventListener("change", saveSettings);

@@ -22,6 +22,7 @@ let currentDelegation = null;
 let signatureSettings = {
   Nummer: "Alles",
   MfG: "MfG1",
+  CustomGreeting: "",
   InsertTitleBefore: false,
   InsertTitleAfter: false,
   MobileUsage: false,
@@ -79,6 +80,8 @@ function greetingHtml() {
     greeting = "Freundliche Grüße";
   } else if (signatureSettings.MfG === "MfG3") {
     greeting = "LG";
+  } else if (signatureSettings.MfG === "MfGCustom") {
+    greeting = String(signatureSettings.CustomGreeting || "").trim();
   }
   if (!greeting) return "";
   return `<p style="margin: 0; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);">${escapeHtml(greeting)}<br><br></p>`;

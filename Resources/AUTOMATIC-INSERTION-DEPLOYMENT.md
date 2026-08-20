@@ -11,7 +11,7 @@ files isn't enough. Complete these steps in order.
 2. Wait until GitHub Pages has published the new files.
 3. Remove the currently sideloaded Attensam add-in from Outlook.
 4. Close Outlook completely.
-5. Sideload the included `manifest.xml` version `1.4.1.0`.
+5. Sideload the included `manifest.xml` version `1.5.0.0`.
 6. Restart Outlook.
 7. Open a compose window and open the task pane once. Wait for the status
    `Microsoft-365-Profil wurde automatisch geladen.` This stores the profile
@@ -29,7 +29,7 @@ event runtime intentionally skips insertion instead of inserting stale data.
 
 ## Outlook Mobile
 
-Manifest version `1.4.1.0` includes both the mobile settings command and the mobile
+Manifest version `1.5.0.0` includes both the mobile settings command and the mobile
 `OnNewMessageCompose` launch event.
 
 1. Use Outlook for Android or iOS version `4.2352.0` or later.
@@ -52,7 +52,7 @@ iOS, composing through the Share action doesn't trigger the launch event.
 
 ## Send As / Im Auftrag von
 
-Version `1.4.1.0` reads the current compose item’s From field. If its address
+Version `1.5.0.0` reads the current compose item’s From field. If its address
 belongs to a different user, the add-in inserts `Im Auftrag von` followed by
 that user’s name, `extensionAttribute10`, and `extensionAttribute11`. Changing
 the From field updates an automatically inserted signature through the
@@ -79,13 +79,15 @@ included until `User.Read.All` and the event-runtime authorization are working.
 
 ## Live settings updates
 
-Signatures inserted by version `1.4.1.0` contain a non-visible Attensam marker.
-When a user changes a preference in the desktop compose settings page, the
-add-in checks the current message for that marker. If present, it rebuilds and
-replaces the signature immediately, including the current From identity. If no
-Attensam signature is present, changing a setting doesn't insert one.
+Signatures inserted by version `1.5.0.0` contain both an HTML attribute and a
+non-visible text marker. When a user changes a preference in the desktop
+compose settings page, the add-in rebuilds the signature immediately, including
+the current From identity. Clients with Mailbox 1.10 use Outlook's native
+signature replacement. Older clients replace the marked block in the message
+body instead.
 
-Signatures inserted by an older add-in version don't contain the marker and
-therefore can't be detected for live updating. Insert the signature once with
-version `1.4.1.0` to enable this behavior. Outlook Mobile opens settings in
-read mode, so mobile changes apply to the next compose item.
+On clients with native signature replacement, saving settings can insert the
+signature when the compose item doesn't yet contain one. Older clients require
+a signature inserted by version `1.4.1.0` or later so the block can be found.
+Outlook Mobile opens settings in read mode, so mobile changes apply to the next
+compose item.

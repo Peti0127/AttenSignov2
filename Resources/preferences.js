@@ -10,6 +10,7 @@
   const DEFAULT_SETTINGS = Object.freeze({
     Nummer: "Alles",
     MfG: "MfG1",
+    CustomGreeting: "",
     AutoInsert: false,
     AutoInsertMode: "NewMail",
     InsertTitleBefore: false,
@@ -18,7 +19,7 @@
     Confidentiality: false,
   });
   const ALLOWED_NUMBERS = new Set(["Alles", "Handy", "Festnetz", "Office", "EDVHotline"]);
-  const ALLOWED_GREETINGS = new Set(["MfG0", "MfG1", "MfG2", "MfG3"]);
+  const ALLOWED_GREETINGS = new Set(["MfG0", "MfG1", "MfG2", "MfG3", "MfGCustom"]);
   const ALLOWED_AUTO_MODES = new Set(["NewMail", "AllMail"]);
   const LEGACY_NUMBER_MAP = Object.freeze({
     both: "Alles",
@@ -46,6 +47,10 @@
 
   function titleAttributesStorageKey() {
     return `${TITLE_ATTRIBUTES_CACHE_PREFIX}:${currentUserKey()}`;
+  }
+
+  function normalizeCustomGreeting(value) {
+    return String(value || "").replace(/\s+/g, " ").trim().slice(0, 200);
   }
 
   function setDepartment(department) {
@@ -97,6 +102,7 @@
     return {
       Nummer: ALLOWED_NUMBERS.has(value?.Nummer) ? value.Nummer : DEFAULT_SETTINGS.Nummer,
       MfG: ALLOWED_GREETINGS.has(value?.MfG) ? value.MfG : DEFAULT_SETTINGS.MfG,
+      CustomGreeting: normalizeCustomGreeting(value?.CustomGreeting),
       AutoInsert: value.AutoInsert === true,
       AutoInsertMode: ALLOWED_AUTO_MODES.has(value?.AutoInsertMode)
         ? value.AutoInsertMode
@@ -129,6 +135,7 @@
     return {
       Nummer: record.Nummer,
       MfG: record.MfG,
+      CustomGreeting: record.CustomGreeting,
       AutoInsert: record.AutoInsert,
       AutoInsertMode: record.AutoInsertMode,
       InsertTitleBefore: record.InsertTitleBefore,
@@ -157,6 +164,7 @@
     return {
       Nummer: LEGACY_NUMBER_MAP[legacy] || DEFAULT_SETTINGS.Nummer,
       MfG: DEFAULT_SETTINGS.MfG,
+      CustomGreeting: DEFAULT_SETTINGS.CustomGreeting,
       AutoInsert: DEFAULT_SETTINGS.AutoInsert,
       AutoInsertMode: DEFAULT_SETTINGS.AutoInsertMode,
       InsertTitleBefore: DEFAULT_SETTINGS.InsertTitleBefore,
@@ -170,6 +178,7 @@
     if (
       !ALLOWED_NUMBERS.has(settings?.Nummer)
       || !ALLOWED_GREETINGS.has(settings?.MfG)
+      || typeof settings?.CustomGreeting !== "string"
       || typeof settings?.AutoInsert !== "boolean"
       || !ALLOWED_AUTO_MODES.has(settings?.AutoInsertMode)
       || typeof settings?.InsertTitleBefore !== "boolean"
@@ -182,6 +191,7 @@
     const record = {
       Nummer: settings.Nummer,
       MfG: settings.MfG,
+      CustomGreeting: normalizeCustomGreeting(settings.CustomGreeting),
       AutoInsert: settings.AutoInsert,
       AutoInsertMode: settings.AutoInsertMode,
       InsertTitleBefore: settings.InsertTitleBefore,

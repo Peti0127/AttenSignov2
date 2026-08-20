@@ -11,6 +11,7 @@ Key: `attensam.signature.settings.v2`
 {
   "Nummer": "Alles",
   "MfG": "MfG1",
+  "CustomGreeting": "",
   "AutoInsert": false,
   "AutoInsertMode": "NewMail",
   "InsertTitleBefore": false,
@@ -24,7 +25,8 @@ Key: `attensam.signature.settings.v2`
 Allowed values:
 
 - `Nummer`: `Alles`, `Handy`, `Festnetz`, `Office`, `EDVHotline`
-- `MfG`: `MfG0`, `MfG1`, `MfG2`, `MfG3`
+- `MfG`: `MfG0`, `MfG1`, `MfG2`, `MfG3`, `MfGCustom`
+- `CustomGreeting`: the user's custom greeting text, up to 200 characters
 - `AutoInsert`: `true` or `false`
 - `AutoInsertMode`: `NewMail` or `AllMail`
 - `InsertTitleBefore`: `true` or `false`
@@ -34,6 +36,10 @@ Allowed values:
 
 `MfG0` means no greeting. The other values render the configured greeting and
 one blank line before the signature details.
+
+`MfGCustom` renders the normalized plain text stored in `CustomGreeting`. The
+desktop and mobile settings pages show the custom text field only while this
+mode is selected. HTML entered by a user is escaped before rendering.
 
 `InsertTitleBefore` inserts `extensionAttribute10` before the first name, and
 `InsertTitleAfter` inserts `extensionAttribute11` after the last name. Each
