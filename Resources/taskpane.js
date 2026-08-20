@@ -44,9 +44,9 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-function phoneLine() {
-  const phone = escapeHtml(profile.phone.trim());
-  const mobile = escapeHtml(profile.mobile.trim());
+function phoneLine(profileValue = profile) {
+  const phone = escapeHtml(String(profileValue.phone || "").trim());
+  const mobile = escapeHtml(String(profileValue.mobile || "").trim());
   const officeNumber = CONFIG.officeNumber.includes("YOUR_")
     ? ""
     : escapeHtml(CONFIG.officeNumber.trim());
@@ -102,21 +102,22 @@ function normalizeEmail(value) {
   return String(value || "").trim().toLocaleLowerCase("de-AT");
 }
 
-function delegationName(delegation) {
-  if (!delegation) return "";
-  const titleBefore = String(delegation.customAttribute10 || "").trim();
-  const titleAfter = String(delegation.customAttribute11 || "").trim();
-  const personalName = [delegation.firstName, delegation.lastName]
+function personalName(profileValue) {
+  if (!profileValue) return "";
+  return [profileValue.firstName, profileValue.lastName]
     .map((value) => String(value || "").trim())
     .filter(Boolean)
-    .join(" ") || String(delegation.displayName || "").trim();
-  return [titleBefore, personalName, titleAfter].filter(Boolean).join(" ");
+    .join(" ") || String(profileValue.displayName || profileValue.email || "").trim();
 }
 
-function delegationHtml() {
-  const name = delegationName(currentDelegation);
-  if (!name) return "";
-  return `<p style="margin: 0; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);">Im Auftrag von <b>${escapeHtml(name)}</b><br><br></p>`;
+function delegatedName(profileValue) {
+  const titleBefore = signatureSettings.InsertTitleBefore
+    ? String(profileValue?.customAttribute10 || "").trim()
+    : "";
+  const titleAfter = signatureSettings.InsertTitleAfter
+    ? String(profileValue?.customAttribute11 || "").trim()
+    : "";
+  return [titleBefore, personalName(profileValue), titleAfter].filter(Boolean).join(" ");
 }
 
 function bannerForCity() {
@@ -186,26 +187,32 @@ function scaleSignaturePreview() {
 }
 
 function renderSignature() {
-  const titleBefore = signatureSettings.InsertTitleBefore && profile.customAttribute10.trim()
-    ? `${profile.customAttribute10.trim()} `
+  const signatureProfile = currentDelegation || profile;
+  const titleBefore = !currentDelegation
+    && signatureSettings.InsertTitleBefore && String(signatureProfile.customAttribute10 || "").trim()
+    ? `${String(signatureProfile.customAttribute10).trim()} `
     : "";
-  const titleAfter = signatureSettings.InsertTitleAfter && profile.customAttribute11.trim()
-    ? ` ${profile.customAttribute11.trim()}`
+  const titleAfter = !currentDelegation
+    && signatureSettings.InsertTitleAfter && String(signatureProfile.customAttribute11 || "").trim()
+    ? ` ${String(signatureProfile.customAttribute11).trim()}`
     : "";
+  const senderName = personalName(profile);
+  const fromName = delegatedName(currentDelegation);
   const values = {
-    FirstName: profile.firstName, LastName: profile.lastName,
-    Company: profile.company, City: profile.city, Street: profile.street,
-    PostalCode: profile.postalCode, JobTitle: profile.jobTitle,
-    "E-mail": profile.email, Mobile: profile.mobile, Phone: profile.phone,
+    FirstName: currentDelegation ? senderName : signatureProfile.firstName,
+    LastName: currentDelegation ? `(i.A. ${fromName})` : signatureProfile.lastName,
+    Company: signatureProfile.company, City: signatureProfile.city, Street: signatureProfile.street,
+    PostalCode: signatureProfile.postalCode, JobTitle: signatureProfile.jobTitle,
+    "E-mail": signatureProfile.email, Mobile: signatureProfile.mobile, Phone: signatureProfile.phone,
     CustomAttribute10: titleBefore,
     CustomAttribute11: titleAfter,
   };
   const signatureBody = signatureTemplate.replace(/\{([^{}]+)\}/g, (match, key) => {
-    if (key === "Phone Mobile Office Number") return phoneLine();
-    if (key === "Banner") return bannerForCity();
+    if (key === "Phone Mobile Office Number") return phoneLine(signatureProfile);
+    if (key === "Banner") return bannerForCity(signatureProfile);
     return Object.hasOwn(values, key) ? escapeHtml(values[key]) : match;
   });
-  const signatureContent = greetingHtml() + delegationHtml() + signatureBody + noticesHtml();
+  const signatureContent = greetingHtml() + signatureBody + noticesHtml();
   const html = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2"><span style="display:none!important;mso-hide:all;max-height:0;overflow:hidden;font-size:0;line-height:0;color:transparent;">${SIGNATURE_MARKER_TEXT}</span>${signatureContent}</div>`;
   previewElement.innerHTML = html;
   previewElement.querySelectorAll("img").forEach((image) => {
@@ -304,12 +311,24 @@ async function loadDelegatedUser(fromDetails) {
     lastName: "",
     email: fromDetails.emailAddress || "",
     id: "",
+    company: "",
+    city: "",
+    street: "",
+    postalCode: "",
+    jobTitle: "",
+    department: "",
+    mobile: "",
+    phone: "",
     customAttribute10: "",
     customAttribute11: "",
   };
   try {
     const token = await acquireGraphToken(["User.Read.All"]);
-    const select = "id,displayName,givenName,surname,mail,userPrincipalName,onPremisesExtensionAttributes";
+    const select = [
+      "id", "displayName", "givenName", "surname", "mail", "userPrincipalName",
+      "companyName", "city", "streetAddress", "postalCode", "jobTitle",
+      "department", "mobilePhone", "businessPhones", "onPremisesExtensionAttributes",
+    ].join(",");
     let response = await fetch(
       `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(fromDetails.emailAddress)}?$select=${encodeURIComponent(select)}`,
       { headers: { Authorization: `Bearer ${token}` } },
@@ -335,6 +354,14 @@ async function loadDelegatedUser(fromDetails) {
       firstName: user.givenName || "",
       lastName: user.surname || "",
       email: user.mail || user.userPrincipalName || fallback.email,
+      company: user.companyName || "",
+      city: user.city || "",
+      street: user.streetAddress || "",
+      postalCode: user.postalCode || "",
+      jobTitle: user.jobTitle || "",
+      department: user.department || "",
+      mobile: user.mobilePhone || "",
+      phone: user.businessPhones?.[0] || "",
       customAttribute10: user.onPremisesExtensionAttributes?.extensionAttribute10 || "",
       customAttribute11: user.onPremisesExtensionAttributes?.extensionAttribute11 || "",
     };

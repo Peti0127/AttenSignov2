@@ -71,30 +71,29 @@ function normalizeEmail(value) {
   return String(value || "").trim().toLocaleLowerCase("de-AT");
 }
 
-function delegationName(delegation) {
-  let personalName = "";
+function personalName(profile) {
+  let name = "";
+  if (!profile) return "";
+  if (profile.firstName) name = String(profile.firstName).trim();
+  if (profile.lastName) {
+    if (name) name += " ";
+    name += String(profile.lastName).trim();
+  }
+  if (!name) name = String(profile.displayName || profile.email || "").trim();
+  return name;
+}
+
+function delegatedName(delegation, settings) {
   const parts = [];
   if (!delegation) return "";
-  if (delegation.firstName) personalName = String(delegation.firstName).trim();
-  if (delegation.lastName) {
-    if (personalName) personalName += " ";
-    personalName += String(delegation.lastName).trim();
-  }
-  if (!personalName) personalName = String(delegation.displayName || "").trim();
-  if (String(delegation.customAttribute10 || "").trim()) {
+  if (settings.InsertTitleBefore === true && String(delegation.customAttribute10 || "").trim()) {
     parts.push(String(delegation.customAttribute10).trim());
   }
-  if (personalName) parts.push(personalName);
-  if (String(delegation.customAttribute11 || "").trim()) {
+  if (personalName(delegation)) parts.push(personalName(delegation));
+  if (settings.InsertTitleAfter === true && String(delegation.customAttribute11 || "").trim()) {
     parts.push(String(delegation.customAttribute11).trim());
   }
   return parts.join(" ");
-}
-
-function delegationHtml(delegation) {
-  const name = delegationName(delegation);
-  if (!name) return "";
-  return `<p style="margin: 0; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);">Im Auftrag von <b>${escapeHtml(name)}</b><br><br></p>`;
 }
 
 function bannerForCity(cityValue) {
@@ -133,18 +132,25 @@ function bannerForCity(cityValue) {
 }
 
 function renderSignature(renderData, settings, delegation) {
-  const profile = renderData.profile;
+  const senderProfile = renderData.profile;
+  const profile = delegation || senderProfile;
   let titleBefore = "";
   let titleAfter = "";
-  if (settings.InsertTitleBefore === true && String(profile.customAttribute10 || "").trim()) {
+  if (!delegation && settings.InsertTitleBefore === true && String(profile.customAttribute10 || "").trim()) {
     titleBefore = `${String(profile.customAttribute10).trim()} `;
   }
-  if (settings.InsertTitleAfter === true && String(profile.customAttribute11 || "").trim()) {
+  if (!delegation && settings.InsertTitleAfter === true && String(profile.customAttribute11 || "").trim()) {
     titleAfter = ` ${String(profile.customAttribute11).trim()}`;
   }
+  let firstName = profile.firstName;
+  let lastName = profile.lastName;
+  if (delegation) {
+    firstName = personalName(senderProfile);
+    lastName = `(i.A. ${delegatedName(delegation, settings)})`;
+  }
   const values = {
-    FirstName: profile.firstName,
-    LastName: profile.lastName,
+    FirstName: firstName,
+    LastName: lastName,
     Company: profile.company,
     City: profile.city,
     Street: profile.street,
@@ -164,7 +170,7 @@ function renderSignature(renderData, settings, delegation) {
     if (Object.prototype.hasOwnProperty.call(values, key)) return escapeHtml(values[key]);
     return match;
   });
-  const signatureContent = greetingHtml(settings) + delegationHtml(delegation) + signatureBody + noticesHtml(settings);
+  const signatureContent = greetingHtml(settings) + signatureBody + noticesHtml(settings);
   return `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2"><span style="display:none!important;mso-hide:all;max-height:0;overflow:hidden;font-size:0;line-height:0;color:transparent;">${SIGNATURE_MARKER_TEXT}</span>${signatureContent}</div>`;
 }
 
@@ -226,7 +232,7 @@ function acquireEventGraphToken(renderData) {
 
 function fetchDelegatedUser(renderData, fromDetails) {
   return acquireEventGraphToken(renderData).then(function requestDelegatedUser(token) {
-    const select = "id,displayName,givenName,surname,mail,userPrincipalName,onPremisesExtensionAttributes";
+    const select = "id,displayName,givenName,surname,mail,userPrincipalName,companyName,city,streetAddress,postalCode,jobTitle,department,mobilePhone,businessPhones,onPremisesExtensionAttributes";
     const url = `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(fromDetails.emailAddress)}?$select=${encodeURIComponent(select)}`;
     return fetch(url, { headers: { Authorization: `Bearer ${token}` } }).then(function directResult(response) {
       if (response.ok) return response.json();
@@ -249,6 +255,14 @@ function fetchDelegatedUser(renderData, fromDetails) {
       firstName: user.givenName || "",
       lastName: user.surname || "",
       email: user.mail || user.userPrincipalName || fromDetails.emailAddress || "",
+      company: user.companyName || "",
+      city: user.city || "",
+      street: user.streetAddress || "",
+      postalCode: user.postalCode || "",
+      jobTitle: user.jobTitle || "",
+      department: user.department || "",
+      mobile: user.mobilePhone || "",
+      phone: user.businessPhones && user.businessPhones[0] ? user.businessPhones[0] : "",
       customAttribute10: attributes.extensionAttribute10 || "",
       customAttribute11: attributes.extensionAttribute11 || "",
     };
@@ -279,6 +293,14 @@ function resolveDelegation(renderData, callback) {
       firstName: "",
       lastName: "",
       email: fromDetails.emailAddress || "",
+      company: "",
+      city: "",
+      street: "",
+      postalCode: "",
+      jobTitle: "",
+      department: "",
+      mobile: "",
+      phone: "",
       customAttribute10: "",
       customAttribute11: "",
     };
@@ -293,7 +315,7 @@ function resolveDelegation(renderData, callback) {
       }
       callback(user);
     }).catch(function fallbackToFrom(error) {
-      console.error("Titel der abweichenden Absenderadresse konnten nicht geladen werden.", error);
+      console.error("Profil der abweichenden Absenderadresse konnte nicht vollständig geladen werden.", error);
       callback(fallback);
     });
   });

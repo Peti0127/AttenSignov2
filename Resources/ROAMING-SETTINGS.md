@@ -82,8 +82,11 @@ the new selection.
 The render-data record also contains the public Entra client and tenant IDs
 needed by the event runtime. When the Outlook From address differs from the
 signed-in profile, the runtime requests a `User.Read.All` token silently and
-loads the selected sender’s display name plus `extensionAttribute10` and
-`extensionAttribute11`. The token itself is never written to roaming settings.
+loads the selected sender's complete signature profile, including company,
+address, job title, telephone numbers, and both extension attributes. The
+signature uses these From-user details while rendering the name as
+`signed-in user (i.A. From user)`. The token itself is never written to roaming
+settings.
 
 Rendered signatures include the `attensam-signature-root` element and a hidden
 `ATTENSAM-SIGNATURE-V2` text marker. After a preference is saved, the desktop
