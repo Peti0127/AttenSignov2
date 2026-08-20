@@ -1,7 +1,8 @@
-/* global Office */
+/* global Office, msal */
 
 const SETTINGS_KEY = "attensam.signature.settings.v2";
 const RENDER_DATA_KEY = "attensam.signature.render-data.v1";
+let eventMsalInstance;
 
 function escapeHtml(value) {
   return String(value || "")
@@ -63,6 +64,36 @@ function noticesHtml(settings) {
   return html;
 }
 
+function normalizeEmail(value) {
+  return String(value || "").trim().toLocaleLowerCase("de-AT");
+}
+
+function delegationName(delegation) {
+  let personalName = "";
+  const parts = [];
+  if (!delegation) return "";
+  if (delegation.firstName) personalName = String(delegation.firstName).trim();
+  if (delegation.lastName) {
+    if (personalName) personalName += " ";
+    personalName += String(delegation.lastName).trim();
+  }
+  if (!personalName) personalName = String(delegation.displayName || "").trim();
+  if (String(delegation.customAttribute10 || "").trim()) {
+    parts.push(String(delegation.customAttribute10).trim());
+  }
+  if (personalName) parts.push(personalName);
+  if (String(delegation.customAttribute11 || "").trim()) {
+    parts.push(String(delegation.customAttribute11).trim());
+  }
+  return parts.join(" ");
+}
+
+function delegationHtml(delegation) {
+  const name = delegationName(delegation);
+  if (!name) return "";
+  return `<p style="margin: 0; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);">Im Auftrag von <b>${escapeHtml(name)}</b><br><br></p>`;
+}
+
 function bannerForCity(cityValue) {
   const city = String(cityValue || "").trim();
   if (city === "Wien") {
@@ -98,7 +129,7 @@ function bannerForCity(cityValue) {
   return "";
 }
 
-function renderSignature(renderData, settings) {
+function renderSignature(renderData, settings, delegation) {
   const profile = renderData.profile;
   let titleBefore = "";
   let titleAfter = "";
@@ -130,7 +161,7 @@ function renderSignature(renderData, settings) {
     if (Object.prototype.hasOwnProperty.call(values, key)) return escapeHtml(values[key]);
     return match;
   });
-  return greetingHtml(settings) + signatureBody + noticesHtml(settings);
+  return greetingHtml(settings) + delegationHtml(delegation) + signatureBody + noticesHtml(settings);
 }
 
 function completeEvent(event) {
@@ -156,14 +187,122 @@ function synchronizedSettings(savedSettings, renderData) {
   return result;
 }
 
-function insertCachedSignature(event, settings, renderData) {
+function acquireEventGraphToken(renderData) {
+  const graphAuth = renderData && renderData.graphAuth;
+  if (
+    typeof msal === "undefined"
+    || !graphAuth
+    || !graphAuth.clientId
+    || String(graphAuth.clientId).includes("YOUR_")
+  ) {
+    return Promise.reject(new Error("Graph-Konfiguration für den Ereignisruntime fehlt."));
+  }
+  let authority = String(graphAuth.tenantId || "");
+  if (!authority.startsWith("https://")) {
+    authority = `https://login.microsoftonline.com/${authority}`;
+  }
+  let initialize;
+  if (eventMsalInstance) {
+    initialize = Promise.resolve(eventMsalInstance);
+  } else {
+    initialize = msal.createNestablePublicClientApplication({
+      auth: { clientId: graphAuth.clientId, authority },
+      cache: { cacheLocation: "localStorage" },
+    }).then(function rememberInstance(instance) {
+      eventMsalInstance = instance;
+      return instance;
+    });
+  }
+  return initialize.then(function acquireToken(instance) {
+    return instance.acquireTokenSilent({ scopes: ["User.Read.All"] });
+  }).then(function tokenValue(result) {
+    return result.accessToken;
+  });
+}
+
+function fetchDelegatedUser(renderData, fromDetails) {
+  return acquireEventGraphToken(renderData).then(function requestDelegatedUser(token) {
+    const select = "id,displayName,givenName,surname,mail,userPrincipalName,onPremisesExtensionAttributes";
+    const url = `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(fromDetails.emailAddress)}?$select=${encodeURIComponent(select)}`;
+    return fetch(url, { headers: { Authorization: `Bearer ${token}` } }).then(function directResult(response) {
+      if (response.ok) return response.json();
+      const address = String(fromDetails.emailAddress || "").replace(/'/g, "''");
+      const filter = `mail eq '${address}' or userPrincipalName eq '${address}'`;
+      const fallbackUrl = `https://graph.microsoft.com/v1.0/users?$filter=${encodeURIComponent(filter)}&$select=${encodeURIComponent(select)}&$top=1`;
+      return fetch(fallbackUrl, { headers: { Authorization: `Bearer ${token}` } }).then(function fallbackResult(fallbackResponse) {
+        if (!fallbackResponse.ok) throw new Error(`Microsoft Graph: ${fallbackResponse.status}`);
+        return fallbackResponse.json().then(function firstUser(payload) {
+          if (!payload.value || !payload.value[0]) throw new Error("Microsoft Graph: Benutzer nicht gefunden");
+          return payload.value[0];
+        });
+      });
+    });
+  }).then(function mapDelegatedUser(user) {
+    const attributes = user.onPremisesExtensionAttributes || {};
+    return {
+      displayName: user.displayName || fromDetails.displayName || fromDetails.emailAddress || "",
+      id: user.id || "",
+      firstName: user.givenName || "",
+      lastName: user.surname || "",
+      email: user.mail || user.userPrincipalName || fromDetails.emailAddress || "",
+      customAttribute10: attributes.extensionAttribute10 || "",
+      customAttribute11: attributes.extensionAttribute11 || "",
+    };
+  });
+}
+
+function resolveDelegation(renderData, callback) {
+  const from = Office.context.mailbox.item.from;
+  if (!from || !from.getAsync) {
+    callback(null);
+    return;
+  }
+  from.getAsync(function onFromRead(result) {
+    if (result.status !== Office.AsyncResultStatus.Succeeded || !result.value) {
+      callback(null);
+      return;
+    }
+    const fromDetails = result.value;
+    const fromEmail = normalizeEmail(fromDetails.emailAddress);
+    const ownEmail = normalizeEmail(renderData && renderData.profile && renderData.profile.email);
+    if (!fromEmail || fromEmail === ownEmail) {
+      callback(null);
+      return;
+    }
+    const fallback = {
+      displayName: fromDetails.displayName || fromDetails.emailAddress || "",
+      id: "",
+      firstName: "",
+      lastName: "",
+      email: fromDetails.emailAddress || "",
+      customAttribute10: "",
+      customAttribute11: "",
+    };
+    fetchDelegatedUser(renderData, fromDetails).then(function resolved(user) {
+      if (
+        user.id
+        && renderData.profile.id
+        && user.id === renderData.profile.id
+      ) {
+        callback(null);
+        return;
+      }
+      callback(user);
+    }).catch(function fallbackToFrom(error) {
+      console.error("Titel der abweichenden Absenderadresse konnten nicht geladen werden.", error);
+      callback(fallback);
+    });
+  });
+}
+
+function insertCachedSignature(event, settings, renderData, delegation) {
   let html;
   try {
     if (!renderData || !renderData.profile || typeof renderData.template !== "string") {
       completeEvent(event);
       return;
     }
-    html = renderSignature(renderData, settings);
+    html = renderSignature(renderData, settings, delegation);
   } catch (error) {
     console.error("Automatische Signatur konnte nicht erstellt werden.", error);
     completeEvent(event);
@@ -187,6 +326,12 @@ function insertCachedSignature(event, settings, renderData) {
   }
 }
 
+function resolveAndInsertSignature(event, settings, renderData) {
+  resolveDelegation(renderData, function onDelegationResolved(delegation) {
+    insertCachedSignature(event, settings, renderData, delegation);
+  });
+}
+
 function autoInsertSignature(event) {
   let settings;
   let renderData;
@@ -202,7 +347,7 @@ function autoInsertSignature(event) {
     }
 
     if (settings.AutoInsertMode === "AllMail") {
-      insertCachedSignature(event, settings, renderData);
+      resolveAndInsertSignature(event, settings, renderData);
       return;
     }
 
@@ -215,7 +360,7 @@ function autoInsertSignature(event) {
         completeEvent(event);
         return;
       }
-      insertCachedSignature(event, settings, renderData);
+      resolveAndInsertSignature(event, settings, renderData);
     });
   } catch (error) {
     console.error("Automatische Signatur konnte nicht eingefügt werden.", error);
@@ -223,5 +368,40 @@ function autoInsertSignature(event) {
   }
 }
 
+function updateSignatureForFrom(event) {
+  let settings;
+  let renderData;
+  try {
+    renderData = Office.context.roamingSettings.get(RENDER_DATA_KEY);
+    settings = synchronizedSettings(
+      Office.context.roamingSettings.get(SETTINGS_KEY),
+      renderData
+    );
+    if (!settings || settings.AutoInsert !== true) {
+      completeEvent(event);
+      return;
+    }
+    if (settings.AutoInsertMode === "AllMail") {
+      resolveAndInsertSignature(event, settings, renderData);
+      return;
+    }
+    Office.context.mailbox.item.getComposeTypeAsync(function onComposeType(result) {
+      if (
+        result.status !== Office.AsyncResultStatus.Succeeded
+        || !result.value
+        || result.value.composeType !== "newMail"
+      ) {
+        completeEvent(event);
+        return;
+      }
+      resolveAndInsertSignature(event, settings, renderData);
+    });
+  } catch (error) {
+    console.error("Signatur konnte nach dem Absenderwechsel nicht aktualisiert werden.", error);
+    completeEvent(event);
+  }
+}
+
 Office.onReady();
 Office.actions.associate("autoInsertSignature", autoInsertSignature);
+Office.actions.associate("updateSignatureForFrom", updateSignatureForFrom);

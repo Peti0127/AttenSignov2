@@ -3,12 +3,15 @@
 Automatic insertion is an Outlook launch event, so replacing only the web
 files isn't enough. Complete these steps in order.
 
-1. Upload every file from the package to the GitHub Pages `Resources` folder,
-   including `autorun.html` and `autorun.js`.
+1. Upload the hosted add-in files from the package to the GitHub Pages
+   `Resources` folder, including `autorun.html`, `autorun.js`, and
+   `autorun-classic.js`. The Markdown documentation and source-only
+   `msal-shim.js` don't need to be hosted. The well-known JSON file has a
+   separate root location described below.
 2. Wait until GitHub Pages has published the new files.
 3. Remove the currently sideloaded Attensam add-in from Outlook.
 4. Close Outlook completely.
-5. Sideload the included `manifest.xml` version `1.3.2.0`.
+5. Sideload the included `manifest.xml` version `1.4.0.0`.
 6. Restart Outlook.
 7. Open a compose window and open the task pane once. Wait for the status
    `Microsoft-365-Profil wurde automatisch geladen.` This stores the profile
@@ -26,7 +29,7 @@ event runtime intentionally skips insertion instead of inserting stale data.
 
 ## Outlook Mobile
 
-Manifest version `1.3.2.0` includes both the mobile settings command and the mobile
+Manifest version `1.4.0.0` includes both the mobile settings command and the mobile
 `OnNewMessageCompose` launch event.
 
 1. Use Outlook for Android or iOS version `4.2352.0` or later.
@@ -46,3 +49,30 @@ Outlook Mobile doesn't expose normal add-in task panes while composing.
 Therefore the settings command is intentionally available while reading a
 message, and signature insertion happens automatically in compose mode. On
 iOS, composing through the Share action doesn't trigger the launch event.
+
+## Send As / Im Auftrag von
+
+Version `1.4.0.0` reads the current compose item’s From field. If its address
+belongs to a different user, the add-in inserts `Im Auftrag von` followed by
+that user’s name, `extensionAttribute10`, and `extensionAttribute11`. Changing
+the From field updates an automatically inserted signature through the
+`OnMessageFromChanged` event.
+
+This lookup requires additional Microsoft Graph configuration:
+
+1. In the Microsoft Entra app registration used by `clientId`, add the
+   delegated Microsoft Graph permission `User.Read.All`.
+2. Select `Grant admin consent` for the tenant. Individual users can't consent
+   to this permission themselves.
+3. Upload `autorun-classic.js` to the GitHub Pages `Resources` directory with
+   the other web files.
+4. For classic Outlook on Windows, publish the included
+   `microsoft-officeaddins-allowed.json` at the origin-root URL
+   `https://peti0127.github.io/.well-known/microsoft-officeaddins-allowed.json`.
+   This is the domain root, not the `AttenSignov2/Resources` directory. A
+   GitHub Pages user-site repository or a custom domain may be needed to serve
+   that root path.
+
+If the directory lookup is temporarily unavailable, the add-in still uses the
+display name supplied by Outlook, but the two extension attributes can't be
+included until `User.Read.All` and the event-runtime authorization are working.

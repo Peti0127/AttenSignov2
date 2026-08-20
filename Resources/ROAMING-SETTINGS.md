@@ -73,6 +73,12 @@ The automatic runtime selects the newest timestamped copy, preventing an older
 `Nummer` value from falling back to `Alles` while the task pane already shows
 the new selection.
 
+The render-data record also contains the public Entra client and tenant IDs
+needed by the event runtime. When the Outlook From address differs from the
+signed-in profile, the runtime requests a `User.Read.All` token silently and
+loads the selected sender’s display name plus `extensionAttribute10` and
+`extensionAttribute11`. The token itself is never written to roaming settings.
+
 - `NewMail` inserts only when `getComposeTypeAsync()` returns `newMail`.
 - `AllMail` inserts for new messages, replies, reply-all messages, and forwards.
 - Editing an existing draft doesn't trigger `OnNewMessageCompose`.
@@ -82,7 +88,7 @@ Outlook Mobile exposes the required launch-event, `setSignatureAsync`, and
 `getComposeTypeAsync` APIs as documented mobile exceptions. The
 `VersionOverridesV1_1` configuration in `manifest.xml` registers the event for
 both desktop and mobile. Upload
-`autorun.html` and `autorun.js` to the same GitHub Pages `Resources` directory
+`autorun.html`, `autorun.js`, and `autorun-classic.js` to the same GitHub Pages `Resources` directory
 as the task-pane files before installing the updated manifest.
 
 On Outlook Mobile, open the `Einstellungen` command while reading a message.
@@ -97,5 +103,6 @@ runtime. After changing the manifest, remove the installed add-in, sideload the
 new manifest, and restart Outlook so the launch-event registration and runtime
 bundle are refreshed.
 
-No SQL database, API endpoint, database credentials, or additional Microsoft
-Graph permission is required for these preferences.
+No SQL database, API endpoint, or database credentials are required. Reading
+another sender's full directory profile requires the delegated Microsoft Graph
+permission `User.Read.All` with tenant administrator consent.

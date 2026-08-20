@@ -101,7 +101,7 @@ async function acquireGraphToken() {
 async function loadProfile() {
   const token = await acquireGraphToken();
   const select = [
-    "givenName", "surname", "displayName", "mail", "userPrincipalName",
+    "id", "givenName", "surname", "displayName", "mail", "userPrincipalName",
     "companyName", "city", "streetAddress", "postalCode", "jobTitle",
     "department", "mobilePhone", "businessPhones", "onPremisesExtensionAttributes",
   ].join(",");
@@ -112,6 +112,7 @@ async function loadProfile() {
   if (!response.ok) throw new Error(`Microsoft Graph: ${response.status}`);
   const user = await response.json();
   return {
+    id: user.id || "",
     firstName: user.givenName || "",
     lastName: user.surname || "",
     email: user.mail || user.userPrincipalName || "",
@@ -138,6 +139,10 @@ async function saveAutomaticRenderData() {
     officeNumber: CONFIG.officeNumber,
     settings: { ...currentSettings },
     settingsUpdatedAt: now,
+    graphAuth: {
+      clientId: CONFIG.clientId,
+      tenantId: CONFIG.tenantId,
+    },
     updatedAt: now,
   });
   await new Promise((resolve, reject) => {
