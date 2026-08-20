@@ -102,6 +102,13 @@ function normalizeEmail(value) {
   return String(value || "").trim().toLocaleLowerCase("de-AT");
 }
 
+function emailDomain(value) {
+  const email = normalizeEmail(value);
+  const separator = email.lastIndexOf("@");
+  if (separator <= 0 || separator === email.length - 1) return "";
+  return email.slice(separator + 1);
+}
+
 function personalName(profileValue) {
   if (!profileValue) return "";
   return [profileValue.firstName, profileValue.lastName]
@@ -379,6 +386,15 @@ async function refreshDelegationForCurrentFrom() {
     normalizeEmail(Office.context.mailbox.userProfile.emailAddress),
   ].filter(Boolean));
   if (!fromEmail || ownEmails.has(fromEmail)) {
+    currentDelegation = null;
+    return;
+  }
+  const fromDomain = emailDomain(fromEmail);
+  const ownDomains = new Set([
+    emailDomain(profile.email),
+    emailDomain(Office.context.mailbox.userProfile.emailAddress),
+  ].filter(Boolean));
+  if (!fromDomain || !ownDomains.has(fromDomain)) {
     currentDelegation = null;
     return;
   }

@@ -11,7 +11,7 @@ files isn't enough. Complete these steps in order.
 2. Wait until GitHub Pages has published the new files.
 3. Remove the currently sideloaded Attensam add-in from Outlook.
 4. Close Outlook completely.
-5. Sideload the included `manifest.xml` version `1.6.0.0`.
+5. Sideload the included `manifest.xml` version `1.6.1.0`.
 6. Restart Outlook.
 7. Open a compose window and open the task pane once. Wait for the status
    `Microsoft-365-Profil wurde automatisch geladen.` This stores the profile
@@ -29,7 +29,7 @@ event runtime intentionally skips insertion instead of inserting stale data.
 
 ## Outlook Mobile
 
-Manifest version `1.6.0.0` includes both the mobile settings command and the mobile
+Manifest version `1.6.1.0` includes both the mobile settings command and the mobile
 `OnNewMessageCompose` launch event.
 
 1. Use Outlook for Android or iOS version `4.2352.0` or later.
@@ -52,7 +52,7 @@ iOS, composing through the Share action doesn't trigger the launch event.
 
 ## Send As / Im Auftrag von
 
-Version `1.6.0.0` reads the current compose item’s From field. If its address
+Version `1.6.1.0` reads the current compose item’s From field. If its address
 belongs to a different user, all signature contact and organization data comes
 from that From user's Microsoft 365 profile. The name line keeps the signed-in
 sender first and adds the From user in parentheses, for example
@@ -60,6 +60,12 @@ sender first and adds the From user in parentheses, for example
 `extensionAttribute10` and `extensionAttribute11` around John Doe's name.
 Changing the From field updates an automatically inserted signature through
 the `OnMessageFromChanged` event.
+
+As a security boundary, delegated rendering is enabled only when the From
+address has the same exact email domain as the signed-in user's Microsoft 365
+address. Domain comparison is case-insensitive. A different or malformed
+domain skips the directory lookup and keeps the normal signed-in user
+signature without an `i.A.` name.
 
 This lookup requires additional Microsoft Graph configuration:
 
@@ -82,7 +88,7 @@ included until `User.Read.All` and the event-runtime authorization are working.
 
 ## Live settings updates
 
-Signatures inserted by version `1.6.0.0` contain both an HTML attribute and a
+Signatures inserted by version `1.6.1.0` contain both an HTML attribute and a
 non-visible text marker. When a user changes a preference in the desktop
 compose settings page, the add-in rebuilds the signature immediately, including
 the current From identity. Clients with Mailbox 1.10 use Outlook's native

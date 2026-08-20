@@ -88,6 +88,11 @@ signature uses these From-user details while rendering the name as
 `signed-in user (i.A. From user)`. The token itself is never written to roaming
 settings.
 
+The add-in compares the normalized domain after the final `@` in both email
+addresses before requesting the From user's profile. Exact same-domain matches
+are allowed; different or missing domains disable delegated rendering and use
+the signed-in user's normal signature.
+
 Rendered signatures include the `attensam-signature-root` element and a hidden
 `ATTENSAM-SIGNATURE-V2` text marker. After a preference is saved, the desktop
 settings page uses Outlook's native signature replacement when available. On

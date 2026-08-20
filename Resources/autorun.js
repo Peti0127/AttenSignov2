@@ -71,6 +71,13 @@ function normalizeEmail(value) {
   return String(value || "").trim().toLocaleLowerCase("de-AT");
 }
 
+function emailDomain(value) {
+  const email = normalizeEmail(value);
+  const separator = email.lastIndexOf("@");
+  if (separator <= 0 || separator === email.length - 1) return "";
+  return email.slice(separator + 1);
+}
+
 function personalName(profile) {
   let name = "";
   if (!profile) return "";
@@ -284,6 +291,18 @@ function resolveDelegation(renderData, callback) {
     const fromEmail = normalizeEmail(fromDetails.emailAddress);
     const ownEmail = normalizeEmail(renderData && renderData.profile && renderData.profile.email);
     if (!fromEmail || fromEmail === ownEmail) {
+      callback(null);
+      return;
+    }
+    const fromDomain = emailDomain(fromEmail);
+    const profileDomain = emailDomain(ownEmail);
+    const mailboxDomain = emailDomain(
+      Office.context.mailbox.userProfile && Office.context.mailbox.userProfile.emailAddress,
+    );
+    if (
+      !fromDomain
+      || (fromDomain !== profileDomain && fromDomain !== mailboxDomain)
+    ) {
       callback(null);
       return;
     }
