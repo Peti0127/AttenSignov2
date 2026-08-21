@@ -418,8 +418,7 @@ function showProfileWarnings(profileValue) {
     profileWarningsElement.hidden = true;
     return;
   }
-  const previewPhoneMode = signatureSettings.Nummer === "EDVHotline" ? "Festnetz" : null;
-  const messages = profileWarningMessages(profileValue, previewPhoneMode);
+  const messages = profileWarningMessages(profileValue, signatureSettings.Nummer);
   profileWarningsElement.replaceChildren(...messages.map((message) => {
     const paragraph = document.createElement("p");
     paragraph.textContent = message;
