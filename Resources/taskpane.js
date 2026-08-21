@@ -38,6 +38,7 @@ function readableError(error) {
     Nummer: "Alles",
     MfG: "MfG1",
     CustomGreeting: "",
+    GreetingLines: 1,
     AutoInsert: false,
     AutoInsertMode: "NewMail",
     InsertTitleBefore: false,
@@ -47,6 +48,7 @@ function readableError(error) {
   });
   const ALLOWED_NUMBERS = new Set(["Alles", "Handy", "Festnetz", "Office", "EDVHotline"]);
   const ALLOWED_GREETINGS = new Set(["MfG0", "MfG1", "MfG2", "MfG3", "MfGCustom"]);
+  const ALLOWED_GREETING_LINES = new Set([1, 2, 3]);
   const ALLOWED_AUTO_MODES = new Set(["NewMail", "AllMail"]);
   const LEGACY_NUMBER_MAP = Object.freeze({
     both: "Alles",
@@ -130,6 +132,9 @@ function readableError(error) {
       Nummer: ALLOWED_NUMBERS.has(value?.Nummer) ? value.Nummer : DEFAULT_SETTINGS.Nummer,
       MfG: ALLOWED_GREETINGS.has(value?.MfG) ? value.MfG : DEFAULT_SETTINGS.MfG,
       CustomGreeting: normalizeCustomGreeting(value?.CustomGreeting),
+      GreetingLines: ALLOWED_GREETING_LINES.has(Number(value?.GreetingLines))
+        ? Number(value.GreetingLines)
+        : DEFAULT_SETTINGS.GreetingLines,
       AutoInsert: value.AutoInsert === true,
       AutoInsertMode: ALLOWED_AUTO_MODES.has(value?.AutoInsertMode)
         ? value.AutoInsertMode
@@ -163,6 +168,7 @@ function readableError(error) {
       Nummer: record.Nummer,
       MfG: record.MfG,
       CustomGreeting: record.CustomGreeting,
+      GreetingLines: record.GreetingLines,
       AutoInsert: record.AutoInsert,
       AutoInsertMode: record.AutoInsertMode,
       InsertTitleBefore: record.InsertTitleBefore,
@@ -192,6 +198,7 @@ function readableError(error) {
       Nummer: LEGACY_NUMBER_MAP[legacy] || DEFAULT_SETTINGS.Nummer,
       MfG: DEFAULT_SETTINGS.MfG,
       CustomGreeting: DEFAULT_SETTINGS.CustomGreeting,
+      GreetingLines: DEFAULT_SETTINGS.GreetingLines,
       AutoInsert: DEFAULT_SETTINGS.AutoInsert,
       AutoInsertMode: DEFAULT_SETTINGS.AutoInsertMode,
       InsertTitleBefore: DEFAULT_SETTINGS.InsertTitleBefore,
@@ -206,6 +213,7 @@ function readableError(error) {
       !ALLOWED_NUMBERS.has(settings?.Nummer)
       || !ALLOWED_GREETINGS.has(settings?.MfG)
       || typeof settings?.CustomGreeting !== "string"
+      || !ALLOWED_GREETING_LINES.has(Number(settings?.GreetingLines))
       || typeof settings?.AutoInsert !== "boolean"
       || !ALLOWED_AUTO_MODES.has(settings?.AutoInsertMode)
       || typeof settings?.InsertTitleBefore !== "boolean"
@@ -219,6 +227,7 @@ function readableError(error) {
       Nummer: settings.Nummer,
       MfG: settings.MfG,
       CustomGreeting: normalizeCustomGreeting(settings.CustomGreeting),
+      GreetingLines: Number(settings.GreetingLines),
       AutoInsert: settings.AutoInsert,
       AutoInsertMode: settings.AutoInsertMode,
       InsertTitleBefore: settings.InsertTitleBefore,
@@ -283,6 +292,7 @@ let signatureSettings = {
   Nummer: "Alles",
   MfG: "MfG1",
   CustomGreeting: "",
+  GreetingLines: 1,
   InsertTitleBefore: false,
   InsertTitleAfter: false,
   MobileUsage: false,
@@ -344,7 +354,9 @@ function greetingHtml() {
     greeting = String(signatureSettings.CustomGreeting || "").trim();
   }
   if (!greeting) return "";
-  return `<p style="margin: 0; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);">${escapeHtml(greeting)}<br><br></p>`;
+  const configuredLines = Number(signatureSettings.GreetingLines);
+  const blankLines = [1, 2, 3].includes(configuredLines) ? configuredLines : 1;
+  return `<p style="margin: 0; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);">${escapeHtml(greeting)}${"<br>".repeat(blankLines + 1)}</p>`;
 }
 
 function noticesHtml() {
@@ -774,6 +786,8 @@ const edvHotlineOption = document.getElementById("edv-hotline-option");
 const greetingModeSelect = document.getElementById("greeting-mode");
 const customGreetingField = document.getElementById("custom-greeting-field");
 const customGreetingInput = document.getElementById("custom-greeting");
+const greetingLinesField = document.getElementById("greeting-lines-field");
+const greetingLinesSelect = document.getElementById("greeting-lines");
 const titleBeforeField = document.getElementById("title-before-field");
 const insertTitleBeforeCheckbox = document.getElementById("insert-title-before");
 const titleAfterField = document.getElementById("title-after-field");
@@ -796,14 +810,18 @@ function updateAutoInsertVisibility() {
 
 function updateGreetingVisibility() {
   const isCustom = greetingModeSelect.value === "MfGCustom";
+  const hasGreeting = greetingModeSelect.value !== "MfG0";
   customGreetingField.hidden = !isCustom;
+  greetingLinesField.hidden = !hasGreeting;
   customGreetingInput.disabled = greetingModeSelect.disabled || !isCustom;
+  greetingLinesSelect.disabled = greetingModeSelect.disabled || !hasGreeting;
 }
 
 function setControlsDisabled(disabled) {
   phoneModeSelect.disabled = disabled;
   greetingModeSelect.disabled = disabled;
   customGreetingInput.disabled = disabled || greetingModeSelect.value !== "MfGCustom";
+  greetingLinesSelect.disabled = disabled || greetingModeSelect.value === "MfG0";
   insertTitleBeforeCheckbox.disabled = disabled;
   insertTitleAfterCheckbox.disabled = disabled;
   mobileUsageCheckbox.disabled = disabled;
@@ -899,6 +917,7 @@ async function initializeSettings() {
       : currentSettings.Nummer;
     greetingModeSelect.value = currentSettings.MfG;
     customGreetingInput.value = currentSettings.CustomGreeting;
+    greetingLinesSelect.value = String(currentSettings.GreetingLines);
     updateGreetingVisibility();
     titleBeforeField.hidden = !titleAttributes.customAttribute10;
     titleAfterField.hidden = !titleAttributes.customAttribute11;
@@ -924,6 +943,7 @@ async function saveSettings() {
       Nummer: phoneModeSelect.value,
       MfG: greetingModeSelect.value,
       CustomGreeting: customGreetingInput.value,
+      GreetingLines: Number(greetingLinesSelect.value),
       AutoInsert: autoInsertCheckbox.checked,
       AutoInsertMode: autoInsertModeSelect.value,
       InsertTitleBefore: insertTitleBeforeCheckbox.checked,
@@ -953,6 +973,7 @@ greetingModeSelect.addEventListener("change", () => {
   saveSettings();
 });
 customGreetingInput.addEventListener("change", saveSettings);
+greetingLinesSelect.addEventListener("change", saveSettings);
 insertTitleBeforeCheckbox.addEventListener("change", saveSettings);
 insertTitleAfterCheckbox.addEventListener("change", saveSettings);
 mobileUsageCheckbox.addEventListener("change", saveSettings);
@@ -982,6 +1003,8 @@ const edvHotlineOption = document.getElementById("edv-hotline-option");
 const greetingModeSelect = document.getElementById("greeting-mode");
 const customGreetingField = document.getElementById("custom-greeting-field");
 const customGreetingInput = document.getElementById("custom-greeting");
+const greetingLinesField = document.getElementById("greeting-lines-field");
+const greetingLinesSelect = document.getElementById("greeting-lines");
 const titleBeforeField = document.getElementById("title-before-field");
 const insertTitleBeforeCheckbox = document.getElementById("insert-title-before");
 const titleAfterField = document.getElementById("title-after-field");
@@ -1007,6 +1030,7 @@ function setControlsDisabled(disabled) {
   phoneModeSelect.disabled = disabled;
   greetingModeSelect.disabled = disabled;
   customGreetingInput.disabled = disabled || greetingModeSelect.value !== "MfGCustom";
+  greetingLinesSelect.disabled = disabled || greetingModeSelect.value === "MfG0";
   insertTitleBeforeCheckbox.disabled = disabled;
   insertTitleAfterCheckbox.disabled = disabled;
   mobileUsageCheckbox.disabled = disabled;
@@ -1021,8 +1045,11 @@ function updateAutoInsertVisibility() {
 
 function updateGreetingVisibility() {
   const isCustom = greetingModeSelect.value === "MfGCustom";
+  const hasGreeting = greetingModeSelect.value !== "MfG0";
   customGreetingField.hidden = !isCustom;
+  greetingLinesField.hidden = !hasGreeting;
   customGreetingInput.disabled = greetingModeSelect.disabled || !isCustom;
+  greetingLinesSelect.disabled = greetingModeSelect.disabled || !hasGreeting;
 }
 
 function updateDepartmentOption(department) {
@@ -1042,6 +1069,7 @@ function showSettings(settings, department, titleAttributes) {
     : settings.Nummer;
   greetingModeSelect.value = settings.MfG;
   customGreetingInput.value = settings.CustomGreeting;
+  greetingLinesSelect.value = String(settings.GreetingLines);
   updateGreetingVisibility();
   titleBeforeField.hidden = !titleAttributes.customAttribute10;
   titleAfterField.hidden = !titleAttributes.customAttribute11;
@@ -1182,6 +1210,7 @@ async function saveSettings() {
       Nummer: phoneModeSelect.value,
       MfG: greetingModeSelect.value,
       CustomGreeting: customGreetingInput.value,
+      GreetingLines: Number(greetingLinesSelect.value),
       AutoInsert: autoInsertCheckbox.checked,
       AutoInsertMode: autoInsertModeSelect.value,
       InsertTitleBefore: insertTitleBeforeCheckbox.checked,
@@ -1203,6 +1232,7 @@ greetingModeSelect.addEventListener("change", () => {
   saveSettings();
 });
 customGreetingInput.addEventListener("change", saveSettings);
+greetingLinesSelect.addEventListener("change", saveSettings);
 insertTitleBeforeCheckbox.addEventListener("change", saveSettings);
 insertTitleAfterCheckbox.addEventListener("change", saveSettings);
 mobileUsageCheckbox.addEventListener("change", saveSettings);
