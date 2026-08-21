@@ -563,7 +563,8 @@ function renderSignature() {
   const signatureContent = greetingHtml() + signatureBody + noticesHtml();
   const marker = `<span style="display:none!important;mso-hide:all;max-height:0;overflow:hidden;font-size:0;line-height:0;color:transparent;">${SIGNATURE_MARKER_TEXT}</span>`;
   const previewHtml = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2">${marker}${signatureContent}</div>`;
-  const html = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2">${marker}${insertedProfileWarningsHtml(signatureProfile)}${signatureContent}</div>`;
+  const insertedWarnings = currentDelegation ? "" : insertedProfileWarningsHtml(signatureProfile);
+  const html = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2">${marker}${insertedWarnings}${signatureContent}</div>`;
   previewElement.innerHTML = previewHtml;
   showProfileWarnings(signatureProfile);
   previewElement.querySelectorAll("img").forEach((image) => {
