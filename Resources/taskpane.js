@@ -418,7 +418,8 @@ function showProfileWarnings(profileValue) {
     profileWarningsElement.hidden = true;
     return;
   }
-  const messages = profileWarningMessages(profileValue);
+  const previewPhoneMode = signatureSettings.Nummer === "EDVHotline" ? "Festnetz" : null;
+  const messages = profileWarningMessages(profileValue, previewPhoneMode);
   profileWarningsElement.replaceChildren(...messages.map((message) => {
     const paragraph = document.createElement("p");
     paragraph.textContent = message;
@@ -885,7 +886,7 @@ function updatePhoneWarnings() {
   const bothNeeded = mode === "Alles";
   combinedPhoneWarning.hidden = !(bothNeeded && mobileMissing && phoneMissing);
   mobilePhoneWarning.hidden = !mobileMissing
-    || (mode !== "Handy" && mode !== "Alles")
+    || (mode !== "Handy" && mode !== "Alles" && mode !== "EDVHotline")
     || (bothNeeded && phoneMissing);
   landlinePhoneWarning.hidden = !phoneMissing
     || (mode !== "Festnetz" && mode !== "Alles")
@@ -1149,7 +1150,7 @@ function updatePhoneWarnings() {
   const bothNeeded = mode === "Alles";
   combinedPhoneWarning.hidden = !(bothNeeded && mobileMissing && phoneMissing);
   mobilePhoneWarning.hidden = !mobileMissing
-    || (mode !== "Handy" && mode !== "Alles")
+    || (mode !== "Handy" && mode !== "Alles" && mode !== "EDVHotline")
     || (bothNeeded && phoneMissing);
   landlinePhoneWarning.hidden = !phoneMissing
     || (mode !== "Festnetz" && mode !== "Alles")
