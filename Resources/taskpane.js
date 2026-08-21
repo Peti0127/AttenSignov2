@@ -381,21 +381,33 @@ function missingProfileFields(profileValue) {
     ["postalCode", "Postleitzahl"],
     ["street", "Straße"],
   ];
-  const missing = requiredFields
+  return requiredFields
     .filter(([key]) => !String(profileValue?.[key] || "").trim())
     .map(([, label]) => label);
-  if (!String(profileValue?.mobile || "").trim()) missing.push("Mobilnummer");
-  if (!String(profileValue?.phone || "").trim()) missing.push("Festnetznummer");
-  return missing;
 }
 
-function profileWarningMessages(profileValue) {
-  return missingProfileFields(profileValue)
+function profileWarningMessages(profileValue, phoneMode = null) {
+  const messages = missingProfileFields(profileValue)
     .map((field) => `Information über ${field} fehlt, bitte EDV kontaktieren!`);
+  const mobileMissing = !String(profileValue?.mobile || "").trim();
+  const phoneMissing = !String(profileValue?.phone || "").trim();
+  const needsMobile = phoneMode === null || phoneMode === "Handy" || phoneMode === "Alles";
+  const needsPhone = phoneMode === null || phoneMode === "Festnetz" || phoneMode === "Alles";
+  if (mobileMissing && phoneMissing && needsMobile && needsPhone) {
+    messages.push("Informationen über Festnetznummer und Mobilnummer fehlen, bitte EDV kontaktieren!");
+  } else {
+    if (mobileMissing && needsMobile) {
+      messages.push("Information über Mobilnummer fehlt, bitte EDV kontaktieren!");
+    }
+    if (phoneMissing && needsPhone) {
+      messages.push("Information über Festnetznummer fehlt, bitte EDV kontaktieren!");
+    }
+  }
+  return messages;
 }
 
 function insertedProfileWarningsHtml(profileValue) {
-  return profileWarningMessages(profileValue)
+  return profileWarningMessages(profileValue, signatureSettings.Nummer)
     .map((message) => `<p style="margin: 0 0 6px; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: #c00000; font-weight: bold;"><b>${escapeHtml(message)}</b></p>`)
     .join("");
 }
@@ -831,6 +843,7 @@ const SETTINGS_SIGNATURE_MARKER_TEXT = "ATTENSAM-SIGNATURE-V2";
 
 const phoneModeSelect = document.getElementById("phone-mode");
 const edvHotlineOption = document.getElementById("edv-hotline-option");
+const combinedPhoneWarning = document.getElementById("combined-phone-warning");
 const mobilePhoneWarning = document.getElementById("mobile-phone-warning");
 const landlinePhoneWarning = document.getElementById("landline-phone-warning");
 const greetingModeSelect = document.getElementById("greeting-mode");
@@ -861,15 +874,22 @@ function updateAutoInsertVisibility() {
 
 function updatePhoneWarnings() {
   if (!settingsProfile) {
+    combinedPhoneWarning.hidden = true;
     mobilePhoneWarning.hidden = true;
     landlinePhoneWarning.hidden = true;
     return;
   }
   const mode = phoneModeSelect.value;
-  mobilePhoneWarning.hidden = Boolean(String(settingsProfile.mobile || "").trim())
-    || (mode !== "Handy" && mode !== "Alles");
-  landlinePhoneWarning.hidden = Boolean(String(settingsProfile.phone || "").trim())
-    || (mode !== "Festnetz" && mode !== "Alles");
+  const mobileMissing = !String(settingsProfile.mobile || "").trim();
+  const phoneMissing = !String(settingsProfile.phone || "").trim();
+  const bothNeeded = mode === "Alles";
+  combinedPhoneWarning.hidden = !(bothNeeded && mobileMissing && phoneMissing);
+  mobilePhoneWarning.hidden = !mobileMissing
+    || (mode !== "Handy" && mode !== "Alles")
+    || (bothNeeded && phoneMissing);
+  landlinePhoneWarning.hidden = !phoneMissing
+    || (mode !== "Festnetz" && mode !== "Alles")
+    || (bothNeeded && mobileMissing);
 }
 
 function updateGreetingVisibility() {
@@ -1069,6 +1089,7 @@ const AUTO_RENDER_DATA_KEY = "attensam.signature.render-data.v1";
 
 const phoneModeSelect = document.getElementById("phone-mode");
 const edvHotlineOption = document.getElementById("edv-hotline-option");
+const combinedPhoneWarning = document.getElementById("combined-phone-warning");
 const mobilePhoneWarning = document.getElementById("mobile-phone-warning");
 const landlinePhoneWarning = document.getElementById("landline-phone-warning");
 const greetingModeSelect = document.getElementById("greeting-mode");
@@ -1117,15 +1138,22 @@ function updateAutoInsertVisibility() {
 
 function updatePhoneWarnings() {
   if (!settingsProfile) {
+    combinedPhoneWarning.hidden = true;
     mobilePhoneWarning.hidden = true;
     landlinePhoneWarning.hidden = true;
     return;
   }
   const mode = phoneModeSelect.value;
-  mobilePhoneWarning.hidden = Boolean(String(settingsProfile.mobile || "").trim())
-    || (mode !== "Handy" && mode !== "Alles");
-  landlinePhoneWarning.hidden = Boolean(String(settingsProfile.phone || "").trim())
-    || (mode !== "Festnetz" && mode !== "Alles");
+  const mobileMissing = !String(settingsProfile.mobile || "").trim();
+  const phoneMissing = !String(settingsProfile.phone || "").trim();
+  const bothNeeded = mode === "Alles";
+  combinedPhoneWarning.hidden = !(bothNeeded && mobileMissing && phoneMissing);
+  mobilePhoneWarning.hidden = !mobileMissing
+    || (mode !== "Handy" && mode !== "Alles")
+    || (bothNeeded && phoneMissing);
+  landlinePhoneWarning.hidden = !phoneMissing
+    || (mode !== "Festnetz" && mode !== "Alles")
+    || (bothNeeded && mobileMissing);
 }
 
 function updateGreetingVisibility() {
