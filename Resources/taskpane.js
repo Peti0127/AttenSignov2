@@ -360,9 +360,15 @@ function greetingHtml() {
   return `<p style="margin: 0; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);">${escapeHtml(greeting)}${"<br>".repeat(blankLines + 1)}</p>`;
 }
 
+function isOutlookMobile() {
+  const platform = Office.context?.platform;
+  const platformTypes = Office.PlatformType || {};
+  return platform === platformTypes.Android || platform === platformTypes.iOS;
+}
+
 function noticesHtml() {
   let html = "";
-  if (signatureSettings.MobileUsage) {
+  if (signatureSettings.MobileUsage && isOutlookMobile()) {
     html += '<p style="margin: 12px 0 0; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);">Diese E-Mail wurde über Outlook Mobile versendet.</p>';
   }
   if (signatureSettings.Confidentiality) {
