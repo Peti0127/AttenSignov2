@@ -44,6 +44,7 @@ function readableError(error) {
     InsertTitleBefore: false,
     InsertTitleAfter: false,
     MobileUsage: false,
+    MobileUsageText: "",
     Confidentiality: false,
   });
   const ALLOWED_NUMBERS = new Set(["Alles", "Handy", "Festnetz", "Office", "EDVHotline"]);
@@ -80,6 +81,10 @@ function readableError(error) {
 
   function normalizeCustomGreeting(value) {
     return String(value || "").replace(/\s+/g, " ").trim().slice(0, 200);
+  }
+
+  function normalizeMobileUsageText(value) {
+    return String(value || "").replace(/\s+/g, " ").trim().slice(0, 300);
   }
 
   function setDepartment(department) {
@@ -142,6 +147,7 @@ function readableError(error) {
       InsertTitleBefore: value.InsertTitleBefore === true,
       InsertTitleAfter: value.InsertTitleAfter === true,
       MobileUsage: value.MobileUsage === true,
+      MobileUsageText: normalizeMobileUsageText(value?.MobileUsageText),
       Confidentiality: value.Confidentiality === true,
       updatedAt: Number.isFinite(Date.parse(value.updatedAt)) ? value.updatedAt : "",
     };
@@ -174,6 +180,7 @@ function readableError(error) {
       InsertTitleBefore: record.InsertTitleBefore,
       InsertTitleAfter: record.InsertTitleAfter,
       MobileUsage: record.MobileUsage,
+      MobileUsageText: record.MobileUsageText,
       Confidentiality: record.Confidentiality,
     };
   }
@@ -204,6 +211,7 @@ function readableError(error) {
       InsertTitleBefore: DEFAULT_SETTINGS.InsertTitleBefore,
       InsertTitleAfter: DEFAULT_SETTINGS.InsertTitleAfter,
       MobileUsage: DEFAULT_SETTINGS.MobileUsage,
+      MobileUsageText: DEFAULT_SETTINGS.MobileUsageText,
       Confidentiality: DEFAULT_SETTINGS.Confidentiality,
     };
   }
@@ -219,6 +227,7 @@ function readableError(error) {
       || typeof settings?.InsertTitleBefore !== "boolean"
       || typeof settings?.InsertTitleAfter !== "boolean"
       || typeof settings?.MobileUsage !== "boolean"
+      || typeof settings?.MobileUsageText !== "string"
       || typeof settings?.Confidentiality !== "boolean"
     ) {
       throw new Error("Ungültige Einstellung.");
@@ -233,6 +242,7 @@ function readableError(error) {
       InsertTitleBefore: settings.InsertTitleBefore,
       InsertTitleAfter: settings.InsertTitleAfter,
       MobileUsage: settings.MobileUsage,
+      MobileUsageText: normalizeMobileUsageText(settings.MobileUsageText),
       Confidentiality: settings.Confidentiality,
       updatedAt: new Date().toISOString(),
     };
@@ -296,6 +306,7 @@ let signatureSettings = {
   InsertTitleBefore: false,
   InsertTitleAfter: false,
   MobileUsage: false,
+  MobileUsageText: "",
   Confidentiality: false,
 };
 
@@ -369,7 +380,9 @@ function isOutlookMobile() {
 function noticesHtml() {
   let html = "";
   if (signatureSettings.MobileUsage && isOutlookMobile()) {
-    html += '<p style="margin: 12px 0 0; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);">Diese E-Mail wurde über Outlook Mobile versendet.</p>';
+    const customText = String(signatureSettings.MobileUsageText || "").replace(/\s+/g, " ").trim();
+    const mobileNotice = `Wurde über Outlook Mobile versendet.${customText ? ` ${customText}` : ""}`;
+    html += `<p style="margin: 12px 0 0; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);">${escapeHtml(mobileNotice)}</p>`;
   }
   if (signatureSettings.Confidentiality) {
     html += '<p style="margin: 6px 0 0; font-family: Aptos, Arial, sans-serif; font-size: 9pt; color: rgb(0, 0, 0);">Diese E-Mail ist vertraulich.</p>';
@@ -862,6 +875,8 @@ const insertTitleBeforeCheckbox = document.getElementById("insert-title-before")
 const titleAfterField = document.getElementById("title-after-field");
 const insertTitleAfterCheckbox = document.getElementById("insert-title-after");
 const mobileUsageCheckbox = document.getElementById("mobile-usage");
+const mobileUsageTextField = document.getElementById("mobile-usage-text-field");
+const mobileUsageTextInput = document.getElementById("mobile-usage-text");
 const confidentialityCheckbox = document.getElementById("confidentiality");
 const autoInsertCheckbox = document.getElementById("auto-insert");
 const autoInsertModeField = document.getElementById("auto-insert-mode-field");
@@ -876,6 +891,11 @@ function setSettingsStatus(message) {
 
 function updateAutoInsertVisibility() {
   autoInsertModeField.hidden = !autoInsertCheckbox.checked;
+}
+
+function updateMobileUsageVisibility() {
+  mobileUsageTextField.hidden = !mobileUsageCheckbox.checked;
+  mobileUsageTextInput.disabled = mobileUsageCheckbox.disabled || !mobileUsageCheckbox.checked;
 }
 
 function updatePhoneWarnings() {
@@ -915,6 +935,7 @@ function setControlsDisabled(disabled) {
   insertTitleBeforeCheckbox.disabled = disabled;
   insertTitleAfterCheckbox.disabled = disabled;
   mobileUsageCheckbox.disabled = disabled;
+  mobileUsageTextInput.disabled = disabled || !mobileUsageCheckbox.checked;
   confidentialityCheckbox.disabled = disabled;
   autoInsertCheckbox.disabled = disabled;
   autoInsertModeSelect.disabled = disabled;
@@ -1016,6 +1037,8 @@ async function initializeSettings() {
     insertTitleBeforeCheckbox.checked = currentSettings.InsertTitleBefore;
     insertTitleAfterCheckbox.checked = currentSettings.InsertTitleAfter;
     mobileUsageCheckbox.checked = currentSettings.MobileUsage;
+    mobileUsageTextInput.value = currentSettings.MobileUsageText;
+    updateMobileUsageVisibility();
     confidentialityCheckbox.checked = currentSettings.Confidentiality;
     autoInsertCheckbox.checked = currentSettings.AutoInsert;
     autoInsertModeSelect.value = currentSettings.AutoInsertMode;
@@ -1041,6 +1064,7 @@ async function saveSettings() {
       InsertTitleBefore: insertTitleBeforeCheckbox.checked,
       InsertTitleAfter: insertTitleAfterCheckbox.checked,
       MobileUsage: mobileUsageCheckbox.checked,
+      MobileUsageText: mobileUsageTextInput.value,
       Confidentiality: confidentialityCheckbox.checked,
     });
     try {
@@ -1071,7 +1095,11 @@ customGreetingInput.addEventListener("change", saveSettings);
 greetingLinesSelect.addEventListener("change", saveSettings);
 insertTitleBeforeCheckbox.addEventListener("change", saveSettings);
 insertTitleAfterCheckbox.addEventListener("change", saveSettings);
-mobileUsageCheckbox.addEventListener("change", saveSettings);
+mobileUsageCheckbox.addEventListener("change", () => {
+  updateMobileUsageVisibility();
+  saveSettings();
+});
+mobileUsageTextInput.addEventListener("change", saveSettings);
 confidentialityCheckbox.addEventListener("change", saveSettings);
 autoInsertCheckbox.addEventListener("change", () => {
   updateAutoInsertVisibility();
@@ -1108,6 +1136,8 @@ const insertTitleBeforeCheckbox = document.getElementById("insert-title-before")
 const titleAfterField = document.getElementById("title-after-field");
 const insertTitleAfterCheckbox = document.getElementById("insert-title-after");
 const mobileUsageCheckbox = document.getElementById("mobile-usage");
+const mobileUsageTextField = document.getElementById("mobile-usage-text-field");
+const mobileUsageTextInput = document.getElementById("mobile-usage-text");
 const confidentialityCheckbox = document.getElementById("confidentiality");
 const autoInsertCheckbox = document.getElementById("auto-insert");
 const autoInsertModeField = document.getElementById("auto-insert-mode-field");
@@ -1133,6 +1163,7 @@ function setControlsDisabled(disabled) {
   insertTitleBeforeCheckbox.disabled = disabled;
   insertTitleAfterCheckbox.disabled = disabled;
   mobileUsageCheckbox.disabled = disabled;
+  mobileUsageTextInput.disabled = disabled || !mobileUsageCheckbox.checked;
   confidentialityCheckbox.disabled = disabled;
   autoInsertCheckbox.disabled = disabled;
   autoInsertModeSelect.disabled = disabled;
@@ -1140,6 +1171,11 @@ function setControlsDisabled(disabled) {
 
 function updateAutoInsertVisibility() {
   autoInsertModeField.hidden = !autoInsertCheckbox.checked;
+}
+
+function updateMobileUsageVisibility() {
+  mobileUsageTextField.hidden = !mobileUsageCheckbox.checked;
+  mobileUsageTextInput.disabled = mobileUsageCheckbox.disabled || !mobileUsageCheckbox.checked;
 }
 
 function updatePhoneWarnings() {
@@ -1199,6 +1235,8 @@ function showSettings(settings, department, titleAttributes) {
   insertTitleBeforeCheckbox.checked = settings.InsertTitleBefore;
   insertTitleAfterCheckbox.checked = settings.InsertTitleAfter;
   mobileUsageCheckbox.checked = settings.MobileUsage;
+  mobileUsageTextInput.value = settings.MobileUsageText;
+  updateMobileUsageVisibility();
   confidentialityCheckbox.checked = settings.Confidentiality;
   autoInsertCheckbox.checked = settings.AutoInsert;
   autoInsertModeSelect.value = settings.AutoInsertMode;
@@ -1340,6 +1378,7 @@ async function saveSettings() {
       InsertTitleBefore: insertTitleBeforeCheckbox.checked,
       InsertTitleAfter: insertTitleAfterCheckbox.checked,
       MobileUsage: mobileUsageCheckbox.checked,
+      MobileUsageText: mobileUsageTextInput.value,
       Confidentiality: confidentialityCheckbox.checked,
     });
     setSettingsStatus("Einstellungen gespeichert.");
@@ -1362,7 +1401,11 @@ customGreetingInput.addEventListener("change", saveSettings);
 greetingLinesSelect.addEventListener("change", saveSettings);
 insertTitleBeforeCheckbox.addEventListener("change", saveSettings);
 insertTitleAfterCheckbox.addEventListener("change", saveSettings);
-mobileUsageCheckbox.addEventListener("change", saveSettings);
+mobileUsageCheckbox.addEventListener("change", () => {
+  updateMobileUsageVisibility();
+  saveSettings();
+});
+mobileUsageTextInput.addEventListener("change", saveSettings);
 confidentialityCheckbox.addEventListener("change", saveSettings);
 autoInsertCheckbox.addEventListener("change", () => {
   updateAutoInsertVisibility();
