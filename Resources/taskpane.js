@@ -326,14 +326,14 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
-function phoneLine(profileValue = profile) {
+function phoneLine(profileValue = profile, settings = signatureSettings) {
   const phone = escapeHtml(String(profileValue.phone || "").trim());
   const mobile = escapeHtml(String(profileValue.mobile || "").trim());
   const officeNumber = CONFIG.officeNumber.includes("YOUR_")
     ? ""
     : escapeHtml(CONFIG.officeNumber.trim());
 
-  switch (signatureSettings.Nummer) {
+  switch (settings.Nummer) {
     case "Handy":
       return mobile ? `Mobil ${mobile}` : "";
     case "Festnetz":
@@ -353,20 +353,20 @@ function phoneLine(profileValue = profile) {
   }
 }
 
-function greetingHtml() {
-  if (signatureSettings.MfG === "MfG0") return "";
+function greetingHtml(settings = signatureSettings) {
+  if (settings.MfG === "MfG0") return "";
   let greeting = "";
-  if (signatureSettings.MfG === "MfG1") {
+  if (settings.MfG === "MfG1") {
     greeting = "Mit freundlichen Grüßen";
-  } else if (signatureSettings.MfG === "MfG2") {
+  } else if (settings.MfG === "MfG2") {
     greeting = "Freundliche Grüße";
-  } else if (signatureSettings.MfG === "MfG3") {
+  } else if (settings.MfG === "MfG3") {
     greeting = "LG";
-  } else if (signatureSettings.MfG === "MfGCustom") {
-    greeting = String(signatureSettings.CustomGreeting || "").trim();
+  } else if (settings.MfG === "MfGCustom") {
+    greeting = String(settings.CustomGreeting || "").trim();
   }
   if (!greeting) return "";
-  const configuredLines = Number(signatureSettings.GreetingLines);
+  const configuredLines = Number(settings.GreetingLines);
   const blankLines = [1, 2, 3].includes(configuredLines) ? configuredLines : 1;
   return `<p style="margin: 0; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);">${escapeHtml(greeting)}${"<br>".repeat(blankLines + 1)}</p>`;
 }
@@ -377,14 +377,14 @@ function isOutlookMobile() {
   return platform === platformTypes.Android || platform === platformTypes.iOS;
 }
 
-function noticesHtml() {
+function noticesHtml(settings = signatureSettings) {
   let html = "";
-  if (signatureSettings.MobileUsage && isOutlookMobile()) {
-    const customText = String(signatureSettings.MobileUsageText || "").replace(/\s+/g, " ").trim();
+  if (settings.MobileUsage && isOutlookMobile()) {
+    const customText = String(settings.MobileUsageText || "").replace(/\s+/g, " ").trim();
     const mobileNotice = `Wurde über Outlook Mobile versendet.${customText ? ` ${customText}` : ""}`;
     html += `<p style="margin: 12px 0 0; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);">${escapeHtml(mobileNotice)}</p>`;
   }
-  if (signatureSettings.Confidentiality) {
+  if (settings.Confidentiality) {
     html += '<p style="margin: 6px 0 0; font-family: Aptos, Arial, sans-serif; font-size: 9pt; color: rgb(0, 0, 0);">Diese E-Mail ist vertraulich.</p>';
   }
   return html;
@@ -393,7 +393,6 @@ function noticesHtml() {
 function missingProfileFields(profileValue) {
   const requiredFields = [
     ["firstName", "Vorname"],
-    ["lastName", "Nachname"],
     ["jobTitle", "Funktion"],
     ["email", "E-Mail-Adresse"],
     ["city", "Ort"],
@@ -405,39 +404,39 @@ function missingProfileFields(profileValue) {
     .map(([, label]) => label);
 }
 
+function joinedFieldNames(fields) {
+  if (fields.length < 2) return fields[0] || "";
+  return `${fields.slice(0, -1).join(", ")} und ${fields[fields.length - 1]}`;
+}
+
 function profileWarningMessages(profileValue, phoneMode = null) {
-  const messages = missingProfileFields(profileValue)
-    .map((field) => `Information über ${field} fehlt, bitte EDV kontaktieren!`);
+  const missing = missingProfileFields(profileValue);
   const mobileMissing = !String(profileValue?.mobile || "").trim();
   const phoneMissing = !String(profileValue?.phone || "").trim();
   const needsMobile = phoneMode === null || phoneMode === "Handy" || phoneMode === "Alles";
   const needsPhone = phoneMode === null || phoneMode === "Festnetz" || phoneMode === "Alles";
-  if (mobileMissing && phoneMissing && needsMobile && needsPhone) {
-    messages.push("Informationen über Festnetznummer und Mobilnummer fehlen, bitte EDV kontaktieren!");
-  } else {
-    if (mobileMissing && needsMobile) {
-      messages.push("Information über Mobilnummer fehlt, bitte EDV kontaktieren!");
-    }
-    if (phoneMissing && needsPhone) {
-      messages.push("Information über Festnetznummer fehlt, bitte EDV kontaktieren!");
-    }
+  if (phoneMissing && needsPhone) missing.push("Festnetznummer");
+  if (mobileMissing && needsMobile) missing.push("Mobilnummer");
+  if (missing.length === 0) return [];
+  if (missing.length === 1) {
+    return [`Information über ${missing[0]} fehlt, bitte EDV kontaktieren!`];
   }
-  return messages;
+  return [`Informationen über ${joinedFieldNames(missing)} fehlen, bitte EDV kontaktieren!`];
 }
 
-function insertedProfileWarningsHtml(profileValue) {
-  return profileWarningMessages(profileValue, signatureSettings.Nummer)
+function insertedProfileWarningsHtml(profileValue, phoneMode = signatureSettings.Nummer) {
+  return profileWarningMessages(profileValue, phoneMode)
     .map((message) => `<p style="margin: 0 0 6px; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: #c00000; font-weight: bold;"><b>${escapeHtml(message)}</b></p>`)
     .join("");
 }
 
-function showProfileWarnings(profileValue) {
+function showProfileWarnings(profileValue, phoneMode = signatureSettings.Nummer) {
   if (!profileLoaded) {
     profileWarningsElement.replaceChildren();
     profileWarningsElement.hidden = true;
     return;
   }
-  const messages = profileWarningMessages(profileValue, signatureSettings.Nummer);
+  const messages = profileWarningMessages(profileValue, phoneMode);
   profileWarningsElement.replaceChildren(...messages.map((message) => {
     const paragraph = document.createElement("p");
     paragraph.textContent = message;
@@ -535,20 +534,35 @@ function scaleSignaturePreview() {
 }
 
 function renderSignature() {
+  const sendAs = Boolean(
+    currentDelegation
+    && String(currentDelegation.firstName || "").trim()
+    && !String(currentDelegation.lastName || "").trim(),
+  );
+  const sendOnBehalf = Boolean(currentDelegation) && !sendAs;
   const signatureProfile = currentDelegation || profile;
-  const titleBefore = !currentDelegation
+  const renderSettings = sendAs
+    ? {
+        ...signatureSettings,
+        Nummer: "Office",
+        Confidentiality: false,
+        MobileUsage: false,
+        MobileUsageText: "",
+      }
+    : signatureSettings;
+  const titleBefore = !sendOnBehalf
     && signatureSettings.InsertTitleBefore && String(signatureProfile.customAttribute10 || "").trim()
     ? `${String(signatureProfile.customAttribute10).trim()} `
     : "";
-  const titleAfter = !currentDelegation
+  const titleAfter = !sendOnBehalf
     && signatureSettings.InsertTitleAfter && String(signatureProfile.customAttribute11 || "").trim()
     ? ` ${String(signatureProfile.customAttribute11).trim()}`
     : "";
   const senderName = personalName(profile);
   const fromName = delegatedName(currentDelegation);
   const values = {
-    FirstName: currentDelegation ? senderName : signatureProfile.firstName,
-    LastName: currentDelegation ? `(i.A. ${fromName})` : signatureProfile.lastName,
+    FirstName: sendOnBehalf ? senderName : signatureProfile.firstName,
+    LastName: sendOnBehalf ? `(i.A. ${fromName})` : signatureProfile.lastName,
     Company: signatureProfile.company, City: signatureProfile.city, Street: signatureProfile.street,
     PostalCode: signatureProfile.postalCode, JobTitle: signatureProfile.jobTitle,
     "E-mail": signatureProfile.email, Mobile: signatureProfile.mobile, Phone: signatureProfile.phone,
@@ -556,17 +570,16 @@ function renderSignature() {
     CustomAttribute11: titleAfter,
   };
   const signatureBody = signatureTemplate.replace(/\{([^{}]+)\}/g, (match, key) => {
-    if (key === "Phone Mobile Office Number") return phoneLine(signatureProfile);
+    if (key === "Phone Mobile Office Number") return phoneLine(signatureProfile, renderSettings);
     if (key === "Banner") return bannerForCity(signatureProfile);
     return Object.hasOwn(values, key) ? escapeHtml(values[key]) : match;
   });
-  const signatureContent = greetingHtml() + signatureBody + noticesHtml();
+  const signatureContent = greetingHtml(renderSettings) + signatureBody + noticesHtml(renderSettings);
   const marker = `<span style="display:none!important;mso-hide:all;max-height:0;overflow:hidden;font-size:0;line-height:0;color:transparent;">${SIGNATURE_MARKER_TEXT}</span>`;
   const previewHtml = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2">${marker}${signatureContent}</div>`;
-  const insertedWarnings = currentDelegation ? "" : insertedProfileWarningsHtml(signatureProfile);
-  const html = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2">${marker}${insertedWarnings}${signatureContent}</div>`;
+  const html = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2">${marker}${insertedProfileWarningsHtml(signatureProfile, renderSettings.Nummer)}${signatureContent}</div>`;
   previewElement.innerHTML = previewHtml;
-  showProfileWarnings(signatureProfile);
+  showProfileWarnings(signatureProfile, renderSettings.Nummer);
   previewElement.querySelectorAll("img").forEach((image) => {
     if (!image.complete) image.addEventListener("load", scaleSignaturePreview, { once: true });
   });
