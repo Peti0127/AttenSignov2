@@ -384,9 +384,8 @@ function missingProfileFields(profileValue) {
   const missing = requiredFields
     .filter(([key]) => !String(profileValue?.[key] || "").trim())
     .map(([, label]) => label);
-  if (!String(profileValue?.mobile || "").trim() && !String(profileValue?.phone || "").trim()) {
-    missing.push("Telefonnummer");
-  }
+  if (!String(profileValue?.mobile || "").trim()) missing.push("Mobilnummer");
+  if (!String(profileValue?.phone || "").trim()) missing.push("Festnetznummer");
   return missing;
 }
 
