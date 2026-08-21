@@ -302,6 +302,7 @@ let signatureSettings = {
 const statusElement = document.getElementById("status");
 const previewElement = document.getElementById("signature-preview");
 const signatureButton = document.getElementById("signature-button");
+const profileWarningsElement = document.getElementById("profile-warnings");
 
 function setStatus(message) {
   statusElement.textContent = message;
@@ -368,6 +369,51 @@ function noticesHtml() {
     html += '<p style="margin: 6px 0 0; font-family: Aptos, Arial, sans-serif; font-size: 9pt; color: rgb(0, 0, 0);">Diese E-Mail ist vertraulich.</p>';
   }
   return html;
+}
+
+function missingProfileFields(profileValue) {
+  const requiredFields = [
+    ["firstName", "Vorname"],
+    ["lastName", "Nachname"],
+    ["jobTitle", "Funktion"],
+    ["email", "E-Mail-Adresse"],
+    ["city", "Ort"],
+    ["postalCode", "Postleitzahl"],
+    ["street", "Straße"],
+  ];
+  const missing = requiredFields
+    .filter(([key]) => !String(profileValue?.[key] || "").trim())
+    .map(([, label]) => label);
+  if (!String(profileValue?.mobile || "").trim() && !String(profileValue?.phone || "").trim()) {
+    missing.push("Telefonnummer");
+  }
+  return missing;
+}
+
+function profileWarningMessages(profileValue) {
+  return missingProfileFields(profileValue)
+    .map((field) => `Information über ${field} fehlt, bitte EDV kontaktieren!`);
+}
+
+function insertedProfileWarningsHtml(profileValue) {
+  return profileWarningMessages(profileValue)
+    .map((message) => `<p style="margin: 0 0 6px; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: #c00000; font-weight: bold;"><b>${escapeHtml(message)}</b></p>`)
+    .join("");
+}
+
+function showProfileWarnings(profileValue) {
+  if (!profileLoaded) {
+    profileWarningsElement.replaceChildren();
+    profileWarningsElement.hidden = true;
+    return;
+  }
+  const messages = profileWarningMessages(profileValue);
+  profileWarningsElement.replaceChildren(...messages.map((message) => {
+    const paragraph = document.createElement("p");
+    paragraph.textContent = message;
+    return paragraph;
+  }));
+  profileWarningsElement.hidden = messages.length === 0;
 }
 
 function normalizeEmail(value) {
@@ -485,8 +531,11 @@ function renderSignature() {
     return Object.hasOwn(values, key) ? escapeHtml(values[key]) : match;
   });
   const signatureContent = greetingHtml() + signatureBody + noticesHtml();
-  const html = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2"><span style="display:none!important;mso-hide:all;max-height:0;overflow:hidden;font-size:0;line-height:0;color:transparent;">${SIGNATURE_MARKER_TEXT}</span>${signatureContent}</div>`;
-  previewElement.innerHTML = html;
+  const marker = `<span style="display:none!important;mso-hide:all;max-height:0;overflow:hidden;font-size:0;line-height:0;color:transparent;">${SIGNATURE_MARKER_TEXT}</span>`;
+  const previewHtml = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2">${marker}${signatureContent}</div>`;
+  const html = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2">${marker}${insertedProfileWarningsHtml(signatureProfile)}${signatureContent}</div>`;
+  previewElement.innerHTML = previewHtml;
+  showProfileWarnings(signatureProfile);
   previewElement.querySelectorAll("img").forEach((image) => {
     if (!image.complete) image.addEventListener("load", scaleSignaturePreview, { once: true });
   });
@@ -783,6 +832,8 @@ const SETTINGS_SIGNATURE_MARKER_TEXT = "ATTENSAM-SIGNATURE-V2";
 
 const phoneModeSelect = document.getElementById("phone-mode");
 const edvHotlineOption = document.getElementById("edv-hotline-option");
+const mobilePhoneWarning = document.getElementById("mobile-phone-warning");
+const landlinePhoneWarning = document.getElementById("landline-phone-warning");
 const greetingModeSelect = document.getElementById("greeting-mode");
 const customGreetingField = document.getElementById("custom-greeting-field");
 const customGreetingInput = document.getElementById("custom-greeting");
@@ -799,6 +850,7 @@ const autoInsertModeField = document.getElementById("auto-insert-mode-field");
 const autoInsertModeSelect = document.getElementById("auto-insert-mode");
 const settingsStatus = document.getElementById("settings-status");
 let currentSettings;
+let settingsProfile = null;
 
 function setSettingsStatus(message) {
   settingsStatus.textContent = message;
@@ -806,6 +858,19 @@ function setSettingsStatus(message) {
 
 function updateAutoInsertVisibility() {
   autoInsertModeField.hidden = !autoInsertCheckbox.checked;
+}
+
+function updatePhoneWarnings() {
+  if (!settingsProfile) {
+    mobilePhoneWarning.hidden = true;
+    landlinePhoneWarning.hidden = true;
+    return;
+  }
+  const mode = phoneModeSelect.value;
+  mobilePhoneWarning.hidden = Boolean(String(settingsProfile.mobile || "").trim())
+    || (mode !== "Handy" && mode !== "Alles");
+  landlinePhoneWarning.hidden = Boolean(String(settingsProfile.phone || "").trim())
+    || (mode !== "Festnetz" && mode !== "Alles");
 }
 
 function updateGreetingVisibility() {
@@ -907,6 +972,7 @@ async function updateInsertedSignature() {
 async function initializeSettings() {
   try {
     currentSettings = await SignaturePreferences.getSettings();
+    settingsProfile = Office.context.roamingSettings?.get(AUTO_RENDER_DATA_KEY)?.profile || null;
     const department = SignaturePreferences.getDepartment();
     const titleAttributes = SignaturePreferences.getTitleAttributes();
     const canUseEdvHotline = department.trim().toLocaleUpperCase("de-AT") === "IT";
@@ -915,6 +981,7 @@ async function initializeSettings() {
     phoneModeSelect.value = currentSettings.Nummer === "EDVHotline" && !canUseEdvHotline
       ? "Alles"
       : currentSettings.Nummer;
+    updatePhoneWarnings();
     greetingModeSelect.value = currentSettings.MfG;
     customGreetingInput.value = currentSettings.CustomGreeting;
     greetingLinesSelect.value = String(currentSettings.GreetingLines);
@@ -967,7 +1034,10 @@ async function saveSettings() {
   }
 }
 
-phoneModeSelect.addEventListener("change", saveSettings);
+phoneModeSelect.addEventListener("change", () => {
+  updatePhoneWarnings();
+  saveSettings();
+});
 greetingModeSelect.addEventListener("change", () => {
   updateGreetingVisibility();
   saveSettings();
@@ -1000,6 +1070,8 @@ const AUTO_RENDER_DATA_KEY = "attensam.signature.render-data.v1";
 
 const phoneModeSelect = document.getElementById("phone-mode");
 const edvHotlineOption = document.getElementById("edv-hotline-option");
+const mobilePhoneWarning = document.getElementById("mobile-phone-warning");
+const landlinePhoneWarning = document.getElementById("landline-phone-warning");
 const greetingModeSelect = document.getElementById("greeting-mode");
 const customGreetingField = document.getElementById("custom-greeting-field");
 const customGreetingInput = document.getElementById("custom-greeting");
@@ -1021,6 +1093,7 @@ let currentSettings;
 let currentProfile;
 let signatureTemplate = "";
 let msalInstance;
+let settingsProfile = null;
 
 function setSettingsStatus(message) {
   settingsStatus.textContent = message;
@@ -1043,6 +1116,19 @@ function updateAutoInsertVisibility() {
   autoInsertModeField.hidden = !autoInsertCheckbox.checked;
 }
 
+function updatePhoneWarnings() {
+  if (!settingsProfile) {
+    mobilePhoneWarning.hidden = true;
+    landlinePhoneWarning.hidden = true;
+    return;
+  }
+  const mode = phoneModeSelect.value;
+  mobilePhoneWarning.hidden = Boolean(String(settingsProfile.mobile || "").trim())
+    || (mode !== "Handy" && mode !== "Alles");
+  landlinePhoneWarning.hidden = Boolean(String(settingsProfile.phone || "").trim())
+    || (mode !== "Festnetz" && mode !== "Alles");
+}
+
 function updateGreetingVisibility() {
   const isCustom = greetingModeSelect.value === "MfGCustom";
   const hasGreeting = greetingModeSelect.value !== "MfG0";
@@ -1063,10 +1149,14 @@ function updateDepartmentOption(department) {
 }
 
 function showSettings(settings, department, titleAttributes) {
+  if (titleAttributes && (Object.hasOwn(titleAttributes, "mobile") || Object.hasOwn(titleAttributes, "phone"))) {
+    settingsProfile = titleAttributes;
+  }
   const canUseEdvHotline = updateDepartmentOption(department);
   phoneModeSelect.value = settings.Nummer === "EDVHotline" && !canUseEdvHotline
     ? "Alles"
     : settings.Nummer;
+  updatePhoneWarnings();
   greetingModeSelect.value = settings.MfG;
   customGreetingInput.value = settings.CustomGreeting;
   greetingLinesSelect.value = String(settings.GreetingLines);
@@ -1166,6 +1256,7 @@ async function initializeSettings() {
   setControlsDisabled(true);
   try {
     currentSettings = await SignaturePreferences.getSettings();
+    settingsProfile = Office.context.roamingSettings?.get(AUTO_RENDER_DATA_KEY)?.profile || null;
     showSettings(
       currentSettings,
       SignaturePreferences.getDepartment(),
@@ -1226,7 +1317,10 @@ async function saveSettings() {
   }
 }
 
-phoneModeSelect.addEventListener("change", saveSettings);
+phoneModeSelect.addEventListener("change", () => {
+  updatePhoneWarnings();
+  saveSettings();
+});
 greetingModeSelect.addEventListener("change", () => {
   updateGreetingVisibility();
   saveSettings();
