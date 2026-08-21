@@ -393,7 +393,7 @@ function noticesHtml(settings = signatureSettings) {
 function missingProfileFields(profileValue) {
   const requiredFields = [
     ["firstName", "Vorname"],
-    ["jobTitle", "Funktion"],
+    ["jobTitle", "Titel"],
     ["email", "E-Mail-Adresse"],
     ["city", "Ort"],
     ["postalCode", "Postleitzahl"],
@@ -474,6 +474,16 @@ function delegatedName(profileValue) {
   return [titleBefore, personalName(profileValue), titleAfter].filter(Boolean).join(" ");
 }
 
+function isFirstNameOnlyProfile(profileValue) {
+  if (!profileValue) return false;
+  const firstName = String(profileValue.firstName || "").trim();
+  const lastName = String(profileValue.lastName || "").trim();
+  if (lastName) return false;
+  if (firstName) return true;
+  const displayName = String(profileValue.displayName || "").replace(/\s+/g, " ").trim();
+  return Boolean(displayName && !displayName.includes("@") && !displayName.includes(" "));
+}
+
 function bannerForCity(profileValue = profile) {
   const city = String(profileValue.city || "").trim();
   if (city === "Wien") {
@@ -534,13 +544,12 @@ function scaleSignaturePreview() {
 }
 
 function renderSignature() {
-  const sendAs = Boolean(
-    currentDelegation
-    && String(currentDelegation.firstName || "").trim()
-    && !String(currentDelegation.lastName || "").trim(),
-  );
+  const sendAs = isFirstNameOnlyProfile(currentDelegation);
   const sendOnBehalf = Boolean(currentDelegation) && !sendAs;
-  const signatureProfile = currentDelegation || profile;
+  const selectedProfile = currentDelegation || profile;
+  const signatureProfile = sendAs && !String(selectedProfile.firstName || "").trim()
+    ? { ...selectedProfile, firstName: String(selectedProfile.displayName || "").trim() }
+    : selectedProfile;
   const renderSettings = sendAs
     ? {
         ...signatureSettings,
