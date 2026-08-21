@@ -1,4 +1,30 @@
 /* Attensam compact UI bundle. Generated from the tested UI modules. */
+const ATTENSAM_CONFIG = Object.freeze({
+  clientId: "89659501-37e7-4916-abeb-4dc5178e3034",
+  tenantId: "https://login.microsoftonline.com/1333c2c2-fdf6-4fdc-8559-3dc12559d264",
+  officeNumber: "05 7999 100",
+});
+
+function hasConfiguredEntraApp() {
+  const clientId = String(ATTENSAM_CONFIG.clientId || "").trim();
+  const tenantId = String(ATTENSAM_CONFIG.tenantId || "").trim();
+  return Boolean(
+    clientId
+    && tenantId
+    && clientId !== "asd"
+    && !clientId.includes("YOUR_")
+    && !tenantId.includes("YOUR_")
+    && !tenantId.endsWith("/asd")
+  );
+}
+
+function readableError(error) {
+  if (typeof error === "string" && error.trim()) return error.trim();
+  if (typeof error?.message === "string" && error.message.trim()) return error.message.trim();
+  if (typeof error?.errorMessage === "string" && error.errorMessage.trim()) return error.errorMessage.trim();
+  if (typeof error?.errorCode === "string" && error.errorCode.trim()) return error.errorCode.trim();
+  return "Unbekannter Fehler";
+}
 /* global Office */
 
 (function exposeSignaturePreferences(global) {
@@ -238,11 +264,7 @@
   if (!(new URLSearchParams(window.location.search).get("view") !== "settings")) return;
 /* global Office, msal, SignaturePreferences */
 
-const CONFIG = {
-  clientId: "89659501-37e7-4916-abeb-4dc5178e3034",
-  tenantId: "https://login.microsoftonline.com/1333c2c2-fdf6-4fdc-8559-3dc12559d264",
-  officeNumber: "05 7999 100",
-};
+const CONFIG = ATTENSAM_CONFIG;
 const AUTO_RENDER_DATA_KEY = "attensam.signature.render-data.v1";
 const SIGNATURE_MARKER_ID = "attensam-signature-root";
 const SIGNATURE_MARKER_TEXT = "ATTENSAM-SIGNATURE-V2";
@@ -501,8 +523,8 @@ function applyMailboxBasics() {
 }
 
 async function acquireGraphToken(scopes = ["User.Read"]) {
-  if (CONFIG.clientId.includes("YOUR_")) {
-    throw new Error("Bitte die Entra Client-ID oben in taskpane.js eintragen.");
+  if (!hasConfiguredEntraApp()) {
+    throw new Error("Bitte Client-ID und Tenant-ID einmal im ATTENSAM_CONFIG-Block oben in taskpane.js eintragen.");
   }
   if (!Office.context.requirements.isSetSupported("NestedAppAuth", "1.1")) {
     throw new Error("Dieser Outlook-Client unterstützt Nested App Authentication 1.1 nicht.");
@@ -952,11 +974,7 @@ Office.onReady((info) => {
   if (!(new URLSearchParams(window.location.search).get("view") === "settings" && new URLSearchParams(window.location.search).get("mobile") === "1")) return;
 /* global Office, msal, SignaturePreferences */
 
-const CONFIG = {
-  clientId: "asd",
-  tenantId: "https://login.microsoftonline.com/asd",
-  officeNumber: "YOUR_FIXED_OFFICE_NUMBER",
-};
+const CONFIG = ATTENSAM_CONFIG;
 const AUTO_RENDER_DATA_KEY = "attensam.signature.render-data.v1";
 
 const phoneModeSelect = document.getElementById("phone-mode");
@@ -1037,8 +1055,8 @@ function showSettings(settings, department, titleAttributes) {
 }
 
 async function acquireGraphToken() {
-  if (CONFIG.clientId.includes("YOUR_")) {
-    throw new Error("Bitte die Entra Client-ID in taskpane.js eintragen.");
+  if (!hasConfiguredEntraApp()) {
+    throw new Error("Bitte Client-ID und Tenant-ID einmal im ATTENSAM_CONFIG-Block oben in taskpane.js eintragen.");
   }
   if (!Office.context.requirements.isSetSupported("NestedAppAuth", "1.1")) {
     throw new Error("Dieser Outlook-Client unterstützt Nested App Authentication 1.1 nicht.");
@@ -1125,7 +1143,14 @@ async function initializeSettings() {
       SignaturePreferences.getDepartment(),
       SignaturePreferences.getTitleAttributes(),
     );
-    setSettingsStatus("Microsoft-365-Profil wird geladen …");
+    setControlsDisabled(false);
+  } catch (error) {
+    setSettingsStatus(`Einstellungen konnten nicht geladen werden: ${readableError(error)}`);
+    return;
+  }
+
+  setSettingsStatus("Einstellungen sind verfügbar. Microsoft-365-Profil wird geladen …");
+  try {
     [signatureTemplate, currentProfile] = await Promise.all([
       fetch("template.html", { cache: "no-store" }).then((response) => {
         if (!response.ok) throw new Error("template.html konnte nicht geladen werden.");
@@ -1143,7 +1168,9 @@ async function initializeSettings() {
     setControlsDisabled(false);
     setSettingsStatus("Profil und Einstellungen sind bereit.");
   } catch (error) {
-    setSettingsStatus(error.message || "Profil und Einstellungen konnten nicht geladen werden.");
+    console.error("Microsoft-365-Profil konnte mobil nicht aktualisiert werden.", error);
+    setControlsDisabled(false);
+    setSettingsStatus(`Einstellungen sind verfügbar; Profil konnte nicht aktualisiert werden: ${readableError(error)}`);
   }
 }
 
