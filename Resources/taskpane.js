@@ -1208,7 +1208,7 @@ deleteCustomButton.addEventListener("click", async () => {
   if (!item) return;
   if (!deleteConfirmationArmed) {
     deleteConfirmationArmed = true;
-    deleteCustomButton.textContent = "Löschen bestätigen";
+    deleteCustomButton.textContent = "Wirklich löschen?";
     return;
   }
   try {
