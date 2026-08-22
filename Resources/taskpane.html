@@ -11,8 +11,8 @@
   </script>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@5.18.0/lib/msal-browser.min.js"></script>
-  <script defer src="autorun-classic.js?v=1.7.14"></script>
-  <script defer src="taskpane.js?v=1.7.14"></script>
+  <script defer src="autorun-classic.js?v=0.8.0"></script>
+  <script defer src="taskpane.js?v=0.8.0"></script>
   <style>
     :root { --red:#cb2525; --ink:#222220; --muted:#6f6d68; --line:#deddd7; --paper:#f7f6f1; }
     * { box-sizing:border-box; }
@@ -29,6 +29,8 @@
     .nav-link:hover, .nav-link:focus-visible { border-color:var(--red); color:var(--red); outline:none; }
     main { padding:20px 18px 92px; }
     .section-title { display:flex; align-items:end; justify-content:space-between; margin:0 0 14px; }
+    .add-signature { display:grid; place-items:center; width:34px; height:34px; border:1px solid var(--line); border-radius:50%; color:var(--red); background:#fff; font-size:24px; line-height:1; }
+    .add-signature:hover, .add-signature:focus-visible { border-color:var(--red); box-shadow:0 0 0 3px rgba(203,37,37,.1); outline:none; }
     .step { display:block; margin-bottom:6px; color:var(--red); font-size:9px; font-weight:800; letter-spacing:.15em; }
     button { border:0; border-radius:4px; font:inherit; font-weight:700; cursor:pointer; }
     button:disabled { opacity:.5; cursor:not-allowed; }
@@ -37,9 +39,22 @@
     .preview.ready:hover, .preview.ready:focus-visible { border:1px solid var(--red); box-shadow:0 10px 30px rgba(203,37,37,.12); outline:none; }
     .preview.ready { cursor:pointer; }
     .preview[aria-disabled="true"] { cursor:wait; }
-    #signature-preview { display:inline-block; min-width:470px; transform-origin:top left; user-select:none; -webkit-user-select:none; -ms-user-select:none; pointer-events:none; }
-    #signature-preview img { max-width:100%; height:auto; -webkit-user-drag:none; }
-    #signature-preview p { margin:0 0 12px; }
+    .signature-preview-content { display:inline-block; min-width:470px; transform-origin:top left; user-select:none; -webkit-user-select:none; -ms-user-select:none; pointer-events:none; }
+    .signature-preview-content img { max-width:100%; height:auto; -webkit-user-drag:none; }
+    .signature-preview-content p { margin:0 0 12px; }
+    .custom-editor, .custom-signature-card { margin-top:18px; }
+    .custom-editor { padding:14px; border:1px solid var(--line); border-radius:4px; background:#fff; }
+    textarea { width:100%; min-height:180px; padding:10px 11px; resize:vertical; border:1px solid #cbc9c2; border-radius:4px; background:#fff; color:var(--ink); font:12px/1.45 Consolas,monospace; }
+    textarea:focus { border-color:var(--red); box-shadow:0 0 0 3px rgba(203,37,37,.1); outline:none; }
+    .editor-actions { display:flex; gap:8px; margin-top:12px; }
+    .editor-actions button, .context-menu button { min-height:38px; padding:0 13px; }
+    .primary-action { color:#fff; background:var(--red); }
+    .secondary-action { border:1px solid var(--line); background:#fff; color:var(--ink); }
+    .custom-signature-title { display:flex; align-items:center; gap:8px; margin:0 0 7px; font-size:12px; font-weight:700; }
+    .default-badge { padding:3px 6px; border-radius:10px; color:#fff; background:var(--red); font-size:9px; }
+    .context-menu { position:fixed; z-index:20; min-width:185px; padding:6px; border:1px solid var(--line); border-radius:5px; background:#fff; box-shadow:0 8px 25px rgba(0,0,0,.18); }
+    .context-menu button { display:block; width:100%; border-radius:3px; background:#fff; color:var(--ink); text-align:left; }
+    .context-menu button:hover, .context-menu button:focus-visible { color:var(--red); background:#f8eeee; outline:none; }
     .field + .field { margin-top:22px; }
     label { display:block; margin-bottom:8px; font-size:13px; font-weight:700; }
     select, input[type="text"] { width:100%; min-height:42px; padding:0 11px; border:1px solid #cbc9c2; border-radius:4px; background:#fff; color:var(--ink); font:inherit; }
@@ -66,16 +81,27 @@
     <header>
       <div class="logo" aria-hidden="true">A</div>
       <div><p class="eyebrow">ATTENSAM</p><h1>Signatur erstellen</h1></div>
-      <a class="nav-link" href="taskpane.html?view=settings&amp;v=1.7.14" aria-label="Einstellungen öffnen">⚙ Einstellungen</a>
+      <a class="nav-link" href="taskpane.html?view=settings&amp;v=0.8.0" aria-label="Einstellungen öffnen">⚙ Einstellungen</a>
     </header>
     <main>
       <section>
-        <div class="section-title"><div><span class="step">MICROSOFT 365</span><h2>Ihre Signatur</h2></div></div>
+        <div class="section-title"><div><span class="step">MICROSOFT 365</span><h2>Ihre Signatur</h2></div><button id="custom-add-button" class="add-signature" type="button" aria-label="Benutzerdefinierte Signatur hinzufügen" title="Benutzerdefinierte Signatur hinzufügen" hidden>+</button></div>
         <p class="profile-source">Die Signatur wird automatisch aus Ihrem Microsoft-365-Profil erstellt.</p>
         <div id="signature-button" class="preview" role="button" tabindex="-1" aria-disabled="true" aria-label="Signatur in Outlook einfügen">
-          <div id="signature-preview">Vorlage wird geladen …</div>
+          <div id="signature-preview" class="signature-preview-content">Vorlage wird geladen …</div>
         </div>
         <div id="profile-warnings" class="validation-warnings" role="alert" hidden></div>
+        <div id="custom-editor" class="custom-editor" hidden>
+          <div class="field"><label for="custom-signature-title">Titel</label><input id="custom-signature-title" type="text" maxlength="80" autocomplete="off" placeholder="z. B. Messe-Signatur"></div>
+          <div class="field"><label for="custom-signature-html">Signatur (HTML)</label><textarea id="custom-signature-html" maxlength="7000" spellcheck="false" placeholder="HTML-Code der Signatur"></textarea></div>
+          <div class="editor-actions"><button id="custom-save-button" class="primary-action" type="button">Speichern</button><button id="custom-cancel-button" class="secondary-action" type="button">Abbrechen</button></div>
+          <p class="hint">Bis zu drei Signaturen. Profil-Platzhalter wie {FirstName}, {LastName}, {JobTitle} und {E-mail} können verwendet werden.</p>
+        </div>
+        <div id="custom-signatures" aria-live="polite"></div>
+        <div id="signature-context-menu" class="context-menu" role="menu" hidden>
+          <button id="set-default-signature" type="button" role="menuitem">Als Standard festlegen</button>
+          <button id="delete-custom-signature" type="button" role="menuitem">Signatur löschen</button>
+        </div>
       </section>
     </main>
     <footer class="status-footer"><p id="status" role="status" aria-live="polite">Outlook wird initialisiert …</p></footer>
@@ -85,7 +111,7 @@
     <header>
       <div class="logo" aria-hidden="true">A</div>
       <div><p class="eyebrow">ATTENSAM</p><h1>Einstellungen</h1></div>
-      <a id="settings-back" class="nav-link" href="taskpane.html?v=1.7.14">← Zurück</a>
+      <a id="settings-back" class="nav-link" href="taskpane.html?v=0.8.0">← Zurück</a>
     </header>
     <main>
       <span class="step">SIGNATUR</span>

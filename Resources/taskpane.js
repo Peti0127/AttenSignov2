@@ -30,6 +30,10 @@ function readableError(error) {
 (function exposeSignaturePreferences(global) {
   const ROAMING_KEY = "attensam.signature.settings.v2";
   const RENDER_DATA_KEY = "attensam.signature.render-data.v1";
+  const CUSTOM_SIGNATURES_KEY = "attensam.signature.custom-signatures.v1";
+  const CUSTOM_SIGNATURES_CACHE_PREFIX = "attensam.signature.custom-signatures.v1";
+  const VIP_ROLE = "ATS.Signature.VIP";
+  const MAX_CUSTOM_SIGNATURES = 3;
   const CACHE_PREFIX = "attensam.signature.settings.v2";
   const DEPARTMENT_CACHE_PREFIX = "attensam.signature.department.v1";
   const TITLE_ATTRIBUTES_CACHE_PREFIX = "attensam.signature.title-attributes.v1";
@@ -77,6 +81,61 @@ function readableError(error) {
 
   function titleAttributesStorageKey() {
     return `${TITLE_ATTRIBUTES_CACHE_PREFIX}:${currentUserKey()}`;
+  }
+
+  function customSignaturesStorageKey() {
+    return `${CUSTOM_SIGNATURES_CACHE_PREFIX}:${currentUserKey()}`;
+  }
+
+  function normalizeCustomSignatures(value) {
+    const items = Array.isArray(value?.items) ? value.items.slice(0, MAX_CUSTOM_SIGNATURES) : [];
+    const normalizedItems = items.map((item) => ({
+      id: String(item?.id || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64),
+      title: String(item?.title || "").replace(/\s+/g, " ").trim().slice(0, 80),
+      html: String(item?.html || "").trim().slice(0, 7000),
+      updatedAt: Number.isFinite(Date.parse(item?.updatedAt)) ? item.updatedAt : "",
+    })).filter((item) => item.id && item.title && item.html);
+    const allowedIds = new Set(normalizedItems.map((item) => item.id));
+    const requestedDefault = String(value?.defaultId || "standard");
+    return {
+      requiredRole: VIP_ROLE,
+      defaultId: allowedIds.has(requestedDefault) ? requestedDefault : "standard",
+      items: normalizedItems,
+      updatedAt: Number.isFinite(Date.parse(value?.updatedAt)) ? value.updatedAt : "",
+    };
+  }
+
+  async function getCustomSignatures() {
+    let cached = null;
+    try {
+      cached = normalizeCustomSignatures(JSON.parse(localStorage.getItem(customSignaturesStorageKey()) || "null"));
+    } catch {
+      localStorage.removeItem(customSignaturesStorageKey());
+    }
+    const roaming = normalizeCustomSignatures(Office.context.roamingSettings?.get(CUSTOM_SIGNATURES_KEY));
+    const newest = recordTime(cached) > recordTime(roaming) ? cached : roaming;
+    localStorage.setItem(customSignaturesStorageKey(), JSON.stringify(newest));
+    return newest;
+  }
+
+  async function saveCustomSignatures(value) {
+    if (Array.isArray(value?.items) && value.items.length > MAX_CUSTOM_SIGNATURES) {
+      throw new Error("Maximal drei Signaturen sind erlaubt.");
+    }
+    const record = normalizeCustomSignatures({ ...value, updatedAt: new Date().toISOString() });
+    const bytes = new TextEncoder().encode(JSON.stringify(record)).length;
+    if (bytes > 23000) throw new Error("Die benutzerdefinierten Signaturen sind für Outlook RoamingSettings zu groß.");
+    const roamingSettings = Office.context.roamingSettings;
+    if (!roamingSettings) throw new Error("Outlook RoamingSettings ist nicht verfügbar.");
+    roamingSettings.set(CUSTOM_SIGNATURES_KEY, record);
+    await new Promise((resolve, reject) => {
+      roamingSettings.saveAsync((result) => {
+        if (result.status === Office.AsyncResultStatus.Succeeded) resolve();
+        else reject(new Error(result.error?.message || "Signaturen konnten nicht gespeichert werden."));
+      });
+    });
+    localStorage.setItem(customSignaturesStorageKey(), JSON.stringify(record));
+    return record;
   }
 
   function normalizeCustomGreeting(value) {
@@ -276,6 +335,8 @@ function readableError(error) {
     setDepartment,
     getTitleAttributes,
     setTitleAttributes,
+    getCustomSignatures,
+    saveCustomSignatures,
   });
 })(window);
 
@@ -285,6 +346,8 @@ function readableError(error) {
 
 const CONFIG = ATTENSAM_CONFIG;
 const AUTO_RENDER_DATA_KEY = "attensam.signature.render-data.v1";
+const VIP_ROLE = "ATS.Signature.VIP";
+const MAX_CUSTOM_SIGNATURES = 3;
 const SIGNATURE_MARKER_ID = "attensam-signature-root";
 const SIGNATURE_MARKER_TEXT = "ATTENSAM-SIGNATURE-V2";
 
@@ -298,6 +361,10 @@ let signatureTemplate = "";
 let msalInstance;
 let profileLoaded = false;
 let currentDelegation = null;
+let userRoles = new Set();
+let vipAuthorized = false;
+let customSignatures = { requiredRole: VIP_ROLE, defaultId: "standard", items: [] };
+let contextSignatureId = "standard";
 let signatureSettings = {
   Nummer: "Alles",
   MfG: "MfG1",
@@ -314,6 +381,16 @@ const statusElement = document.getElementById("status");
 const previewElement = document.getElementById("signature-preview");
 const signatureButton = document.getElementById("signature-button");
 const profileWarningsElement = document.getElementById("profile-warnings");
+const customAddButton = document.getElementById("custom-add-button");
+const customEditor = document.getElementById("custom-editor");
+const customTitleInput = document.getElementById("custom-signature-title");
+const customHtmlInput = document.getElementById("custom-signature-html");
+const customSaveButton = document.getElementById("custom-save-button");
+const customCancelButton = document.getElementById("custom-cancel-button");
+const customSignaturesElement = document.getElementById("custom-signatures");
+const contextMenu = document.getElementById("signature-context-menu");
+const setDefaultButton = document.getElementById("set-default-signature");
+const deleteCustomButton = document.getElementById("delete-custom-signature");
 
 function setStatus(message) {
   statusElement.textContent = message;
@@ -324,6 +401,61 @@ function escapeHtml(value) {
     .replaceAll("&", "&amp;").replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;").replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function rememberAuthenticationRoles(result) {
+  let tokenClaims = {};
+  try {
+    const encoded = String(result?.idToken || "").split(".")[1];
+    if (encoded) {
+      const normalized = encoded.replace(/-/g, "+").replace(/_/g, "/");
+      tokenClaims = JSON.parse(atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=")));
+    }
+  } catch {
+    tokenClaims = {};
+  }
+  const roles = [
+    ...(Array.isArray(result?.idTokenClaims?.roles) ? result.idTokenClaims.roles : []),
+    ...(Array.isArray(result?.account?.idTokenClaims?.roles) ? result.account.idTokenClaims.roles : []),
+    ...(Array.isArray(tokenClaims?.roles) ? tokenClaims.roles : []),
+  ];
+  userRoles = new Set(roles.map((role) => String(role).trim()).filter(Boolean));
+  vipAuthorized = userRoles.has(VIP_ROLE);
+}
+
+function sanitizeCustomSignatureHtml(value) {
+  const documentValue = new DOMParser().parseFromString(`<div>${String(value || "")}</div>`, "text/html");
+  const root = documentValue.body.firstElementChild;
+  const allowedTags = new Set(["A", "B", "BR", "DIV", "EM", "I", "IMG", "P", "SPAN", "STRONG", "TABLE", "TBODY", "TD", "TH", "TR", "U"]);
+  const allowedAttributes = {
+    A: new Set(["href", "style", "title"]), IMG: new Set(["src", "alt", "width", "height", "border", "style"]),
+    TABLE: new Set(["cellpadding", "cellspacing", "border", "width", "style"]),
+    TD: new Set(["colspan", "rowspan", "width", "height", "style"]), TH: new Set(["colspan", "rowspan", "width", "height", "style"]),
+  };
+  const commonAttributes = new Set(["style", "title"]);
+  [...root.querySelectorAll("*")].forEach((element) => {
+    if (!allowedTags.has(element.tagName)) {
+      element.replaceWith(...element.childNodes);
+      return;
+    }
+    [...element.attributes].forEach((attribute) => {
+      const name = attribute.name.toLowerCase();
+      const allowed = allowedAttributes[element.tagName]?.has(name) || commonAttributes.has(name);
+      if (!allowed || name.startsWith("on")) element.removeAttribute(attribute.name);
+    });
+    if (element.hasAttribute("style")) {
+      const style = element.getAttribute("style").slice(0, 2000);
+      if (/url\s*\(|expression\s*\(|javascript\s*:|@import|behavior\s*:|-moz-binding/i.test(style)) element.removeAttribute("style");
+      else element.setAttribute("style", style);
+    }
+    ["href", "src"].forEach((name) => {
+      if (!element.hasAttribute(name)) return;
+      const url = element.getAttribute(name).trim();
+      const permitted = name === "href" ? /^(https:|mailto:|tel:|#)/i.test(url) : /^https:/i.test(url);
+      if (!permitted) element.removeAttribute(name);
+    });
+  });
+  return root.innerHTML.trim();
 }
 
 function phoneLine(profileValue = profile, settings = signatureSettings) {
@@ -337,18 +469,18 @@ function phoneLine(profileValue = profile, settings = signatureSettings) {
     case "Handy":
       return mobile ? `Mobil ${mobile}` : "";
     case "Festnetz":
-      return phone ? `Tel.: ${phone}` : "";
+      return phone ? `Tel. ${phone}` : "";
     case "Office":
-      return officeNumber ? `Office: ${officeNumber}` : "";
+      return officeNumber ? `Tel. ${officeNumber}` : "";
     case "EDVHotline":
       if (profile.department.trim().toLocaleUpperCase("de-AT") === "IT") {
         return mobile ? `Tel. 05 7999 9999 Mobil ${mobile}` : "Tel. 05 7999 9999";
       }
       // If the department changed, fall back to the standard phone line.
     default:
-      if (phone && mobile) return `Tel.: ${phone}&nbsp;&nbsp;Mobil: ${mobile}`;
+      if (phone && mobile) return `Tel. ${phone}&nbsp;&nbsp;Mobil ${mobile}`;
       if (mobile) return `Mobil ${mobile}`;
-      if (phone) return `Tel.: ${phone}`;
+      if (phone) return `Tel. ${phone}`;
       return "";
   }
 }
@@ -519,19 +651,17 @@ function bannerForCity(profileValue = profile) {
   return "";
 }
 
-function scaleSignaturePreview() {
-  // Reset before measuring so the previous scale doesn't affect the result.
-  previewElement.style.transform = "none";
-
-  const styles = getComputedStyle(signatureButton);
-  const availableWidth = signatureButton.clientWidth
+function scalePreview(container, content) {
+  content.style.transform = "none";
+  const styles = getComputedStyle(container);
+  const availableWidth = container.clientWidth
     - parseFloat(styles.paddingLeft)
     - parseFloat(styles.paddingRight);
-  const availableHeight = signatureButton.clientHeight
+  const availableHeight = container.clientHeight
     - parseFloat(styles.paddingTop)
     - parseFloat(styles.paddingBottom);
-  const naturalWidth = previewElement.scrollWidth;
-  const naturalHeight = previewElement.scrollHeight;
+  const naturalWidth = content.scrollWidth;
+  const naturalHeight = content.scrollHeight;
 
   if (!naturalWidth || !naturalHeight) return;
 
@@ -540,20 +670,32 @@ function scaleSignaturePreview() {
     availableWidth / naturalWidth,
     availableHeight / naturalHeight,
   );
-  previewElement.style.transform = `scale(${scale})`;
+  content.style.transform = `scale(${scale})`;
 }
 
-function renderSignature() {
+function scaleSignaturePreview() {
+  scalePreview(signatureButton, previewElement);
+  customSignaturesElement.querySelectorAll(".preview").forEach((container) => {
+    const content = container.querySelector(".signature-preview-content");
+    if (content) scalePreview(container, content);
+  });
+}
+
+function buildSignature(templateHtml = signatureTemplate, customComplete = false) {
   const sendAs = isFirstNameOnlyProfile(currentDelegation);
   const sendOnBehalf = Boolean(currentDelegation) && !sendAs;
   const selectedProfile = currentDelegation || profile;
   const signatureProfile = sendAs && !String(selectedProfile.firstName || "").trim()
     ? { ...selectedProfile, firstName: String(selectedProfile.displayName || "").trim() }
     : selectedProfile;
+  const sendAsHasDirectNumber = Boolean(
+    String(signatureProfile.phone || "").trim()
+    || String(signatureProfile.mobile || "").trim(),
+  );
   const renderSettings = sendAs
     ? {
         ...signatureSettings,
-        Nummer: "Office",
+        Nummer: sendAsHasDirectNumber ? "Available" : "Office",
         Confidentiality: false,
         MobileUsage: false,
         MobileUsageText: "",
@@ -578,26 +720,83 @@ function renderSignature() {
     CustomAttribute10: titleBefore,
     CustomAttribute11: titleAfter,
   };
-  const signatureBody = signatureTemplate.replace(/\{([^{}]+)\}/g, (match, key) => {
+  const signatureBody = templateHtml.replace(/\{([^{}]+)\}/g, (match, key) => {
     if (key === "Phone Mobile Office Number") return phoneLine(signatureProfile, renderSettings);
     if (key === "Banner") return bannerForCity(signatureProfile);
     return Object.hasOwn(values, key) ? escapeHtml(values[key]) : match;
   });
-  const signatureContent = greetingHtml(renderSettings) + signatureBody + noticesHtml(renderSettings);
+  const signatureContent = customComplete
+    ? signatureBody
+    : greetingHtml(renderSettings) + signatureBody + noticesHtml(renderSettings);
   const marker = `<span style="display:none!important;mso-hide:all;max-height:0;overflow:hidden;font-size:0;line-height:0;color:transparent;">${SIGNATURE_MARKER_TEXT}</span>`;
   const previewHtml = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2">${marker}${signatureContent}</div>`;
   const html = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2">${marker}${insertedProfileWarningsHtml(signatureProfile, renderSettings.Nummer)}${signatureContent}</div>`;
-  previewElement.innerHTML = previewHtml;
-  showProfileWarnings(signatureProfile, renderSettings.Nummer);
+  return { html, previewHtml, signatureProfile, renderSettings };
+}
+
+function renderSignature() {
+  const result = buildSignature();
+  previewElement.innerHTML = result.previewHtml;
+  showProfileWarnings(result.signatureProfile, result.renderSettings.Nummer);
   previewElement.querySelectorAll("img").forEach((image) => {
     if (!image.complete) image.addEventListener("load", scaleSignaturePreview, { once: true });
   });
   requestAnimationFrame(scaleSignaturePreview);
-  const ready = Boolean(html && profileLoaded);
+  const ready = Boolean(result.html && profileLoaded);
   signatureButton.setAttribute("aria-disabled", String(!ready));
   signatureButton.tabIndex = ready ? 0 : -1;
   signatureButton.classList.toggle("ready", ready);
-  return html;
+  renderCustomSignatureCards();
+  return result.html;
+}
+
+function defaultBadge(id) {
+  return customSignatures.defaultId === id ? '<span class="default-badge">Standard</span>' : "";
+}
+
+function renderCustomSignatureCards() {
+  customSignaturesElement.replaceChildren();
+  if (!vipAuthorized) return;
+  customSignatures.items.forEach((item) => {
+    const card = document.createElement("article");
+    card.className = "custom-signature-card";
+    card.innerHTML = `<div class="custom-signature-title"><span>${escapeHtml(item.title)}</span>${defaultBadge(item.id)}</div><div class="preview ready" role="button" tabindex="0" aria-label="${escapeHtml(item.title)} einfügen"><div class="signature-preview-content"></div></div>`;
+    const button = card.querySelector(".preview");
+    const content = card.querySelector(".signature-preview-content");
+    content.innerHTML = buildSignature(item.html, true).previewHtml;
+    button.addEventListener("click", () => insertSignature(item.id));
+    button.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        insertSignature(item.id);
+      }
+    });
+    button.addEventListener("contextmenu", (event) => openSignatureMenu(event, item.id));
+    content.querySelectorAll("img").forEach((image) => {
+      if (!image.complete) image.addEventListener("load", () => scalePreview(button, content), { once: true });
+    });
+    customSignaturesElement.append(card);
+    requestAnimationFrame(() => scalePreview(button, content));
+  });
+  customAddButton.disabled = customSignatures.items.length >= MAX_CUSTOM_SIGNATURES;
+  customAddButton.title = customAddButton.disabled ? "Maximal drei Signaturen" : "Benutzerdefinierte Signatur hinzufügen";
+}
+
+function openSignatureMenu(event, id) {
+  if (!vipAuthorized) return;
+  event.preventDefault();
+  contextSignatureId = id;
+  deleteCustomButton.hidden = id === "standard";
+  setDefaultButton.disabled = customSignatures.defaultId === id;
+  contextMenu.hidden = false;
+  const width = 195;
+  contextMenu.style.left = `${Math.min(event.clientX, window.innerWidth - width - 8)}px`;
+  contextMenu.style.top = `${Math.min(event.clientY, window.innerHeight - 100)}px`;
+  setDefaultButton.focus();
+}
+
+function closeSignatureMenu() {
+  contextMenu.hidden = true;
 }
 
 async function saveAutoRenderData() {
@@ -657,10 +856,14 @@ async function acquireGraphToken(scopes = ["User.Read"]) {
   }
   const request = { scopes };
   try {
-    return (await msalInstance.acquireTokenSilent(request)).accessToken;
+    const result = await msalInstance.acquireTokenSilent(request);
+    rememberAuthenticationRoles(result);
+    return result.accessToken;
   } catch (error) {
     if (!(error instanceof msal.InteractionRequiredAuthError)) throw error;
-    return (await msalInstance.acquireTokenPopup(request)).accessToken;
+    const result = await msalInstance.acquireTokenPopup(request);
+    rememberAuthenticationRoles(result);
+    return result.accessToken;
   }
 }
 
@@ -804,6 +1007,10 @@ async function loadProfile() {
     });
     SignaturePreferences.setDepartment(profile.department);
     SignaturePreferences.setTitleAttributes(profile.customAttribute10, profile.customAttribute11);
+    customAddButton.hidden = !vipAuthorized;
+    customSignatures = vipAuthorized
+      ? await SignaturePreferences.getCustomSignatures()
+      : { requiredRole: VIP_ROLE, defaultId: "standard", items: [] };
     await refreshDelegationForCurrentFrom();
     profileLoaded = true;
     showProfile();
@@ -823,10 +1030,13 @@ async function loadProfile() {
   }
 }
 
-async function insertSignature() {
+async function insertSignature(customId = "standard") {
   if (!profileLoaded || signatureButton.getAttribute("aria-disabled") === "true") return;
   await refreshDelegationForCurrentFrom();
-  const html = renderSignature();
+  const item = vipAuthorized && customId !== "standard"
+    ? customSignatures.items.find((entry) => entry.id === customId)
+    : null;
+  const html = item ? buildSignature(item.html, true).html : renderSignature();
   const body = Office.context.mailbox.item?.body;
   if (!body) {
     setStatus("Bitte eine neue Nachricht öffnen.");
@@ -860,12 +1070,82 @@ async function initialize() {
   }
 }
 
-signatureButton.addEventListener("click", insertSignature);
+signatureButton.addEventListener("click", () => insertSignature("standard"));
 signatureButton.addEventListener("keydown", (event) => {
   if (event.key === "Enter" || event.key === " ") {
     event.preventDefault();
     insertSignature();
   }
+});
+signatureButton.addEventListener("contextmenu", (event) => openSignatureMenu(event, "standard"));
+customAddButton.addEventListener("click", () => {
+  if (!vipAuthorized || customSignatures.items.length >= MAX_CUSTOM_SIGNATURES) return;
+  customEditor.hidden = false;
+  customTitleInput.focus();
+});
+customCancelButton.addEventListener("click", () => {
+  customEditor.hidden = true;
+  customTitleInput.value = "";
+  customHtmlInput.value = "";
+});
+customSaveButton.addEventListener("click", async () => {
+  if (!vipAuthorized) return;
+  const title = customTitleInput.value.replace(/\s+/g, " ").trim();
+  const html = sanitizeCustomSignatureHtml(customHtmlInput.value);
+  if (!title || !html) {
+    setStatus("Bitte Titel und HTML-Code eingeben.");
+    return;
+  }
+  if (customSignatures.items.length >= MAX_CUSTOM_SIGNATURES) {
+    setStatus("Maximal drei benutzerdefinierte Signaturen sind erlaubt.");
+    return;
+  }
+  const id = `custom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  try {
+    customSignatures = await SignaturePreferences.saveCustomSignatures({
+      ...customSignatures,
+      items: [...customSignatures.items, { id, title, html, updatedAt: new Date().toISOString() }],
+    });
+    customEditor.hidden = true;
+    customTitleInput.value = "";
+    customHtmlInput.value = "";
+    renderCustomSignatureCards();
+    setStatus("Benutzerdefinierte Signatur wurde gespeichert.");
+  } catch (error) {
+    setStatus(error.message || "Signatur konnte nicht gespeichert werden.");
+  }
+});
+setDefaultButton.addEventListener("click", async () => {
+  try {
+    customSignatures = await SignaturePreferences.saveCustomSignatures({ ...customSignatures, defaultId: contextSignatureId });
+    renderCustomSignatureCards();
+    setStatus(contextSignatureId === "standard" ? "Standard-Signatur wurde als Standard festgelegt." : "Benutzerdefinierte Signatur wurde als Standard festgelegt.");
+  } catch (error) {
+    setStatus(error.message || "Standard konnte nicht gespeichert werden.");
+  } finally {
+    closeSignatureMenu();
+  }
+});
+deleteCustomButton.addEventListener("click", async () => {
+  const item = customSignatures.items.find((entry) => entry.id === contextSignatureId);
+  if (!item || !window.confirm(`„${item.title}“ wirklich löschen?`)) return;
+  try {
+    const items = customSignatures.items.filter((entry) => entry.id !== contextSignatureId);
+    customSignatures = await SignaturePreferences.saveCustomSignatures({
+      ...customSignatures,
+      defaultId: customSignatures.defaultId === contextSignatureId ? "standard" : customSignatures.defaultId,
+      items,
+    });
+    renderCustomSignatureCards();
+    setStatus("Benutzerdefinierte Signatur wurde gelöscht.");
+  } catch (error) {
+    setStatus(error.message || "Signatur konnte nicht gelöscht werden.");
+  } finally {
+    closeSignatureMenu();
+  }
+});
+document.addEventListener("click", (event) => {
+  if (!contextMenu.hidden && !contextMenu.contains(event.target)) closeSignatureMenu();
 });
 window.addEventListener("resize", scaleSignaturePreview);
 Office.onReady((info) => {
@@ -1024,6 +1304,7 @@ async function updateInsertedSignature() {
     renderData,
     currentSettings,
     delegation,
+    await SignaturePreferences.getCustomSignatures(),
   );
   const bodyHtml = await getBodyHtml(body);
   if (body.setSignatureAsync) {
