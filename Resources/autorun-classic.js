@@ -148,7 +148,7 @@
   (*! @azure/msal-browser v5.18.0 2026-08-04 *)
 */
 
-/* Attensam v0.8.6 signature-specific settings extension. */
+/* Attensam v0.8.7 signature-specific settings extension. */
 (function enableVipCustomSignatures() {
   const CUSTOM_KEY = "attensam.signature.custom-signatures.v1";
   const SETTINGS_KEY = "attensam.signature.settings.v2";
