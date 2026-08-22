@@ -1,8 +1,8 @@
 /* Attensam compact UI bundle. Generated from the tested UI modules. */
 const ATTENSAM_CONFIG = Object.freeze({
-  clientId: "89659501-37e7-4916-abeb-4dc5178e3034",
-  tenantId: "https://login.microsoftonline.com/1333c2c2-fdf6-4fdc-8559-3dc12559d264",
-  officeNumber: "05 7999 100",
+  clientId: "asd",
+  tenantId: "https://login.microsoftonline.com/asd",
+  officeNumber: "YOUR_FIXED_OFFICE_NUMBER",
 });
 
 function hasConfiguredEntraApp() {
@@ -99,13 +99,18 @@ function readableError(error) {
     }));
   }
 
-  function getVipAuthorized() {
+  function getVipAuthorizationState() {
     try {
-      return JSON.parse(localStorage.getItem(vipStorageKey()) || "null")?.authorized === true;
+      const value = JSON.parse(localStorage.getItem(vipStorageKey()) || "null");
+      return typeof value?.authorized === "boolean" ? value.authorized : null;
     } catch {
       localStorage.removeItem(vipStorageKey());
-      return false;
+      return null;
     }
+  }
+
+  function getVipAuthorized() {
+    return getVipAuthorizationState() === true;
   }
 
   function normalizeCustomSignatures(value) {
@@ -389,6 +394,7 @@ function readableError(error) {
     getSettingsForSignature,
     saveSettingsForSignature,
     getVipAuthorized,
+    getVipAuthorizationState,
     setVipAuthorized,
   });
 })(window);
@@ -450,6 +456,12 @@ const setDefaultButton = document.getElementById("set-default-signature");
 const editCustomButton = document.getElementById("edit-custom-signature");
 const deleteCustomButton = document.getElementById("delete-custom-signature");
 
+const initialCachedVipState = SignaturePreferences.getVipAuthorizationState();
+if (initialCachedVipState !== null) {
+  vipAuthorized = initialCachedVipState;
+  mainSettingsLink.hidden = initialCachedVipState;
+}
+
 function setStatus(message) {
   statusElement.textContent = message;
 }
@@ -480,6 +492,7 @@ function rememberAuthenticationRoles(result) {
   userRoles = new Set(roles.map((role) => String(role).trim()).filter(Boolean));
   vipAuthorized = userRoles.has(VIP_ROLE);
   SignaturePreferences.setVipAuthorized(vipAuthorized);
+  mainSettingsLink.hidden = vipAuthorized;
 }
 
 function sanitizeCustomSignatureHtml(value) {
@@ -1124,6 +1137,9 @@ async function loadProfile() {
     setStatus("Microsoft-365-Profil wurde automatisch geladen.");
   } catch (error) {
     profileLoaded = false;
+    if (SignaturePreferences.getVipAuthorizationState() === null) {
+      mainSettingsLink.hidden = false;
+    }
     signatureButton.setAttribute("aria-disabled", "true");
     signatureButton.tabIndex = -1;
     signatureButton.classList.remove("ready");
@@ -1159,6 +1175,9 @@ async function insertSignature(customId = "standard") {
 
 async function initialize() {
   try {
+    const cachedVipState = SignaturePreferences.getVipAuthorizationState();
+    vipAuthorized = cachedVipState === true;
+    mainSettingsLink.hidden = cachedVipState !== false;
     signatureTemplate = await fetch("template.html", { cache: "no-store" }).then((response) => {
       if (!response.ok) throw new Error("template.html konnte nicht geladen werden.");
       return response.text();
@@ -1263,7 +1282,7 @@ setDefaultButton.addEventListener("click", async () => {
 });
 openSignatureSettingsButton.addEventListener("click", () => {
   const signatureId = contextSignatureId || "standard";
-  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.4`;
+  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.5`;
 });
 editCustomButton.addEventListener("click", () => {
   const item = customSignatures.items.find((entry) => entry.id === contextSignatureId);
