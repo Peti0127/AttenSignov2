@@ -37,6 +37,7 @@ function readableError(error) {
   const CACHE_PREFIX = "attensam.signature.settings.v2";
   const DEPARTMENT_CACHE_PREFIX = "attensam.signature.department.v1";
   const TITLE_ATTRIBUTES_CACHE_PREFIX = "attensam.signature.title-attributes.v1";
+  const VIP_CACHE_PREFIX = "attensam.signature.vip-role.v1";
   const LEGACY_PHONE_PREFIX = "attensam.signature.phone-mode";
   const DEFAULT_SETTINGS = Object.freeze({
     Nummer: "Alles",
@@ -87,12 +88,35 @@ function readableError(error) {
     return `${CUSTOM_SIGNATURES_CACHE_PREFIX}:${currentUserKey()}`;
   }
 
+  function vipStorageKey() {
+    return `${VIP_CACHE_PREFIX}:${currentUserKey()}`;
+  }
+
+  function setVipAuthorized(value) {
+    localStorage.setItem(vipStorageKey(), JSON.stringify({
+      authorized: value === true,
+      updatedAt: new Date().toISOString(),
+    }));
+  }
+
+  function getVipAuthorized() {
+    try {
+      return JSON.parse(localStorage.getItem(vipStorageKey()) || "null")?.authorized === true;
+    } catch {
+      localStorage.removeItem(vipStorageKey());
+      return false;
+    }
+  }
+
   function normalizeCustomSignatures(value) {
     const items = Array.isArray(value?.items) ? value.items.slice(0, MAX_CUSTOM_SIGNATURES) : [];
     const normalizedItems = items.map((item) => ({
       id: String(item?.id || "").replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64),
       title: String(item?.title || "").replace(/\s+/g, " ").trim().slice(0, 80),
       html: String(item?.html || "").trim().slice(0, 7000),
+      settings: item?.settings && typeof item.settings === "object"
+        ? publicSettings(normalizeRecord(item.settings) || normalizeRecord(DEFAULT_SETTINGS))
+        : null,
       updatedAt: Number.isFinite(Date.parse(item?.updatedAt)) ? item.updatedAt : "",
     })).filter((item) => item.id && item.title && item.html);
     const allowedIds = new Set(normalizedItems.map((item) => item.id));
@@ -328,6 +352,31 @@ function readableError(error) {
     return publicSettings(record);
   }
 
+  async function getSettingsForSignature(signatureId = "standard") {
+    if (!signatureId || signatureId === "standard") return getSettings();
+    const record = await getCustomSignatures();
+    const item = record.items.find((entry) => entry.id === signatureId);
+    if (!item) throw new Error("Die ausgewählte Signatur wurde nicht gefunden.");
+    return item.settings || getSettings();
+  }
+
+  async function saveSettingsForSignature(signatureId = "standard", settings) {
+    if (!signatureId || signatureId === "standard") return saveSettings(settings);
+    const normalized = normalizeRecord({ ...settings, updatedAt: new Date().toISOString() });
+    if (!normalized) throw new Error("Ungültige Einstellung.");
+    const record = await getCustomSignatures();
+    const item = record.items.find((entry) => entry.id === signatureId);
+    if (!item) throw new Error("Die ausgewählte Signatur wurde nicht gefunden.");
+    const savedSettings = publicSettings(normalized);
+    await saveCustomSignatures({
+      ...record,
+      items: record.items.map((entry) => entry.id === signatureId
+        ? { ...entry, settings: savedSettings, updatedAt: new Date().toISOString() }
+        : entry),
+    });
+    return savedSettings;
+  }
+
   global.SignaturePreferences = Object.freeze({
     getSettings,
     saveSettings,
@@ -337,6 +386,10 @@ function readableError(error) {
     setTitleAttributes,
     getCustomSignatures,
     saveCustomSignatures,
+    getSettingsForSignature,
+    saveSettingsForSignature,
+    getVipAuthorized,
+    setVipAuthorized,
   });
 })(window);
 
@@ -383,6 +436,7 @@ const statusElement = document.getElementById("status");
 const previewElement = document.getElementById("signature-preview");
 const signatureButton = document.getElementById("signature-button");
 const profileWarningsElement = document.getElementById("profile-warnings");
+const mainSettingsLink = document.getElementById("main-settings-link");
 const customAddButton = document.getElementById("custom-add-button");
 const customEditor = document.getElementById("custom-editor");
 const customTitleInput = document.getElementById("custom-signature-title");
@@ -391,6 +445,7 @@ const customSaveButton = document.getElementById("custom-save-button");
 const customCancelButton = document.getElementById("custom-cancel-button");
 const customSignaturesElement = document.getElementById("custom-signatures");
 const contextMenu = document.getElementById("signature-context-menu");
+const openSignatureSettingsButton = document.getElementById("open-signature-settings");
 const setDefaultButton = document.getElementById("set-default-signature");
 const editCustomButton = document.getElementById("edit-custom-signature");
 const deleteCustomButton = document.getElementById("delete-custom-signature");
@@ -424,6 +479,7 @@ function rememberAuthenticationRoles(result) {
   ];
   userRoles = new Set(roles.map((role) => String(role).trim()).filter(Boolean));
   vipAuthorized = userRoles.has(VIP_ROLE);
+  SignaturePreferences.setVipAuthorized(vipAuthorized);
 }
 
 function sanitizeCustomSignatureHtml(value) {
@@ -636,11 +692,11 @@ function personalName(profileValue) {
     .join(" ") || String(profileValue.displayName || profileValue.email || "").trim();
 }
 
-function delegatedName(profileValue) {
-  const titleBefore = signatureSettings.InsertTitleBefore
+function delegatedName(profileValue, settings = signatureSettings) {
+  const titleBefore = settings.InsertTitleBefore
     ? String(profileValue?.customAttribute10 || "").trim()
     : "";
-  const titleAfter = signatureSettings.InsertTitleAfter
+  const titleAfter = settings.InsertTitleAfter
     ? String(profileValue?.customAttribute11 || "").trim()
     : "";
   return [titleBefore, personalName(profileValue), titleAfter].filter(Boolean).join(" ");
@@ -721,7 +777,7 @@ function scaleSignaturePreview() {
   });
 }
 
-function buildSignature(templateHtml = signatureTemplate, customComplete = false) {
+function buildSignature(templateHtml = signatureTemplate, settings = signatureSettings, signatureId = "standard") {
   const sendAs = isFirstNameOnlyProfile(currentDelegation);
   const sendOnBehalf = Boolean(currentDelegation) && !sendAs;
   const selectedProfile = currentDelegation || profile;
@@ -734,23 +790,23 @@ function buildSignature(templateHtml = signatureTemplate, customComplete = false
   );
   const renderSettings = sendAs
     ? {
-        ...signatureSettings,
+        ...settings,
         Nummer: sendAsHasDirectNumber ? "Available" : "Office",
         Confidentiality: false,
         MobileUsage: false,
         MobileUsageText: "",
       }
-    : signatureSettings;
+    : settings;
   const titleBefore = !sendOnBehalf
-    && signatureSettings.InsertTitleBefore && String(signatureProfile.customAttribute10 || "").trim()
+    && settings.InsertTitleBefore && String(signatureProfile.customAttribute10 || "").trim()
     ? `${String(signatureProfile.customAttribute10).trim()} `
     : "";
   const titleAfter = !sendOnBehalf
-    && signatureSettings.InsertTitleAfter && String(signatureProfile.customAttribute11 || "").trim()
+    && settings.InsertTitleAfter && String(signatureProfile.customAttribute11 || "").trim()
     ? ` ${String(signatureProfile.customAttribute11).trim()}`
     : "";
   const senderName = personalName(profile);
-  const fromName = delegatedName(currentDelegation);
+  const fromName = delegatedName(currentDelegation, settings);
   const values = {
     FirstName: sendOnBehalf ? senderName : signatureProfile.firstName,
     LastName: sendOnBehalf ? `(i.A. ${fromName})` : signatureProfile.lastName,
@@ -765,12 +821,11 @@ function buildSignature(templateHtml = signatureTemplate, customComplete = false
     if (key === "Banner") return bannerForCity(signatureProfile);
     return Object.hasOwn(values, key) ? escapeHtml(values[key]) : match;
   });
-  const signatureContent = customComplete
-    ? signatureBody
-    : greetingHtml(renderSettings) + signatureBody + noticesHtml(renderSettings);
+  const signatureContent = greetingHtml(renderSettings) + signatureBody + noticesHtml(renderSettings);
   const marker = `<span style="display:none!important;mso-hide:all;max-height:0;overflow:hidden;font-size:0;line-height:0;color:transparent;">${SIGNATURE_MARKER_TEXT}</span>`;
-  const previewHtml = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2">${marker}${signatureContent}</div>`;
-  const html = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2">${marker}${insertedProfileWarningsHtml(signatureProfile, renderSettings.Nummer)}${signatureContent}</div>`;
+  const safeSignatureId = escapeHtml(signatureId);
+  const previewHtml = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2" data-attensam-signature-id="${safeSignatureId}">${marker}${signatureContent}</div>`;
+  const html = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2" data-attensam-signature-id="${safeSignatureId}">${marker}${insertedProfileWarningsHtml(signatureProfile, renderSettings.Nummer)}${signatureContent}</div>`;
   return { html, previewHtml, signatureProfile, renderSettings };
 }
 
@@ -803,7 +858,7 @@ function renderCustomSignatureCards() {
     card.innerHTML = `<div class="custom-signature-title"><span>${escapeHtml(item.title)}</span>${defaultBadge(item.id)}</div><div class="preview ready" role="button" tabindex="0" aria-label="${escapeHtml(item.title)} einfügen"><div class="signature-preview-content"></div></div>`;
     const button = card.querySelector(".preview");
     const content = card.querySelector(".signature-preview-content");
-    content.innerHTML = buildSignature(item.html, true).previewHtml;
+    content.innerHTML = buildSignature(item.html, item.settings || signatureSettings, item.id).previewHtml;
     button.addEventListener("click", () => insertSignature(item.id));
     button.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
@@ -1053,6 +1108,7 @@ async function loadProfile() {
     SignaturePreferences.setDepartment(profile.department);
     SignaturePreferences.setTitleAttributes(profile.customAttribute10, profile.customAttribute11);
     customAddButton.hidden = !vipAuthorized;
+    mainSettingsLink.hidden = vipAuthorized;
     customSignatures = vipAuthorized
       ? await SignaturePreferences.getCustomSignatures()
       : { requiredRole: VIP_ROLE, defaultId: "standard", items: [] };
@@ -1081,7 +1137,7 @@ async function insertSignature(customId = "standard") {
   const item = vipAuthorized && customId !== "standard"
     ? customSignatures.items.find((entry) => entry.id === customId)
     : null;
-  const html = item ? buildSignature(item.html, true).html : renderSignature();
+  const html = item ? buildSignature(item.html, item.settings || signatureSettings, item.id).html : renderSignature();
   const body = Office.context.mailbox.item?.body;
   if (!body) {
     setStatus("Bitte eine neue Nachricht öffnen.");
@@ -1170,7 +1226,14 @@ customSaveButton.addEventListener("click", async () => {
     return;
   }
   const id = editingCustomSignatureId || `custom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-  const updatedItem = { id, title, html, updatedAt: new Date().toISOString() };
+  const existingItem = customSignatures.items.find((item) => item.id === editingCustomSignatureId);
+  const updatedItem = {
+    id,
+    title,
+    html,
+    settings: existingItem?.settings || { ...signatureSettings },
+    updatedAt: new Date().toISOString(),
+  };
   const items = editingCustomSignatureId
     ? customSignatures.items.map((item) => item.id === editingCustomSignatureId ? updatedItem : item)
     : [...customSignatures.items, updatedItem];
@@ -1197,6 +1260,10 @@ setDefaultButton.addEventListener("click", async () => {
   } finally {
     closeSignatureMenu();
   }
+});
+openSignatureSettingsButton.addEventListener("click", () => {
+  const signatureId = contextSignatureId || "standard";
+  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.4`;
 });
 editCustomButton.addEventListener("click", () => {
   const item = customSignatures.items.find((entry) => entry.id === contextSignatureId);
@@ -1245,6 +1312,7 @@ Office.onReady((info) => {
 const AUTO_RENDER_DATA_KEY = "attensam.signature.render-data.v1";
 const SETTINGS_SIGNATURE_MARKER_ID = "attensam-signature-root";
 const SETTINGS_SIGNATURE_MARKER_TEXT = "ATTENSAM-SIGNATURE-V2";
+const SETTINGS_SIGNATURE_ID = String(new URLSearchParams(window.location.search).get("signature") || "standard").replace(/[^a-zA-Z0-9_-]/g, "") || "standard";
 
 const phoneModeSelect = document.getElementById("phone-mode");
 const edvHotlineOption = document.getElementById("edv-hotline-option");
@@ -1268,6 +1336,7 @@ const autoInsertCheckbox = document.getElementById("auto-insert");
 const autoInsertModeField = document.getElementById("auto-insert-mode-field");
 const autoInsertModeSelect = document.getElementById("auto-insert-mode");
 const settingsStatus = document.getElementById("settings-status");
+const settingsHeading = document.getElementById("settings-heading");
 let currentSettings;
 let settingsProfile = null;
 
@@ -1380,16 +1449,24 @@ async function updateInsertedSignature() {
   if (!body?.getAsync) return false;
   const renderData = Office.context.roamingSettings?.get(AUTO_RENDER_DATA_KEY);
   if (!renderData?.profile || typeof renderData.template !== "string") return false;
+  const bodyHtml = await getBodyHtml(body);
+  const bodyDocument = new DOMParser().parseFromString(bodyHtml, "text/html");
+  const existingSignature = bodyDocument.querySelector('[data-attensam-signature="v2"]')
+    || bodyDocument.querySelector('[data-attensam-signature="v1"]');
+  if (!existingSignature) return false;
+  const insertedSignatureId = existingSignature.getAttribute("data-attensam-signature-id") || "standard";
+  if (insertedSignatureId !== SETTINGS_SIGNATURE_ID) return false;
   const delegation = await new Promise((resolve) => {
     AttensamSignatureRuntime.resolveDelegation(renderData, resolve);
   });
+  const customRecord = await SignaturePreferences.getCustomSignatures();
   const html = AttensamSignatureRuntime.renderSignature(
     renderData,
     currentSettings,
     delegation,
-    await SignaturePreferences.getCustomSignatures(),
+    customRecord,
+    SETTINGS_SIGNATURE_ID,
   );
-  const bodyHtml = await getBodyHtml(body);
   if (body.setSignatureAsync) {
     await setCurrentSignature(body, html);
     return true;
@@ -1404,7 +1481,19 @@ async function updateInsertedSignature() {
 
 async function initializeSettings() {
   try {
-    currentSettings = await SignaturePreferences.getSettings();
+    const isVipUser = SignaturePreferences.getVipAuthorized();
+    if (!isVipUser && SETTINGS_SIGNATURE_ID !== "standard") {
+      throw new Error("Diese Signatur-Einstellungen sind nur für VIP-Benutzer verfügbar.");
+    }
+    const customRecord = await SignaturePreferences.getCustomSignatures();
+    const selectedItem = customRecord.items.find((item) => item.id === SETTINGS_SIGNATURE_ID);
+    if (SETTINGS_SIGNATURE_ID !== "standard" && !selectedItem) throw new Error("Die ausgewählte Signatur wurde nicht gefunden.");
+    settingsHeading.textContent = !isVipUser
+      ? "Einstellungen"
+      : SETTINGS_SIGNATURE_ID === "standard"
+      ? "Einstellungen: Standard"
+      : `Einstellungen: ${selectedItem.title}`;
+    currentSettings = await SignaturePreferences.getSettingsForSignature(SETTINGS_SIGNATURE_ID);
     settingsProfile = Office.context.roamingSettings?.get(AUTO_RENDER_DATA_KEY)?.profile || null;
     const department = SignaturePreferences.getDepartment();
     const titleAttributes = SignaturePreferences.getTitleAttributes();
@@ -1441,7 +1530,7 @@ async function saveSettings() {
   setControlsDisabled(true);
   setSettingsStatus("Einstellungen werden gespeichert …");
   try {
-    currentSettings = await SignaturePreferences.saveSettings({
+    currentSettings = await SignaturePreferences.saveSettingsForSignature(SETTINGS_SIGNATURE_ID, {
       Nummer: phoneModeSelect.value,
       MfG: greetingModeSelect.value,
       CustomGreeting: customGreetingInput.value,
@@ -1507,6 +1596,7 @@ Office.onReady((info) => {
 
 const CONFIG = ATTENSAM_CONFIG;
 const AUTO_RENDER_DATA_KEY = "attensam.signature.render-data.v1";
+const MOBILE_SETTINGS_SIGNATURE_ID = String(new URLSearchParams(window.location.search).get("signature") || "standard").replace(/[^a-zA-Z0-9_-]/g, "") || "standard";
 
 const phoneModeSelect = document.getElementById("phone-mode");
 const edvHotlineOption = document.getElementById("edv-hotline-option");
@@ -1531,6 +1621,7 @@ const autoInsertModeField = document.getElementById("auto-insert-mode-field");
 const autoInsertModeSelect = document.getElementById("auto-insert-mode");
 const settingsStatus = document.getElementById("settings-status");
 const closeButton = document.getElementById("close-button");
+const settingsHeading = document.getElementById("settings-heading");
 
 let currentSettings;
 let currentProfile;
@@ -1690,11 +1781,12 @@ async function saveAutomaticRenderData() {
   const roamingSettings = Office.context.roamingSettings;
   if (!roamingSettings) throw new Error("Outlook RoamingSettings ist nicht verfügbar.");
   const now = new Date().toISOString();
+  const standardSettings = await SignaturePreferences.getSettings();
   roamingSettings.set(AUTO_RENDER_DATA_KEY, {
     profile: { ...currentProfile },
     template: signatureTemplate,
     officeNumber: CONFIG.officeNumber,
-    settings: { ...currentSettings },
+    settings: { ...standardSettings },
     settingsUpdatedAt: now,
     graphAuth: {
       clientId: CONFIG.clientId,
@@ -1713,7 +1805,19 @@ async function saveAutomaticRenderData() {
 async function initializeSettings() {
   setControlsDisabled(true);
   try {
-    currentSettings = await SignaturePreferences.getSettings();
+    const isVipUser = SignaturePreferences.getVipAuthorized();
+    if (!isVipUser && MOBILE_SETTINGS_SIGNATURE_ID !== "standard") {
+      throw new Error("Diese Signatur-Einstellungen sind nur für VIP-Benutzer verfügbar.");
+    }
+    const customRecord = await SignaturePreferences.getCustomSignatures();
+    const selectedItem = customRecord.items.find((item) => item.id === MOBILE_SETTINGS_SIGNATURE_ID);
+    if (MOBILE_SETTINGS_SIGNATURE_ID !== "standard" && !selectedItem) throw new Error("Die ausgewählte Signatur wurde nicht gefunden.");
+    settingsHeading.textContent = !isVipUser
+      ? "Einstellungen"
+      : MOBILE_SETTINGS_SIGNATURE_ID === "standard"
+      ? "Einstellungen: Standard"
+      : `Einstellungen: ${selectedItem.title}`;
+    currentSettings = await SignaturePreferences.getSettingsForSignature(MOBILE_SETTINGS_SIGNATURE_ID);
     settingsProfile = Office.context.roamingSettings?.get(AUTO_RENDER_DATA_KEY)?.profile || null;
     showSettings(
       currentSettings,
@@ -1755,7 +1859,7 @@ async function saveSettings() {
   setControlsDisabled(true);
   setSettingsStatus("Einstellungen werden gespeichert …");
   try {
-    currentSettings = await SignaturePreferences.saveSettings({
+    currentSettings = await SignaturePreferences.saveSettingsForSignature(MOBILE_SETTINGS_SIGNATURE_ID, {
       Nummer: phoneModeSelect.value,
       MfG: greetingModeSelect.value,
       CustomGreeting: customGreetingInput.value,

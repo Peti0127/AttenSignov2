@@ -148,7 +148,7 @@
   (*! @azure/msal-browser v5.18.0 2026-08-04 *)
 */
 
-/* Attensam v0.8.2 custom-signature extension. */
+/* Attensam v0.8.4 signature-specific settings extension. */
 (function enableVipCustomSignatures() {
   const CUSTOM_KEY = "attensam.signature.custom-signatures.v1";
   const SETTINGS_KEY = "attensam.signature.settings.v2";
@@ -158,22 +158,29 @@
   if (!runtime || typeof runtime.renderSignature !== "function") return;
 
   const baseRender = runtime.renderSignature;
-  function validDefault(record) {
+  function selectedCustom(record, requestedId) {
     if (!record || record.requiredRole !== VIP_ROLE || !Array.isArray(record.items)) return null;
-    const id = String(record.defaultId || "standard");
+    const id = String(requestedId || record.defaultId || "standard");
     if (id === "standard") return null;
     const item = record.items.slice(0, 3).find((entry) => entry && entry.id === id);
     return item && typeof item.html === "string" && item.html.trim() ? item : null;
   }
 
-  function renderSignature(renderData, settings, delegation, customRecord) {
-    const custom = validDefault(customRecord);
-    if (!custom) return baseRender(renderData, settings, delegation);
-    return baseRender(
-      { ...renderData, template: custom.html },
-      { ...settings, MfG: "MfG0", CustomGreeting: "", MobileUsage: false, MobileUsageText: "", Confidentiality: false },
-      delegation,
+  function markSignature(html, signatureId) {
+    return html.replace(
+      'data-attensam-signature="v2"',
+      `data-attensam-signature="v2" data-attensam-signature-id="${String(signatureId || "standard").replace(/[^a-zA-Z0-9_-]/g, "") || "standard"}"`,
     );
+  }
+
+  function renderSignature(renderData, settings, delegation, customRecord, requestedId) {
+    const custom = selectedCustom(customRecord, requestedId);
+    if (!custom) return markSignature(baseRender(renderData, settings, delegation), "standard");
+    return markSignature(baseRender(
+      { ...renderData, template: custom.html },
+      custom.settings || settings,
+      delegation,
+    ), custom.id);
   }
 
   window.AttensamSignatureRuntime = Object.freeze({
@@ -208,12 +215,18 @@
     });
   }
 
+  function defaultSettings(settings, customRecord) {
+    const custom = selectedCustom(customRecord);
+    return custom?.settings || settings;
+  }
+
   function handleAutomaticInsertion(event) {
     try {
       const roamingSettings = Office.context.roamingSettings;
       const renderData = roamingSettings.get(RENDER_KEY);
-      const settings = newerSettings(roamingSettings.get(SETTINGS_KEY), renderData);
+      const standardSettings = newerSettings(roamingSettings.get(SETTINGS_KEY), renderData);
       const customRecord = roamingSettings.get(CUSTOM_KEY);
+      const settings = defaultSettings(standardSettings, customRecord);
       if (!renderData?.profile || typeof renderData.template !== "string" || settings?.AutoInsert !== true) {
         completed(event);
         return;

@@ -11,8 +11,8 @@
   </script>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@5.18.0/lib/msal-browser.min.js"></script>
-  <script defer src="autorun-classic.js?v=0.8.2"></script>
-  <script defer src="taskpane.js?v=0.8.2"></script>
+  <script defer src="autorun-classic.js?v=0.8.4"></script>
+  <script defer src="taskpane.js?v=0.8.4"></script>
   <style>
     :root { --red:#cb2525; --ink:#222220; --muted:#6f6d68; --line:#deddd7; --paper:#f7f6f1; }
     * { box-sizing:border-box; }
@@ -83,7 +83,7 @@
     <header>
       <div class="logo" aria-hidden="true">A</div>
       <div><p class="eyebrow">ATTENSAM</p><h1>Signatur erstellen</h1></div>
-      <a class="nav-link" href="taskpane.html?view=settings&amp;v=0.8.2" aria-label="Einstellungen öffnen">⚙ Einstellungen</a>
+      <a id="main-settings-link" class="nav-link" href="taskpane.html?view=settings&amp;signature=standard&amp;v=0.8.4" aria-label="Einstellungen öffnen">⚙ Einstellungen</a>
     </header>
     <main>
       <section>
@@ -101,6 +101,7 @@
         </div>
         <div id="custom-signatures" aria-live="polite"></div>
         <div id="signature-context-menu" class="context-menu" role="menu" hidden>
+          <button id="open-signature-settings" type="button" role="menuitem">Einstellungen</button>
           <button id="set-default-signature" type="button" role="menuitem">Als Standard festlegen</button>
           <button id="edit-custom-signature" type="button" role="menuitem">Signatur bearbeiten</button>
           <button id="delete-custom-signature" type="button" role="menuitem">Signatur löschen</button>
@@ -113,8 +114,8 @@
   <section id="settings-view" class="route-view">
     <header>
       <div class="logo" aria-hidden="true">A</div>
-      <div><p class="eyebrow">ATTENSAM</p><h1>Einstellungen</h1></div>
-      <a id="settings-back" class="nav-link" href="taskpane.html?v=0.8.2">← Zurück</a>
+      <div><p class="eyebrow">ATTENSAM</p><h1 id="settings-heading">Einstellungen</h1></div>
+      <a id="settings-back" class="nav-link" href="taskpane.html?v=0.8.4">← Zurück</a>
     </header>
     <main>
       <span class="step">SIGNATUR</span>
