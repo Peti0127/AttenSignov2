@@ -365,6 +365,8 @@ let userRoles = new Set();
 let vipAuthorized = false;
 let customSignatures = { requiredRole: VIP_ROLE, defaultId: "standard", items: [] };
 let contextSignatureId = "standard";
+let editingCustomSignatureId = null;
+let deleteConfirmationArmed = false;
 let signatureSettings = {
   Nummer: "Alles",
   MfG: "MfG1",
@@ -390,6 +392,7 @@ const customCancelButton = document.getElementById("custom-cancel-button");
 const customSignaturesElement = document.getElementById("custom-signatures");
 const contextMenu = document.getElementById("signature-context-menu");
 const setDefaultButton = document.getElementById("set-default-signature");
+const editCustomButton = document.getElementById("edit-custom-signature");
 const deleteCustomButton = document.getElementById("delete-custom-signature");
 
 function setStatus(message) {
@@ -426,9 +429,10 @@ function rememberAuthenticationRoles(result) {
 function sanitizeCustomSignatureHtml(value) {
   const documentValue = new DOMParser().parseFromString(`<div>${String(value || "")}</div>`, "text/html");
   const root = documentValue.body.firstElementChild;
-  const allowedTags = new Set(["A", "B", "BR", "DIV", "EM", "I", "IMG", "P", "SPAN", "STRONG", "TABLE", "TBODY", "TD", "TH", "TR", "U"]);
+  const allowedTags = new Set(["A", "B", "BR", "CENTER", "DIV", "EM", "FONT", "HR", "I", "IMG", "LI", "OL", "P", "SPAN", "STRONG", "SUB", "SUP", "TABLE", "TBODY", "TD", "TFOOT", "TH", "THEAD", "TR", "U", "UL"]);
   const allowedAttributes = {
     A: new Set(["href", "style", "title"]), IMG: new Set(["src", "alt", "width", "height", "border", "style"]),
+    FONT: new Set(["face", "size", "color", "style"]),
     TABLE: new Set(["cellpadding", "cellspacing", "border", "width", "style"]),
     TD: new Set(["colspan", "rowspan", "width", "height", "style"]), TH: new Set(["colspan", "rowspan", "width", "height", "style"]),
   };
@@ -456,6 +460,42 @@ function sanitizeCustomSignatureHtml(value) {
     });
   });
   return root.innerHTML.trim();
+}
+
+function insertHtmlAtEditorCursor(html) {
+  const selection = window.getSelection();
+  if (!selection?.rangeCount || !customHtmlInput.contains(selection.anchorNode)) {
+    customHtmlInput.insertAdjacentHTML("beforeend", html);
+    return;
+  }
+  const range = selection.getRangeAt(0);
+  range.deleteContents();
+  const fragment = range.createContextualFragment(html);
+  const lastNode = fragment.lastChild;
+  range.insertNode(fragment);
+  if (lastNode) {
+    range.setStartAfter(lastNode);
+    range.collapse(true);
+    selection.removeAllRanges();
+    selection.addRange(range);
+  }
+}
+
+function resetCustomEditor() {
+  editingCustomSignatureId = null;
+  customEditor.hidden = true;
+  customTitleInput.value = "";
+  customHtmlInput.innerHTML = "";
+  customSaveButton.textContent = "Speichern";
+}
+
+function openCustomEditor(item = null) {
+  editingCustomSignatureId = item?.id || null;
+  customTitleInput.value = item?.title || "";
+  customHtmlInput.innerHTML = item?.html || "";
+  customSaveButton.textContent = item ? "Änderungen speichern" : "Speichern";
+  customEditor.hidden = false;
+  customTitleInput.focus();
 }
 
 function phoneLine(profileValue = profile, settings = signatureSettings) {
@@ -786,6 +826,9 @@ function openSignatureMenu(event, id) {
   if (!vipAuthorized) return;
   event.preventDefault();
   contextSignatureId = id;
+  deleteConfirmationArmed = false;
+  deleteCustomButton.textContent = "Signatur löschen";
+  editCustomButton.hidden = id === "standard";
   deleteCustomButton.hidden = id === "standard";
   setDefaultButton.disabled = customSignatures.defaultId === id;
   contextMenu.hidden = false;
@@ -796,6 +839,8 @@ function openSignatureMenu(event, id) {
 }
 
 function closeSignatureMenu() {
+  deleteConfirmationArmed = false;
+  deleteCustomButton.textContent = "Signatur löschen";
   contextMenu.hidden = true;
 }
 
@@ -1080,37 +1125,64 @@ signatureButton.addEventListener("keydown", (event) => {
 signatureButton.addEventListener("contextmenu", (event) => openSignatureMenu(event, "standard"));
 customAddButton.addEventListener("click", () => {
   if (!vipAuthorized || customSignatures.items.length >= MAX_CUSTOM_SIGNATURES) return;
-  customEditor.hidden = false;
-  customTitleInput.focus();
+  openCustomEditor();
 });
-customCancelButton.addEventListener("click", () => {
-  customEditor.hidden = true;
-  customTitleInput.value = "";
-  customHtmlInput.value = "";
+customCancelButton.addEventListener("click", resetCustomEditor);
+customHtmlInput.addEventListener("paste", (event) => {
+  const clipboard = event.clipboardData;
+  if (!clipboard) return;
+  const clipboardHtml = clipboard.getData("text/html");
+  const clipboardText = clipboard.getData("text/plain");
+  const clipboardUrl = clipboard.getData("text/uri-list").split(/\r?\n/).find((value) => /^https:\/\//i.test(value.trim()));
+  const containsLocalImage = Array.from(clipboard.items || []).some((item) => item.type.startsWith("image/"));
+  event.preventDefault();
+  if (clipboardHtml) {
+    const sanitized = sanitizeCustomSignatureHtml(clipboardHtml);
+    if (sanitized) insertHtmlAtEditorCursor(sanitized);
+    return;
+  }
+  if (containsLocalImage && clipboardUrl) {
+    insertHtmlAtEditorCursor(`<img src="${escapeHtml(clipboardUrl.trim())}" alt="">`);
+    return;
+  }
+  if (clipboardText) {
+    insertHtmlAtEditorCursor(escapeHtml(clipboardText).replace(/\r\n|\r|\n/g, "<br>"));
+    return;
+  }
+  if (containsLocalImage) {
+    setStatus("Das Bild besitzt keine öffentliche HTTPS-Quelladresse und kann deshalb nicht dauerhaft in der Signatur gespeichert werden.");
+  }
 });
 customSaveButton.addEventListener("click", async () => {
   if (!vipAuthorized) return;
   const title = customTitleInput.value.replace(/\s+/g, " ").trim();
-  const html = sanitizeCustomSignatureHtml(customHtmlInput.value);
+  const html = sanitizeCustomSignatureHtml(customHtmlInput.innerHTML);
   if (!title || !html) {
-    setStatus("Bitte Titel und HTML-Code eingeben.");
+    setStatus("Bitte Titel und Signatur eingeben.");
     return;
   }
-  if (customSignatures.items.length >= MAX_CUSTOM_SIGNATURES) {
+  if (html.length > 7000) {
+    setStatus("Die Signatur ist zu groß. Bitte Inhalt oder Formatierungen reduzieren.");
+    return;
+  }
+  if (!editingCustomSignatureId && customSignatures.items.length >= MAX_CUSTOM_SIGNATURES) {
     setStatus("Maximal drei benutzerdefinierte Signaturen sind erlaubt.");
     return;
   }
-  const id = `custom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const id = editingCustomSignatureId || `custom-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const updatedItem = { id, title, html, updatedAt: new Date().toISOString() };
+  const items = editingCustomSignatureId
+    ? customSignatures.items.map((item) => item.id === editingCustomSignatureId ? updatedItem : item)
+    : [...customSignatures.items, updatedItem];
   try {
     customSignatures = await SignaturePreferences.saveCustomSignatures({
       ...customSignatures,
-      items: [...customSignatures.items, { id, title, html, updatedAt: new Date().toISOString() }],
+      items,
     });
-    customEditor.hidden = true;
-    customTitleInput.value = "";
-    customHtmlInput.value = "";
+    const wasEditing = Boolean(editingCustomSignatureId);
+    resetCustomEditor();
     renderCustomSignatureCards();
-    setStatus("Benutzerdefinierte Signatur wurde gespeichert.");
+    setStatus(wasEditing ? "Benutzerdefinierte Signatur wurde aktualisiert." : "Benutzerdefinierte Signatur wurde gespeichert.");
   } catch (error) {
     setStatus(error.message || "Signatur konnte nicht gespeichert werden.");
   }
@@ -1126,9 +1198,19 @@ setDefaultButton.addEventListener("click", async () => {
     closeSignatureMenu();
   }
 });
+editCustomButton.addEventListener("click", () => {
+  const item = customSignatures.items.find((entry) => entry.id === contextSignatureId);
+  if (item) openCustomEditor(item);
+  closeSignatureMenu();
+});
 deleteCustomButton.addEventListener("click", async () => {
   const item = customSignatures.items.find((entry) => entry.id === contextSignatureId);
-  if (!item || !window.confirm(`„${item.title}“ wirklich löschen?`)) return;
+  if (!item) return;
+  if (!deleteConfirmationArmed) {
+    deleteConfirmationArmed = true;
+    deleteCustomButton.textContent = "Löschen bestätigen";
+    return;
+  }
   try {
     const items = customSignatures.items.filter((entry) => entry.id !== contextSignatureId);
     customSignatures = await SignaturePreferences.saveCustomSignatures({
@@ -1137,6 +1219,7 @@ deleteCustomButton.addEventListener("click", async () => {
       items,
     });
     renderCustomSignatureCards();
+    if (editingCustomSignatureId === contextSignatureId) resetCustomEditor();
     setStatus("Benutzerdefinierte Signatur wurde gelöscht.");
   } catch (error) {
     setStatus(error.message || "Signatur konnte nicht gelöscht werden.");

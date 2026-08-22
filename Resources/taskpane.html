@@ -11,8 +11,8 @@
   </script>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@5.18.0/lib/msal-browser.min.js"></script>
-  <script defer src="autorun-classic.js?v=0.8.0"></script>
-  <script defer src="taskpane.js?v=0.8.0"></script>
+  <script defer src="autorun-classic.js?v=0.8.1"></script>
+  <script defer src="taskpane.js?v=0.8.1"></script>
   <style>
     :root { --red:#cb2525; --ink:#222220; --muted:#6f6d68; --line:#deddd7; --paper:#f7f6f1; }
     * { box-sizing:border-box; }
@@ -44,8 +44,10 @@
     .signature-preview-content p { margin:0 0 12px; }
     .custom-editor, .custom-signature-card { margin-top:18px; }
     .custom-editor { padding:14px; border:1px solid var(--line); border-radius:4px; background:#fff; }
-    textarea { width:100%; min-height:180px; padding:10px 11px; resize:vertical; border:1px solid #cbc9c2; border-radius:4px; background:#fff; color:var(--ink); font:12px/1.45 Consolas,monospace; }
-    textarea:focus { border-color:var(--red); box-shadow:0 0 0 3px rgba(203,37,37,.1); outline:none; }
+    .rich-editor { width:100%; min-height:180px; max-height:360px; padding:10px 11px; overflow:auto; border:1px solid #cbc9c2; border-radius:4px; background:#fff; color:var(--ink); font:12pt/1.35 Aptos,Arial,sans-serif; }
+    .rich-editor:empty::before { color:#999; content:attr(data-placeholder); pointer-events:none; }
+    .rich-editor:focus { border-color:var(--red); box-shadow:0 0 0 3px rgba(203,37,37,.1); outline:none; }
+    .rich-editor img { max-width:100%; height:auto; }
     .editor-actions { display:flex; gap:8px; margin-top:12px; }
     .editor-actions button, .context-menu button { min-height:38px; padding:0 13px; }
     .primary-action { color:#fff; background:var(--red); }
@@ -81,7 +83,7 @@
     <header>
       <div class="logo" aria-hidden="true">A</div>
       <div><p class="eyebrow">ATTENSAM</p><h1>Signatur erstellen</h1></div>
-      <a class="nav-link" href="taskpane.html?view=settings&amp;v=0.8.0" aria-label="Einstellungen öffnen">⚙ Einstellungen</a>
+      <a class="nav-link" href="taskpane.html?view=settings&amp;v=0.8.1" aria-label="Einstellungen öffnen">⚙ Einstellungen</a>
     </header>
     <main>
       <section>
@@ -93,13 +95,14 @@
         <div id="profile-warnings" class="validation-warnings" role="alert" hidden></div>
         <div id="custom-editor" class="custom-editor" hidden>
           <div class="field"><label for="custom-signature-title">Titel</label><input id="custom-signature-title" type="text" maxlength="80" autocomplete="off" placeholder="z. B. Messe-Signatur"></div>
-          <div class="field"><label for="custom-signature-html">Signatur (HTML)</label><textarea id="custom-signature-html" maxlength="7000" spellcheck="false" placeholder="HTML-Code der Signatur"></textarea></div>
+          <div class="field"><label for="custom-signature-html">Signatur</label><div id="custom-signature-html" class="rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Signatur hier eingeben oder aus Outlook einfügen"></div></div>
           <div class="editor-actions"><button id="custom-save-button" class="primary-action" type="button">Speichern</button><button id="custom-cancel-button" class="secondary-action" type="button">Abbrechen</button></div>
-          <p class="hint">Bis zu drei Signaturen. Profil-Platzhalter wie {FirstName}, {LastName}, {JobTitle} und {E-mail} können verwendet werden.</p>
+          <p class="hint">Bis zu drei Signaturen. Formatierungen, Zeilenumbrüche und Bilder mit einer öffentlichen HTTPS-Quelladresse werden beim Einfügen übernommen. Direkt eingefügte lokale Bilddateien benötigen zuerst eine öffentlich erreichbare Bildadresse. Profil-Platzhalter wie {FirstName}, {LastName}, {JobTitle} und {E-mail} können verwendet werden.</p>
         </div>
         <div id="custom-signatures" aria-live="polite"></div>
         <div id="signature-context-menu" class="context-menu" role="menu" hidden>
           <button id="set-default-signature" type="button" role="menuitem">Als Standard festlegen</button>
+          <button id="edit-custom-signature" type="button" role="menuitem">Signatur bearbeiten</button>
           <button id="delete-custom-signature" type="button" role="menuitem">Signatur löschen</button>
         </div>
       </section>
@@ -111,7 +114,7 @@
     <header>
       <div class="logo" aria-hidden="true">A</div>
       <div><p class="eyebrow">ATTENSAM</p><h1>Einstellungen</h1></div>
-      <a id="settings-back" class="nav-link" href="taskpane.html?v=0.8.0">← Zurück</a>
+      <a id="settings-back" class="nav-link" href="taskpane.html?v=0.8.1">← Zurück</a>
     </header>
     <main>
       <span class="step">SIGNATUR</span>
