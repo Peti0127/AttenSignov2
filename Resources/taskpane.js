@@ -1,8 +1,8 @@
 /* Attensam compact UI bundle. Generated from the tested UI modules. */
 const ATTENSAM_CONFIG = Object.freeze({
-  clientId: "asd",
-  tenantId: "https://login.microsoftonline.com/asd",
-  officeNumber: "YOUR_FIXED_OFFICE_NUMBER",
+  clientId: "89659501-37e7-4916-abeb-4dc5178e3034",
+  tenantId: "https://login.microsoftonline.com/1333c2c2-fdf6-4fdc-8559-3dc12559d264",
+  officeNumber: "05 7999 100",
 });
 
 function hasConfiguredEntraApp() {
