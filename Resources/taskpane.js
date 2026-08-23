@@ -476,7 +476,7 @@ const AUTO_RENDER_DATA_KEY = "attensam.signature.render-data.v1";
 const VIP_ROLE = "ATS.Signature.VIP";
 const MAX_CUSTOM_SIGNATURES = 3;
 const SIGNATURE_MARKER_ID = "attensam-signature-root";
-const SIGNATURE_MARKER_TEXT = "ATTENSAM-SIGNATURE-V2";
+const SIGNATURE_MARKER_TEXT = "Attensam-Signatur";
 
 const profile = {
   id: "", firstName: "", lastName: "", jobTitle: "", company: "",
@@ -1350,7 +1350,7 @@ setDefaultButton.addEventListener("click", async () => {
 });
 openSignatureSettingsButton.addEventListener("click", () => {
   const signatureId = contextSignatureId || "standard";
-  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.12`;
+  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.14`;
 });
 editCustomButton.addEventListener("click", () => {
   const item = customSignatures.items.find((entry) => entry.id === contextSignatureId);
@@ -1398,7 +1398,7 @@ Office.onReady((info) => {
 
 const AUTO_RENDER_DATA_KEY = "attensam.signature.render-data.v1";
 const SETTINGS_SIGNATURE_MARKER_ID = "attensam-signature-root";
-const SETTINGS_SIGNATURE_MARKER_TEXT = "ATTENSAM-SIGNATURE-V2";
+const SETTINGS_SIGNATURE_MARKER_TEXT = "Attensam-Signatur";
 const SETTINGS_SIGNATURE_ID = String(new URLSearchParams(window.location.search).get("signature") || "standard").replace(/[^a-zA-Z0-9_-]/g, "") || "standard";
 
 const phoneModeSelect = document.getElementById("phone-mode");

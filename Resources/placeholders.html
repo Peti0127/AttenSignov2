@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+  <title>Attensam Profilplatzhalter</title>
+  <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAABKVBMVEUAAADgAADfAAD/AADiAADhAADhAADiAADhAADYAADhAADiAADgAADhAADkAADhAADgAADhAADhAAD/AADiAADhAADgAADlAADhAADhAADgAADhAADgAADhAAD/AADhAADhAADkAADbAADhAADhAADdAADhAADiAADhAADhAADhAADhAADmAADgAADgAADgAADiAADhAADhAADhAADgAADhAADgAADhAADhAADjAADhAADhAADiAADhAADgAADgAADhAADjAADhAADfAADiAADiAADhAADhAADhAADiAADhAADhAADiAADhAADhAADgAADgAADhAADiAADhAADhAADcAADhAADfAADhAADhAADgAAD/AADjAADiAADiAADjAADjAADhAAD///+ZudeEAAAAYXRSTlMAGUAEI/CwlDMN8Zxs9hPTc0PcAq3iSh3740m1hX8B2v4mB+j8HniMXKq77grIZDHQnzv3UqGmd8El/foa3lO3fgmXOINHhvMiUMM8LNaBa8D4aVTyFnAIuZpLAzZGPi0SEn2rxQAAAAFiS0dEYiu5HTwAAAAJcEhZcwAAAdEAAAHRAQyRTPMAAAAHdElNRQflDA8OIxS5I1PQAAABCUlEQVQ4y2NgoDNgZGLGK8/CmsiGVwF7YmIiBx55Ti6gAm48CniA8om8fLgV8IMUJArglBcEyycKCeNSIAKUFQViMRzy4hKJiZJSQAXSOBTIAOVk5eQTExUUscorKScmqqgyqAGVqWNVoAGU4dLU1AJS2jrYFOgmIoAeFnl9JPlEAywKDJEVJBphyPMZA4VNOEDAFMgyw1BgDhS1gDAtrRITrW3Q5IVtgQrsoBx7INuBgRzg6CSOzHV2cUVT4Jbo7uYBU+zplZho5Y0i72MN8qCvoZ+/uXpAINi3QSgKgkMS0YB8KKoV4tzWyNKiYeEYzmQMi4AaIxQZFY3dK9HiMbFx8QlkBQO5AADiCU4jdj6PHwAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAyMS0xMi0xNVQxNDozNToyMCswMDowMJfACAgAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMjEtMTItMTVUMTQ6MzU6MjArMDA6MDDmnbC0AAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAFd6VFh0UmF3IHByb2ZpbGUgdHlwZSBpcHRjAAB4nOPyDAhxVigoyk/LzEnlUgADIwsuYwsTIxNLkxQDEyBEgDTDZAMjs1Qgy9jUyMTMxBzEB8uASKBKLgDqFxF08kI1lQAAAABJRU5ErkJggg==">
+  <script>
+    if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+      document.documentElement.dataset.clientTheme = "dark";
+    }
+  </script>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <style>
+    :root { color-scheme:light; --red:#e10000; --ink:#090909; --muted:#666; --line:#d2d2d2; --paper:#f7f7f7; --surface:#fff; --hover:#f1f1f1; }
+    :root[data-client-theme="dark"] { color-scheme:dark; --ink:#f2f2f2; --muted:#b8b8b8; --line:#4a4a4a; --paper:#111; --surface:#222; --hover:#333; }
+    @media (prefers-color-scheme:dark) {
+      :root:not([data-client-theme="light"]) { color-scheme:dark; --ink:#f2f2f2; --muted:#b8b8b8; --line:#4a4a4a; --paper:#111; --surface:#222; --hover:#333; }
+    }
+    * { box-sizing:border-box; }
+    body { min-height:100vh; margin:0; color:var(--ink); background:var(--paper); font-family:Inter,"Segoe UI",Arial,sans-serif; }
+    header { display:flex; align-items:center; gap:12px; min-height:72px; padding:15px 18px; background:var(--surface); border-bottom:3px solid var(--red); }
+    .logo-frame { display:grid; place-items:center; width:38px; height:34px; flex:0 0 auto; padding-right:12px; border-right:1px solid var(--line); }
+    .logo { display:block; width:24px; height:24px; object-fit:contain; }
+    .eyebrow { margin:0 0 2px; color:var(--red); font-size:9px; font-weight:800; letter-spacing:.16em; }
+    h1 { margin:0; color:var(--ink); font-size:18px; font-weight:600; }
+    .nav-link { display:grid; place-items:center; width:36px; height:36px; margin-left:auto; padding:0; color:var(--ink); background:transparent; font-size:21px; line-height:1; text-decoration:none; }
+    .nav-link:hover, .nav-link:focus-visible { color:var(--red); background:var(--hover); outline:2px solid rgba(225,0,0,.18); outline-offset:0; }
+    main { max-width:640px; margin:0 auto; padding:20px 18px 36px; }
+    .intro { margin:0 0 16px; color:var(--muted); font-size:12px; line-height:1.5; }
+    .placeholder-list { margin:0; border-top:1px solid var(--line); }
+    .placeholder-row { display:grid; grid-template-columns:minmax(165px,.9fr) 1.3fr; gap:14px; padding:13px 0; border-bottom:1px solid var(--line); }
+    dt, dd { margin:0; }
+    dt code { color:var(--red); font-family:Consolas,"Courier New",monospace; font-size:12px; font-weight:700; overflow-wrap:anywhere; }
+    dd { color:var(--ink); font-size:12px; line-height:1.45; }
+    .note { margin:18px 0 0; color:var(--muted); font-size:11px; line-height:1.5; }
+    @media (max-width:380px) {
+      .placeholder-row { grid-template-columns:1fr; gap:5px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo-frame" aria-hidden="true"><img class="logo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAABKVBMVEUAAADgAADfAAD/AADiAADhAADhAADiAADhAADYAADhAADiAADgAADhAADkAADhAADgAADhAADhAAD/AADiAADhAADgAADlAADhAADhAADgAADhAADgAADhAAD/AADhAADhAADkAADbAADhAADhAADdAADhAADiAADhAADhAADhAADhAADmAADgAADgAADgAADiAADhAADhAADhAADgAADhAADgAADhAADhAADjAADhAADhAADiAADhAADgAADgAADhAADjAADhAADfAADiAADiAADhAADhAADhAADiAADhAADhAADiAADhAADhAADgAADgAADhAADiAADhAADhAADcAADhAADfAADhAADhAADgAAD/AADjAADiAADiAADjAADjAADhAAD///+ZudeEAAAAYXRSTlMAGUAEI/CwlDMN8Zxs9hPTc0PcAq3iSh3740m1hX8B2v4mB+j8HniMXKq77grIZDHQnzv3UqGmd8El/foa3lO3fgmXOINHhvMiUMM8LNaBa8D4aVTyFnAIuZpLAzZGPi0SEn2rxQAAAAFiS0dEYiu5HTwAAAAJcEhZcwAAAdEAAAHRAQyRTPMAAAAHdElNRQflDA8OIxS5I1PQAAABCUlEQVQ4y2NgoDNgZGLGK8/CmsiGVwF7YmIiBx55Ti6gAm48CniA8om8fLgV8IMUJArglBcEyycKCeNSIAKUFQViMRzy4hKJiZJSQAXSOBTIAOVk5eQTExUUscorKScmqqgyqAGVqWNVoAGU4dLU1AJS2jrYFOgmIoAeFnl9JPlEAywKDJEVJBphyPMZA4VNOEDAFMgyw1BgDhS1gDAtrRITrW3Q5IVtgQrsoBx7INuBgRzg6CSOzHV2cUVT4Jbo7uYBU+zplZho5Y0i72MN8qCvoZ+/uXpAINi3QSgKgkMS0YB8KKoV4tzWyNKiYeEYzmQMi4AaIxQZFY3dK9HiMbFx8QlkBQO5AADiCU4jdj6PHwAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAyMS0xMi0xNVQxNDozNToyMCswMDowMJfACAgAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMjEtMTItMTVUMTQ6MzU6MjArMDA6MDDmnbC0AAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAFd6VFh0UmF3IHByb2ZpbGUgdHlwZSBpcHRjAAB4nOPyDAhxVigoyk/LzEnlUgADIwsuYwsTIxNLkxQDEyBEgDTDZAMjs1Qgy9jUyMTMxBzEB8uASKBKLgDqFxF08kI1lQAAAABJRU5ErkJggg==" alt=""></div>
+    <div><p class="eyebrow">ATTENSAM</p><h1>Profilplatzhalter</h1></div>
+    <a class="nav-link" href="taskpane.html?v=0.8.14" aria-label="Zurück" title="Zurück">&#8592;</a>
+  </header>
+  <main>
+    <p class="intro">Diese Platzhalter können in benutzerdefinierten Signaturen verwendet werden.</p>
+    <dl class="placeholder-list">
+      <div class="placeholder-row"><dt><code>{FirstName}</code></dt><dd>Vorname</dd></div>
+      <div class="placeholder-row"><dt><code>{LastName}</code></dt><dd>Nachname</dd></div>
+      <div class="placeholder-row"><dt><code>{JobTitle}</code></dt><dd>Titel</dd></div>
+      <div class="placeholder-row"><dt><code>{E-mail}</code></dt><dd>E-Mail-Adresse</dd></div>
+      <div class="placeholder-row"><dt><code>{Company}</code></dt><dd>Firma</dd></div>
+      <div class="placeholder-row"><dt><code>{City}</code></dt><dd>Ort</dd></div>
+      <div class="placeholder-row"><dt><code>{PostalCode}</code></dt><dd>Postleitzahl</dd></div>
+      <div class="placeholder-row"><dt><code>{Street}</code></dt><dd>Straße</dd></div>
+      <div class="placeholder-row"><dt><code>{Phone}</code></dt><dd>Festnetznummer</dd></div>
+      <div class="placeholder-row"><dt><code>{Mobile}</code></dt><dd>Mobilnummer</dd></div>
+      <div class="placeholder-row"><dt><code>{CustomAttribute10}</code></dt><dd>Vorgestellter Titel (extensionAttribute10)</dd></div>
+      <div class="placeholder-row"><dt><code>{CustomAttribute11}</code></dt><dd>Nachgestellter Titel (extensionAttribute11)</dd></div>
+      <div class="placeholder-row"><dt><code>{Phone Mobile Office Number}</code></dt><dd>Telefonzeile entsprechend der Einstellung „Nummer anzeigen“</dd></div>
+      <div class="placeholder-row"><dt><code>{Banner}</code></dt><dd>Standortabhängiger Banner</dd></div>
+    </dl>
+    <p class="note">Die Grußformel wird über die Einstellungen der jeweiligen Signatur gesteuert und benötigt keinen Platzhalter.</p>
+  </main>
+  <script>
+    (function followClientTheme() {
+      if (typeof Office === "undefined" || typeof Office.onReady !== "function") return;
+
+      const applyOfficeTheme = () => {
+        const theme = Office.context && Office.context.officeTheme;
+        if (!theme) return;
+        const background = String(theme.bodyBackgroundColor || "").toLowerCase();
+        const red = parseInt(background.slice(1, 3), 16) || 255;
+        const green = parseInt(background.slice(3, 5), 16) || 255;
+        const blue = parseInt(background.slice(5, 7), 16) || 255;
+        const dark = (red * 299 + green * 587 + blue * 114) / 1000 < 145;
+        document.documentElement.dataset.clientTheme = dark ? "dark" : "light";
+      };
+
+      Office.onReady(() => {
+        applyOfficeTheme();
+        if (Office.context && Office.context.mailbox && Office.context.mailbox.addHandlerAsync && Office.EventType && Office.EventType.OfficeThemeChanged) {
+          Office.context.mailbox.addHandlerAsync(Office.EventType.OfficeThemeChanged, applyOfficeTheme);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
