@@ -25,6 +25,74 @@ function readableError(error) {
   if (typeof error?.errorCode === "string" && error.errorCode.trim()) return error.errorCode.trim();
   return "Unbekannter Fehler";
 }
+
+(function followClientTheme() {
+  const root = document.documentElement;
+  const media = window.matchMedia?.("(prefers-color-scheme: dark)");
+  let officeThemeDetected = false;
+  const exactColorVariables = ["--paper", "--surface", "--control-bg", "--control-ink", "--footer-bg"];
+
+  function clearExactColors() {
+    exactColorVariables.forEach((name) => root.style.removeProperty(name));
+  }
+
+  function isDarkColor(value) {
+    const hex = String(value || "").trim().replace(/^#/, "");
+    if (!/^[0-9a-f]{6}$/i.test(hex)) return false;
+    const red = Number.parseInt(hex.slice(0, 2), 16);
+    const green = Number.parseInt(hex.slice(2, 4), 16);
+    const blue = Number.parseInt(hex.slice(4, 6), 16);
+    return (red * 0.299 + green * 0.587 + blue * 0.114) < 128;
+  }
+
+  function applySystemPreference() {
+    if (officeThemeDetected) return;
+    clearExactColors();
+    root.dataset.clientTheme = media?.matches ? "dark" : "light";
+  }
+
+  function applyOfficeTheme(theme) {
+    if (!theme?.bodyBackgroundColor) {
+      officeThemeDetected = false;
+      applySystemPreference();
+      return;
+    }
+    officeThemeDetected = true;
+    const dark = isDarkColor(theme.bodyBackgroundColor);
+    root.dataset.clientTheme = dark ? "dark" : "light";
+    clearExactColors();
+    if (!dark) return;
+    const bodyBackground = theme.bodyBackgroundColor;
+    const bodyForeground = theme.bodyForegroundColor || "#f2f2f2";
+    const controlBackground = theme.controlBackgroundColor || "#222222";
+    const controlForeground = theme.controlForegroundColor || bodyForeground;
+    root.style.setProperty("--paper", bodyBackground);
+    root.style.setProperty("--surface", controlBackground);
+    root.style.setProperty("--control-bg", controlBackground);
+    root.style.setProperty("--control-ink", controlForeground);
+    root.style.setProperty("--footer-bg", controlBackground);
+  }
+
+  applySystemPreference();
+  if (media?.addEventListener) media.addEventListener("change", applySystemPreference);
+  else if (media?.addListener) media.addListener(applySystemPreference);
+
+  Office.onReady((info) => {
+    if (info.host !== Office.HostType.Outlook) return;
+    applyOfficeTheme(Office.context.officeTheme);
+    const supportsThemeEvents = Office.context.requirements?.isSetSupported?.("Mailbox", "1.14");
+    if (!supportsThemeEvents || !Office.EventType.OfficeThemeChanged || !Office.context.mailbox?.addHandlerAsync) return;
+    Office.context.mailbox.addHandlerAsync(
+      Office.EventType.OfficeThemeChanged,
+      (event) => applyOfficeTheme(event.officeTheme),
+      (result) => {
+        if (result.status !== Office.AsyncResultStatus.Succeeded) {
+          console.warn("Outlook-Designänderungen konnten nicht automatisch überwacht werden.", result.error);
+        }
+      },
+    );
+  });
+})();
 /* global Office */
 
 (function exposeSignaturePreferences(global) {
@@ -1088,7 +1156,7 @@ async function refreshDelegationForCurrentFrom() {
 }
 
 async function loadProfile() {
-  setStatus("Microsoft-365-Profil wird automatisch geladen …");
+  setStatus("Signaturdaten werden geladen …");
   try {
     const token = await acquireGraphToken();
     const select = [
@@ -1134,7 +1202,7 @@ async function loadProfile() {
       setStatus(`Profil geladen, aber automatische Signaturdaten konnten nicht gespeichert werden: ${cacheError.message}`);
       return;
     }
-    setStatus("Microsoft-365-Profil wurde automatisch geladen.");
+    setStatus("Signaturdaten erfolgreich geladen.");
   } catch (error) {
     profileLoaded = false;
     if (SignaturePreferences.getVipAuthorizationState() === null) {
@@ -1282,7 +1350,7 @@ setDefaultButton.addEventListener("click", async () => {
 });
 openSignatureSettingsButton.addEventListener("click", () => {
   const signatureId = contextSignatureId || "standard";
-  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.8`;
+  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.12`;
 });
 editCustomButton.addEventListener("click", () => {
   const item = customSignatures.items.find((entry) => entry.id === contextSignatureId);
@@ -1849,7 +1917,7 @@ async function initializeSettings() {
     return;
   }
 
-  setSettingsStatus("Einstellungen sind verfügbar. Microsoft-365-Profil wird geladen …");
+  setSettingsStatus("Einstellungen sind verfügbar. Signaturdaten werden geladen …");
   try {
     [signatureTemplate, currentProfile] = await Promise.all([
       fetch("template.html", { cache: "no-store" }).then((response) => {

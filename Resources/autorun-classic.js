@@ -148,7 +148,7 @@
   (*! @azure/msal-browser v5.18.0 2026-08-04 *)
 */
 
-/* Attensam v0.8.8 signature-specific settings extension. */
+/* Attensam v0.8.12 signature-specific settings extension. */
 (function enableVipCustomSignatures() {
   const CUSTOM_KEY = "attensam.signature.custom-signatures.v1";
   const SETTINGS_KEY = "attensam.signature.settings.v2";
@@ -199,19 +199,45 @@
     return !roaming || renderTime >= roamingTime ? renderData.settings : roaming;
   }
 
+  function isOutlookMobile() {
+    const platform = Office.context?.platform;
+    return platform === Office.PlatformType?.Android || platform === Office.PlatformType?.iOS;
+  }
+
+  function disableNativeMobileSignature(callback) {
+    const item = Office.context.mailbox?.item;
+    if (!isOutlookMobile() || typeof item?.disableClientSignatureAsync !== "function") {
+      callback();
+      return;
+    }
+    try {
+      item.disableClientSignatureAsync((result) => {
+        if (result.status !== Office.AsyncResultStatus.Succeeded) {
+          console.warn("Die native Outlook-Mobile-Signatur konnte nicht deaktiviert werden.", result.error);
+        }
+        callback();
+      });
+    } catch (error) {
+      console.warn("Die native Outlook-Mobile-Signatur konnte nicht deaktiviert werden.", error);
+      callback();
+    }
+  }
+
   function insert(event, settings, renderData, customRecord) {
-    runtime.resolveDelegation(renderData, (delegation) => {
-      try {
-        const html = renderSignature(renderData, settings, delegation, customRecord);
-        Office.context.mailbox.item.body.setSignatureAsync(
-          html,
-          { coercionType: Office.CoercionType.Html },
-          () => completed(event),
-        );
-      } catch (error) {
-        console.error("Benutzerdefinierte Standardsignatur konnte nicht eingefügt werden.", error);
-        completed(event);
-      }
+    disableNativeMobileSignature(() => {
+      runtime.resolveDelegation(renderData, (delegation) => {
+        try {
+          const html = renderSignature(renderData, settings, delegation, customRecord);
+          Office.context.mailbox.item.body.setSignatureAsync(
+            html,
+            { coercionType: Office.CoercionType.Html },
+            () => completed(event),
+          );
+        } catch (error) {
+          console.error("Benutzerdefinierte Standardsignatur konnte nicht eingefügt werden.", error);
+          completed(event);
+        }
+      });
     });
   }
 
