@@ -894,6 +894,8 @@ function buildSignature(templateHtml = signatureTemplate, settings = signatureSe
     Company: signatureProfile.company, City: signatureProfile.city, Street: signatureProfile.street,
     PostalCode: signatureProfile.postalCode, JobTitle: signatureProfile.jobTitle,
     "E-mail": signatureProfile.email, Mobile: signatureProfile.mobile, Phone: signatureProfile.phone,
+    TitelVor: titleBefore,
+    TitelNach: titleAfter,
     CustomAttribute10: titleBefore,
     CustomAttribute11: titleAfter,
   };
