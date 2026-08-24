@@ -1352,7 +1352,7 @@ setDefaultButton.addEventListener("click", async () => {
 });
 openSignatureSettingsButton.addEventListener("click", () => {
   const signatureId = contextSignatureId || "standard";
-  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.16`;
+  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.17`;
 });
 editCustomButton.addEventListener("click", () => {
   const item = customSignatures.items.find((entry) => entry.id === contextSignatureId);
@@ -1521,14 +1521,19 @@ function setBodyHtml(body, html) {
   });
 }
 
-function replaceMarkedSignature(bodyHtml, signatureHtml) {
-  const document = new DOMParser().parseFromString(bodyHtml, "text/html");
+function findMarkedSignature(document) {
   const hiddenMarker = Array.from(document.querySelectorAll("span"))
     .find((element) => element.textContent?.includes(SETTINGS_SIGNATURE_MARKER_TEXT));
-  const existingSignature = document.getElementById(SETTINGS_SIGNATURE_MARKER_ID)
+  return document.getElementById(SETTINGS_SIGNATURE_MARKER_ID)
     || document.querySelector('[data-attensam-signature="v1"]')
     || document.querySelector('[data-attensam-signature="v2"]')
+    || document.querySelector(`[id^="${SETTINGS_SIGNATURE_MARKER_ID_PREFIX}"]`)?.parentElement
     || hiddenMarker?.parentElement;
+}
+
+function replaceMarkedSignature(bodyHtml, signatureHtml) {
+  const document = new DOMParser().parseFromString(bodyHtml, "text/html");
+  const existingSignature = findMarkedSignature(document);
   if (!existingSignature) return null;
   existingSignature.outerHTML = signatureHtml;
   return document.body.innerHTML;
@@ -1551,8 +1556,7 @@ async function updateInsertedSignature() {
   if (!renderData?.profile || typeof renderData.template !== "string") return false;
   const bodyHtml = await getBodyHtml(body);
   const bodyDocument = new DOMParser().parseFromString(bodyHtml, "text/html");
-  const existingSignature = bodyDocument.querySelector('[data-attensam-signature="v2"]')
-    || bodyDocument.querySelector('[data-attensam-signature="v1"]');
+  const existingSignature = findMarkedSignature(bodyDocument);
   if (!existingSignature) return false;
   const insertedSignatureId = readInsertedSignatureId(existingSignature);
   // Older signatures may have lost their data attribute during Outlook's HTML
