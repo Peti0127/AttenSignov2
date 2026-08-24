@@ -905,8 +905,8 @@ function buildSignature(templateHtml = signatureTemplate, settings = signatureSe
     return Object.hasOwn(values, key) ? escapeHtml(values[key]) : match;
   });
   const signatureContent = greetingHtml(renderSettings) + signatureBody + noticesHtml(renderSettings);
-  const marker = `<span style="display:none!important;mso-hide:all;max-height:0;overflow:hidden;font-size:0;line-height:0;color:transparent;">${SIGNATURE_MARKER_TEXT}</span>`;
   const safeSignatureId = escapeHtml(signatureId);
+  const marker = `<span id="attensam-signature-marker-${safeSignatureId}" data-attensam-signature-id="${safeSignatureId}" style="display:none!important;mso-hide:all;max-height:0;overflow:hidden;font-size:0;line-height:0;color:transparent;">${SIGNATURE_MARKER_TEXT}</span>`;
   const previewHtml = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2" data-attensam-signature-id="${safeSignatureId}">${marker}${signatureContent}</div>`;
   const html = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2" data-attensam-signature-id="${safeSignatureId}">${marker}${insertedProfileWarningsHtml(signatureProfile, renderSettings.Nummer)}${signatureContent}</div>`;
   return { html, previewHtml, signatureProfile, renderSettings };
@@ -1352,7 +1352,7 @@ setDefaultButton.addEventListener("click", async () => {
 });
 openSignatureSettingsButton.addEventListener("click", () => {
   const signatureId = contextSignatureId || "standard";
-  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.15`;
+  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.16`;
 });
 editCustomButton.addEventListener("click", () => {
   const item = customSignatures.items.find((entry) => entry.id === contextSignatureId);
@@ -1401,6 +1401,7 @@ Office.onReady((info) => {
 const AUTO_RENDER_DATA_KEY = "attensam.signature.render-data.v1";
 const SETTINGS_SIGNATURE_MARKER_ID = "attensam-signature-root";
 const SETTINGS_SIGNATURE_MARKER_TEXT = "Attensam-Signatur";
+const SETTINGS_SIGNATURE_MARKER_ID_PREFIX = "attensam-signature-marker-";
 const SETTINGS_SIGNATURE_ID = String(new URLSearchParams(window.location.search).get("signature") || "standard").replace(/[^a-zA-Z0-9_-]/g, "") || "standard";
 
 const phoneModeSelect = document.getElementById("phone-mode");
@@ -1533,6 +1534,16 @@ function replaceMarkedSignature(bodyHtml, signatureHtml) {
   return document.body.innerHTML;
 }
 
+function readInsertedSignatureId(existingSignature) {
+  const attributeId = String(existingSignature?.getAttribute("data-attensam-signature-id") || "")
+    .replace(/[^a-zA-Z0-9_-]/g, "");
+  if (attributeId) return attributeId;
+  const marker = existingSignature?.querySelector(`[id^="${SETTINGS_SIGNATURE_MARKER_ID_PREFIX}"]`);
+  return String(marker?.id || "")
+    .slice(SETTINGS_SIGNATURE_MARKER_ID_PREFIX.length)
+    .replace(/[^a-zA-Z0-9_-]/g, "");
+}
+
 async function updateInsertedSignature() {
   const body = Office.context.mailbox.item?.body;
   if (!body?.getAsync) return false;
@@ -1543,17 +1554,28 @@ async function updateInsertedSignature() {
   const existingSignature = bodyDocument.querySelector('[data-attensam-signature="v2"]')
     || bodyDocument.querySelector('[data-attensam-signature="v1"]');
   if (!existingSignature) return false;
-  const insertedSignatureId = existingSignature.getAttribute("data-attensam-signature-id") || "standard";
-  if (insertedSignatureId !== SETTINGS_SIGNATURE_ID) return false;
+  const insertedSignatureId = readInsertedSignatureId(existingSignature);
+  // Older signatures may have lost their data attribute during Outlook's HTML
+  // sanitization. In that case, the settings page selected by the user is the
+  // best available source of truth. A present, different ID is still rejected.
+  if (insertedSignatureId && insertedSignatureId !== SETTINGS_SIGNATURE_ID) return false;
   const delegation = await new Promise((resolve) => {
     AttensamSignatureRuntime.resolveDelegation(renderData, resolve);
   });
   const customRecord = await SignaturePreferences.getCustomSignatures();
+  const renderCustomRecord = SETTINGS_SIGNATURE_ID === "standard"
+    ? customRecord
+    : {
+        ...customRecord,
+        items: customRecord.items.map((item) => item.id === SETTINGS_SIGNATURE_ID
+          ? { ...item, settings: { ...currentSettings } }
+          : item),
+      };
   const html = AttensamSignatureRuntime.renderSignature(
     renderData,
     currentSettings,
     delegation,
-    customRecord,
+    renderCustomRecord,
     SETTINGS_SIGNATURE_ID,
   );
   if (body.setSignatureAsync) {

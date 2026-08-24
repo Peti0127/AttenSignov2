@@ -148,7 +148,7 @@
   (*! @azure/msal-browser v5.18.0 2026-08-04 *)
 */
 
-/* Attensam v0.8.15 signature-specific settings extension. */
+/* Attensam v0.8.16 signature-specific settings extension. */
 (function enableVipCustomSignatures() {
   const CUSTOM_KEY = "attensam.signature.custom-signatures.v1";
   const SETTINGS_KEY = "attensam.signature.settings.v2";
@@ -167,9 +167,13 @@
   }
 
   function markSignature(html, signatureId) {
+    const safeSignatureId = String(signatureId || "standard").replace(/[^a-zA-Z0-9_-]/g, "") || "standard";
     return html.replace(
       'data-attensam-signature="v2"',
-      `data-attensam-signature="v2" data-attensam-signature-id="${String(signatureId || "standard").replace(/[^a-zA-Z0-9_-]/g, "") || "standard"}"`,
+      `data-attensam-signature="v2" data-attensam-signature-id="${safeSignatureId}"`,
+    ).replace(
+      "<span style=",
+      `<span id="attensam-signature-marker-${safeSignatureId}" data-attensam-signature-id="${safeSignatureId}" style=`,
     );
   }
 
