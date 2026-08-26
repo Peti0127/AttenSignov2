@@ -148,12 +148,13 @@
   (*! @azure/msal-browser v5.18.0 2026-08-04 *)
 */
 
-/* Attensam v0.8.17 signature-specific settings extension. */
+/* Attensam v0.8.18 signature-specific settings extension. */
 (function enableVipCustomSignatures() {
   const CUSTOM_KEY = "attensam.signature.custom-signatures.v1";
   const SETTINGS_KEY = "attensam.signature.settings.v2";
   const RENDER_KEY = "attensam.signature.render-data.v1";
   const VIP_ROLE = "ATS.Signature.VIP";
+  const PROFILE_CACHE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
   const runtime = typeof window !== "undefined" ? window.AttensamSignatureRuntime : null;
   if (!runtime || typeof runtime.renderSignature !== "function") return;
 
@@ -203,6 +204,17 @@
     return !roaming || renderTime >= roamingTime ? renderData.settings : roaming;
   }
 
+  function hasValidCachedProfile(renderData) {
+    if (!renderData?.profile || typeof renderData.template !== "string" || !renderData.template.trim()) return false;
+    const cachedAt = Date.parse(renderData.profileUpdatedAt || renderData.updatedAt || "");
+    if (!Number.isFinite(cachedAt) || Date.now() - cachedAt > PROFILE_CACHE_MAX_AGE_MS) return false;
+    const mailboxEmail = String(Office.context.mailbox?.userProfile?.emailAddress || "").trim().toLocaleLowerCase("de-AT");
+    const cachedEmails = [renderData.mailboxEmail, renderData.profile.email]
+      .map((value) => String(value || "").trim().toLocaleLowerCase("de-AT"))
+      .filter(Boolean);
+    return Boolean(mailboxEmail && cachedEmails.includes(mailboxEmail));
+  }
+
   function isOutlookMobile() {
     const platform = Office.context?.platform;
     return platform === Office.PlatformType?.Android || platform === Office.PlatformType?.iOS;
@@ -231,7 +243,8 @@
     disableNativeMobileSignature(() => {
       runtime.resolveDelegation(renderData, (delegation) => {
         try {
-          const html = renderSignature(renderData, settings, delegation, customRecord);
+          const verifiedDelegation = delegation?.id ? delegation : null;
+          const html = renderSignature(renderData, settings, verifiedDelegation, customRecord);
           Office.context.mailbox.item.body.setSignatureAsync(
             html,
             { coercionType: Office.CoercionType.Html },
@@ -257,7 +270,7 @@
       const standardSettings = newerSettings(roamingSettings.get(SETTINGS_KEY), renderData);
       const customRecord = roamingSettings.get(CUSTOM_KEY);
       const settings = defaultSettings(standardSettings, customRecord);
-      if (!renderData?.profile || typeof renderData.template !== "string" || settings?.AutoInsert !== true) {
+      if (!hasValidCachedProfile(renderData) || settings?.AutoInsert !== true) {
         completed(event);
         return;
       }

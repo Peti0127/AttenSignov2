@@ -102,6 +102,7 @@ function readableError(error) {
   const CUSTOM_SIGNATURES_CACHE_PREFIX = "attensam.signature.custom-signatures.v1";
   const VIP_ROLE = "ATS.Signature.VIP";
   const MAX_CUSTOM_SIGNATURES = 3;
+  const PROFILE_CACHE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
   const CACHE_PREFIX = "attensam.signature.settings.v2";
   const DEPARTMENT_CACHE_PREFIX = "attensam.signature.department.v1";
   const TITLE_ATTRIBUTES_CACHE_PREFIX = "attensam.signature.title-attributes.v1";
@@ -138,6 +139,18 @@ function readableError(error) {
     } catch {
       return "unknown-user";
     }
+  }
+
+  function getValidRenderData() {
+    const cached = Office.context.roamingSettings?.get(RENDER_DATA_KEY);
+    if (!cached?.profile || typeof cached.template !== "string" || !cached.template.trim()) return null;
+    const cachedAt = Date.parse(cached.profileUpdatedAt || cached.updatedAt || "");
+    if (!Number.isFinite(cachedAt) || Date.now() - cachedAt > PROFILE_CACHE_MAX_AGE_MS) return null;
+    const mailboxEmail = currentUserKey();
+    const cachedEmails = [cached.mailboxEmail, cached.profile.email]
+      .map((value) => String(value || "").trim().toLocaleLowerCase("de-AT"))
+      .filter(Boolean);
+    return mailboxEmail && cachedEmails.includes(mailboxEmail) ? cached : null;
   }
 
   function storageKey() {
@@ -461,6 +474,7 @@ function readableError(error) {
     saveCustomSignatures,
     getSettingsForSignature,
     saveSettingsForSignature,
+    getValidRenderData,
     getVipAuthorized,
     getVipAuthorizationState,
     setVipAuthorized,
@@ -487,6 +501,7 @@ const profile = {
 let signatureTemplate = "";
 let msalInstance;
 let profileLoaded = false;
+let usingCachedProfile = false;
 let currentDelegation = null;
 let userRoles = new Set();
 let vipAuthorized = false;
@@ -985,17 +1000,20 @@ function closeSignatureMenu() {
 async function saveAutoRenderData() {
   const roamingSettings = Office.context.roamingSettings;
   if (!roamingSettings || !signatureTemplate || !profileLoaded) return;
+  const cachedAt = new Date().toISOString();
   roamingSettings.set(AUTO_RENDER_DATA_KEY, {
     profile: { ...profile },
+    mailboxEmail: Office.context.mailbox.userProfile?.emailAddress || profile.email,
     template: signatureTemplate,
     officeNumber: CONFIG.officeNumber,
     settings: { ...signatureSettings },
-    settingsUpdatedAt: new Date().toISOString(),
+    settingsUpdatedAt: cachedAt,
     graphAuth: {
       clientId: CONFIG.clientId,
       tenantId: CONFIG.tenantId,
     },
-    updatedAt: new Date().toISOString(),
+    profileUpdatedAt: cachedAt,
+    updatedAt: cachedAt,
   });
   await new Promise((resolve, reject) => {
     roamingSettings.saveAsync((result) => {
@@ -1016,6 +1034,35 @@ function applyMailboxBasics() {
   profile.lastName = names.length > 1 ? names[names.length - 1] : "";
   profile.email = mailbox.emailAddress || "";
   showProfile();
+}
+
+function getValidCachedRenderData() {
+  return SignaturePreferences.getValidRenderData();
+}
+
+function cachedProfileDate(cached) {
+  const value = new Date(cached.profileUpdatedAt || cached.updatedAt || "");
+  return Number.isFinite(value.getTime()) ? value.toLocaleDateString("de-AT") : "unbekannt";
+}
+
+async function restoreCachedProfile() {
+  const cached = getValidCachedRenderData();
+  if (!cached) return false;
+  Object.assign(profile, cached.profile);
+  signatureTemplate = cached.template;
+  SignaturePreferences.setDepartment(profile.department);
+  SignaturePreferences.setTitleAttributes(profile.customAttribute10, profile.customAttribute11);
+  customAddButton.hidden = !vipAuthorized;
+  mainSettingsLink.hidden = vipAuthorized;
+  customSignatures = vipAuthorized
+    ? await SignaturePreferences.getCustomSignatures()
+    : { requiredRole: VIP_ROLE, defaultId: "standard", items: [] };
+  currentDelegation = null;
+  usingCachedProfile = true;
+  profileLoaded = true;
+  showProfile();
+  setStatus(`Live-Daten konnten nicht geladen werden. Gespeicherte Signaturdaten vom ${cachedProfileDate(cached)} werden verwendet.`);
+  return true;
 }
 
 async function acquireGraphToken(scopes = ["User.Read"]) {
@@ -1188,6 +1235,7 @@ async function loadProfile() {
       customAttribute10: user.onPremisesExtensionAttributes?.extensionAttribute10 || "",
       customAttribute11: user.onPremisesExtensionAttributes?.extensionAttribute11 || "",
     });
+    usingCachedProfile = false;
     SignaturePreferences.setDepartment(profile.department);
     SignaturePreferences.setTitleAttributes(profile.customAttribute10, profile.customAttribute11);
     customAddButton.hidden = !vipAuthorized;
@@ -1206,6 +1254,11 @@ async function loadProfile() {
     }
     setStatus("Signaturdaten erfolgreich geladen.");
   } catch (error) {
+    try {
+      if (await restoreCachedProfile()) return;
+    } catch (cacheError) {
+      console.error("Gespeicherte Signaturdaten konnten nicht geladen werden.", cacheError);
+    }
     profileLoaded = false;
     if (SignaturePreferences.getVipAuthorizationState() === null) {
       mainSettingsLink.hidden = false;
@@ -1219,7 +1272,8 @@ async function loadProfile() {
 
 async function insertSignature(customId = "standard") {
   if (!profileLoaded || signatureButton.getAttribute("aria-disabled") === "true") return;
-  await refreshDelegationForCurrentFrom();
+  if (usingCachedProfile) currentDelegation = null;
+  else await refreshDelegationForCurrentFrom();
   const item = vipAuthorized && customId !== "standard"
     ? customSignatures.items.find((entry) => entry.id === customId)
     : null;
@@ -1248,10 +1302,16 @@ async function initialize() {
     const cachedVipState = SignaturePreferences.getVipAuthorizationState();
     vipAuthorized = cachedVipState === true;
     mainSettingsLink.hidden = cachedVipState !== false;
-    signatureTemplate = await fetch("template.html", { cache: "no-store" }).then((response) => {
-      if (!response.ok) throw new Error("template.html konnte nicht geladen werden.");
-      return response.text();
-    });
+    try {
+      signatureTemplate = await fetch("template.html", { cache: "no-store" }).then((response) => {
+        if (!response.ok) throw new Error("template.html konnte nicht geladen werden.");
+        return response.text();
+      });
+    } catch (templateError) {
+      const cached = getValidCachedRenderData();
+      if (!cached) throw templateError;
+      signatureTemplate = cached.template;
+    }
     signatureSettings = await SignaturePreferences.getSettings();
     applyMailboxBasics();
     await loadProfile();
@@ -1352,7 +1412,7 @@ setDefaultButton.addEventListener("click", async () => {
 });
 openSignatureSettingsButton.addEventListener("click", () => {
   const signatureId = contextSignatureId || "standard";
-  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.17`;
+  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.18`;
 });
 editCustomButton.addEventListener("click", () => {
   const item = customSignatures.items.find((entry) => entry.id === contextSignatureId);
@@ -1552,8 +1612,8 @@ function readInsertedSignatureId(existingSignature) {
 async function updateInsertedSignature() {
   const body = Office.context.mailbox.item?.body;
   if (!body?.getAsync) return false;
-  const renderData = Office.context.roamingSettings?.get(AUTO_RENDER_DATA_KEY);
-  if (!renderData?.profile || typeof renderData.template !== "string") return false;
+  const renderData = SignaturePreferences.getValidRenderData();
+  if (!renderData) return false;
   const bodyHtml = await getBodyHtml(body);
   const bodyDocument = new DOMParser().parseFromString(bodyHtml, "text/html");
   const existingSignature = findMarkedSignature(bodyDocument);
@@ -1566,6 +1626,7 @@ async function updateInsertedSignature() {
   const delegation = await new Promise((resolve) => {
     AttensamSignatureRuntime.resolveDelegation(renderData, resolve);
   });
+  const verifiedDelegation = delegation?.id ? delegation : null;
   const customRecord = await SignaturePreferences.getCustomSignatures();
   const renderCustomRecord = SETTINGS_SIGNATURE_ID === "standard"
     ? customRecord
@@ -1578,7 +1639,7 @@ async function updateInsertedSignature() {
   const html = AttensamSignatureRuntime.renderSignature(
     renderData,
     currentSettings,
-    delegation,
+    verifiedDelegation,
     renderCustomRecord,
     SETTINGS_SIGNATURE_ID,
   );
@@ -1609,7 +1670,7 @@ async function initializeSettings() {
       ? "Einstellungen: Standard"
       : `Einstellungen: ${selectedItem.title}`;
     currentSettings = await SignaturePreferences.getSettingsForSignature(SETTINGS_SIGNATURE_ID);
-    settingsProfile = Office.context.roamingSettings?.get(AUTO_RENDER_DATA_KEY)?.profile || null;
+    settingsProfile = SignaturePreferences.getValidRenderData()?.profile || null;
     const department = SignaturePreferences.getDepartment();
     const titleAttributes = SignaturePreferences.getTitleAttributes();
     const canUseEdvHotline = department.trim().toLocaleUpperCase("de-AT") === "IT";
@@ -1899,6 +1960,7 @@ async function saveAutomaticRenderData() {
   const standardSettings = await SignaturePreferences.getSettings();
   roamingSettings.set(AUTO_RENDER_DATA_KEY, {
     profile: { ...currentProfile },
+    mailboxEmail: Office.context.mailbox.userProfile?.emailAddress || currentProfile.email,
     template: signatureTemplate,
     officeNumber: CONFIG.officeNumber,
     settings: { ...standardSettings },
@@ -1907,6 +1969,7 @@ async function saveAutomaticRenderData() {
       clientId: CONFIG.clientId,
       tenantId: CONFIG.tenantId,
     },
+    profileUpdatedAt: now,
     updatedAt: now,
   });
   await new Promise((resolve, reject) => {
@@ -1933,7 +1996,7 @@ async function initializeSettings() {
       ? "Einstellungen: Standard"
       : `Einstellungen: ${selectedItem.title}`;
     currentSettings = await SignaturePreferences.getSettingsForSignature(MOBILE_SETTINGS_SIGNATURE_ID);
-    settingsProfile = Office.context.roamingSettings?.get(AUTO_RENDER_DATA_KEY)?.profile || null;
+    settingsProfile = SignaturePreferences.getValidRenderData()?.profile || null;
     showSettings(
       currentSettings,
       SignaturePreferences.getDepartment(),
