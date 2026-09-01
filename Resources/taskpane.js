@@ -666,7 +666,7 @@ function phoneLine(profileValue = profile, settings = signatureSettings) {
       return officeNumber ? `Tel. ${officeNumber}` : "";
     case "EDVHotline":
       if (profile.department.trim().toLocaleUpperCase("de-AT") === "IT") {
-        return mobile ? `Tel. 05 7999 9999 Mobil ${mobile}` : "Tel. 05 7999 9999";
+        return mobile ? `Tel. 05 7999 9999 - Mobil ${mobile}` : "Tel. 05 7999 9999";
       }
       // If the department changed, fall back to the standard phone line.
     default:
@@ -903,9 +903,12 @@ function buildSignature(templateHtml = signatureTemplate, settings = signatureSe
     : "";
   const senderName = personalName(profile);
   const fromName = delegatedName(currentDelegation, settings);
+  const delegatedLastNameHtml = sendOnBehalf
+    ? `<span style="font-weight: normal;">(im Auftrag von </span><span style="font-weight: bold;">${escapeHtml(fromName)}</span><span style="font-weight: normal;">)</span>`
+    : "";
   const values = {
     FirstName: sendOnBehalf ? senderName : signatureProfile.firstName,
-    LastName: sendOnBehalf ? `(im Auftrag von ${fromName})` : signatureProfile.lastName,
+    LastName: signatureProfile.lastName,
     Company: signatureProfile.company, City: signatureProfile.city, Street: signatureProfile.street,
     PostalCode: signatureProfile.postalCode, JobTitle: signatureProfile.jobTitle,
     "E-mail": signatureProfile.email, Mobile: signatureProfile.mobile, Phone: signatureProfile.phone,
@@ -917,6 +920,7 @@ function buildSignature(templateHtml = signatureTemplate, settings = signatureSe
   const signatureBody = templateHtml.replace(/\{([^{}]+)\}/g, (match, key) => {
     if (key === "Phone Mobile Office Number") return phoneLine(signatureProfile, renderSettings);
     if (key === "Banner") return bannerForCity(signatureProfile);
+    if (sendOnBehalf && key === "LastName") return delegatedLastNameHtml;
     return Object.hasOwn(values, key) ? escapeHtml(values[key]) : match;
   });
   const signatureContent = greetingHtml(renderSettings) + signatureBody + noticesHtml(renderSettings);
@@ -1412,7 +1416,7 @@ setDefaultButton.addEventListener("click", async () => {
 });
 openSignatureSettingsButton.addEventListener("click", () => {
   const signatureId = contextSignatureId || "standard";
-  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.19`;
+  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.20`;
 });
 editCustomButton.addEventListener("click", () => {
   const item = customSignatures.items.find((entry) => entry.id === contextSignatureId);
