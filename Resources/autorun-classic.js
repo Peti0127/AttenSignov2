@@ -148,7 +148,7 @@
   (*! @azure/msal-browser v5.18.0 2026-08-04 *)
 */
 
-/* Attensam v0.8.21 signature-specific settings extension. */
+/* Attensam v0.8.22 signature-specific settings extension. */
 (function enableVipCustomSignatures() {
   const CUSTOM_KEY = "attensam.signature.custom-signatures.v1";
   const SETTINGS_KEY = "attensam.signature.settings.v2";
@@ -357,13 +357,15 @@
           completed(event);
           return;
         }
-        if (settings.InternalRecipientsOnly !== true) {
+        const skipInternalOnly = settings.SkipInternalOnly === true
+          || settings.InternalRecipientsOnly === true;
+        if (!skipInternalOnly) {
           insert(event, settings, renderData, customRecord);
           return;
         }
         hasOnlyInternalRecipients(renderData, (onlyInternal) => {
-          if (onlyInternal) insert(event, settings, renderData, customRecord);
-          else clearSignature(event);
+          if (onlyInternal) clearSignature(event);
+          else insert(event, settings, renderData, customRecord);
         });
       });
     } catch (error) {

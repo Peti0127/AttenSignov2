@@ -115,7 +115,7 @@ function readableError(error) {
     GreetingLines: 1,
     AutoInsert: false,
     AutoInsertMode: "NewMail",
-    InternalRecipientsOnly: false,
+    SkipInternalOnly: false,
     InsertTitleBefore: false,
     InsertTitleAfter: false,
     MobileUsage: false,
@@ -314,7 +314,9 @@ function readableError(error) {
       AutoInsertMode: ALLOWED_AUTO_MODES.has(value?.AutoInsertMode)
         ? value.AutoInsertMode
         : DEFAULT_SETTINGS.AutoInsertMode,
-      InternalRecipientsOnly: value.InternalRecipientsOnly === true,
+      // v0.8.21 briefly stored the inverse feature under
+      // InternalRecipientsOnly. Preserve that selection during the rename.
+      SkipInternalOnly: value.SkipInternalOnly === true || value.InternalRecipientsOnly === true,
       InsertTitleBefore: value.InsertTitleBefore === true,
       InsertTitleAfter: value.InsertTitleAfter === true,
       MobileUsage: value.MobileUsage === true,
@@ -348,7 +350,7 @@ function readableError(error) {
       GreetingLines: record.GreetingLines,
       AutoInsert: record.AutoInsert,
       AutoInsertMode: record.AutoInsertMode,
-      InternalRecipientsOnly: record.InternalRecipientsOnly,
+      SkipInternalOnly: record.SkipInternalOnly,
       InsertTitleBefore: record.InsertTitleBefore,
       InsertTitleAfter: record.InsertTitleAfter,
       MobileUsage: record.MobileUsage,
@@ -380,7 +382,7 @@ function readableError(error) {
       GreetingLines: DEFAULT_SETTINGS.GreetingLines,
       AutoInsert: DEFAULT_SETTINGS.AutoInsert,
       AutoInsertMode: DEFAULT_SETTINGS.AutoInsertMode,
-      InternalRecipientsOnly: DEFAULT_SETTINGS.InternalRecipientsOnly,
+      SkipInternalOnly: DEFAULT_SETTINGS.SkipInternalOnly,
       InsertTitleBefore: DEFAULT_SETTINGS.InsertTitleBefore,
       InsertTitleAfter: DEFAULT_SETTINGS.InsertTitleAfter,
       MobileUsage: DEFAULT_SETTINGS.MobileUsage,
@@ -397,7 +399,7 @@ function readableError(error) {
       || !ALLOWED_GREETING_LINES.has(Number(settings?.GreetingLines))
       || typeof settings?.AutoInsert !== "boolean"
       || !ALLOWED_AUTO_MODES.has(settings?.AutoInsertMode)
-      || typeof settings?.InternalRecipientsOnly !== "boolean"
+      || typeof settings?.SkipInternalOnly !== "boolean"
       || typeof settings?.InsertTitleBefore !== "boolean"
       || typeof settings?.InsertTitleAfter !== "boolean"
       || typeof settings?.MobileUsage !== "boolean"
@@ -413,7 +415,7 @@ function readableError(error) {
       GreetingLines: Number(settings.GreetingLines),
       AutoInsert: settings.AutoInsert,
       AutoInsertMode: settings.AutoInsertMode,
-      InternalRecipientsOnly: settings.InternalRecipientsOnly,
+      SkipInternalOnly: settings.SkipInternalOnly,
       InsertTitleBefore: settings.InsertTitleBefore,
       InsertTitleAfter: settings.InsertTitleAfter,
       MobileUsage: settings.MobileUsage,
@@ -1422,7 +1424,7 @@ setDefaultButton.addEventListener("click", async () => {
 });
 openSignatureSettingsButton.addEventListener("click", () => {
   const signatureId = contextSignatureId || "standard";
-  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.21`;
+  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.22`;
 });
 editCustomButton.addEventListener("click", () => {
   const item = customSignatures.items.find((entry) => entry.id === contextSignatureId);
@@ -1495,8 +1497,8 @@ const confidentialityCheckbox = document.getElementById("confidentiality");
 const autoInsertCheckbox = document.getElementById("auto-insert");
 const autoInsertModeField = document.getElementById("auto-insert-mode-field");
 const autoInsertModeSelect = document.getElementById("auto-insert-mode");
-const internalRecipientsField = document.getElementById("internal-recipients-field");
-const internalRecipientsOnlyCheckbox = document.getElementById("internal-recipients-only");
+const skipInternalField = document.getElementById("skip-internal-field");
+const skipInternalOnlyCheckbox = document.getElementById("skip-internal-only");
 const settingsStatus = document.getElementById("settings-status");
 const settingsHeading = document.getElementById("settings-heading");
 let currentSettings;
@@ -1508,8 +1510,8 @@ function setSettingsStatus(message) {
 
 function updateAutoInsertVisibility() {
   autoInsertModeField.hidden = !autoInsertCheckbox.checked;
-  internalRecipientsField.hidden = !autoInsertCheckbox.checked;
-  internalRecipientsOnlyCheckbox.disabled = autoInsertCheckbox.disabled || !autoInsertCheckbox.checked;
+  skipInternalField.hidden = !autoInsertCheckbox.checked;
+  skipInternalOnlyCheckbox.disabled = autoInsertCheckbox.disabled || !autoInsertCheckbox.checked;
 }
 
 function updateMobileUsageVisibility() {
@@ -1558,7 +1560,7 @@ function setControlsDisabled(disabled) {
   confidentialityCheckbox.disabled = disabled;
   autoInsertCheckbox.disabled = disabled;
   autoInsertModeSelect.disabled = disabled;
-  internalRecipientsOnlyCheckbox.disabled = disabled || !autoInsertCheckbox.checked;
+  skipInternalOnlyCheckbox.disabled = disabled || !autoInsertCheckbox.checked;
 }
 
 function settingsEmailDomain(value) {
@@ -1680,8 +1682,8 @@ async function updateInsertedSignature() {
   if (insertedSignatureId && insertedSignatureId !== SETTINGS_SIGNATURE_ID) return false;
   if (
     currentSettings.AutoInsert === true
-    && currentSettings.InternalRecipientsOnly === true
-    && !(await settingsHasOnlyInternalRecipients(renderData))
+    && currentSettings.SkipInternalOnly === true
+    && await settingsHasOnlyInternalRecipients(renderData)
   ) {
     if (body.setSignatureAsync) {
       await setCurrentSignature(body, "");
@@ -1765,7 +1767,7 @@ async function initializeSettings() {
     confidentialityCheckbox.checked = currentSettings.Confidentiality;
     autoInsertCheckbox.checked = currentSettings.AutoInsert;
     autoInsertModeSelect.value = currentSettings.AutoInsertMode;
-    internalRecipientsOnlyCheckbox.checked = currentSettings.InternalRecipientsOnly;
+    skipInternalOnlyCheckbox.checked = currentSettings.SkipInternalOnly;
     updateAutoInsertVisibility();
     setControlsDisabled(false);
     setSettingsStatus("Einstellungen geladen.");
@@ -1785,7 +1787,7 @@ async function saveSettings() {
       GreetingLines: Number(greetingLinesSelect.value),
       AutoInsert: autoInsertCheckbox.checked,
       AutoInsertMode: autoInsertModeSelect.value,
-      InternalRecipientsOnly: internalRecipientsOnlyCheckbox.checked,
+      SkipInternalOnly: skipInternalOnlyCheckbox.checked,
       InsertTitleBefore: insertTitleBeforeCheckbox.checked,
       InsertTitleAfter: insertTitleAfterCheckbox.checked,
       MobileUsage: mobileUsageCheckbox.checked,
@@ -1831,7 +1833,7 @@ autoInsertCheckbox.addEventListener("change", () => {
   saveSettings();
 });
 autoInsertModeSelect.addEventListener("change", saveSettings);
-internalRecipientsOnlyCheckbox.addEventListener("change", saveSettings);
+skipInternalOnlyCheckbox.addEventListener("change", saveSettings);
 
 Office.onReady((info) => {
   if (info.host === Office.HostType.Outlook) initializeSettings();
@@ -1869,8 +1871,8 @@ const confidentialityCheckbox = document.getElementById("confidentiality");
 const autoInsertCheckbox = document.getElementById("auto-insert");
 const autoInsertModeField = document.getElementById("auto-insert-mode-field");
 const autoInsertModeSelect = document.getElementById("auto-insert-mode");
-const internalRecipientsField = document.getElementById("internal-recipients-field");
-const internalRecipientsOnlyCheckbox = document.getElementById("internal-recipients-only");
+const skipInternalField = document.getElementById("skip-internal-field");
+const skipInternalOnlyCheckbox = document.getElementById("skip-internal-only");
 const settingsStatus = document.getElementById("settings-status");
 const closeButton = document.getElementById("close-button");
 const settingsHeading = document.getElementById("settings-heading");
@@ -1897,13 +1899,13 @@ function setControlsDisabled(disabled) {
   confidentialityCheckbox.disabled = disabled;
   autoInsertCheckbox.disabled = disabled;
   autoInsertModeSelect.disabled = disabled;
-  internalRecipientsOnlyCheckbox.disabled = disabled || !autoInsertCheckbox.checked;
+  skipInternalOnlyCheckbox.disabled = disabled || !autoInsertCheckbox.checked;
 }
 
 function updateAutoInsertVisibility() {
   autoInsertModeField.hidden = !autoInsertCheckbox.checked;
-  internalRecipientsField.hidden = !autoInsertCheckbox.checked;
-  internalRecipientsOnlyCheckbox.disabled = autoInsertCheckbox.disabled || !autoInsertCheckbox.checked;
+  skipInternalField.hidden = !autoInsertCheckbox.checked;
+  skipInternalOnlyCheckbox.disabled = autoInsertCheckbox.disabled || !autoInsertCheckbox.checked;
 }
 
 function updateMobileUsageVisibility() {
@@ -1973,7 +1975,7 @@ function showSettings(settings, department, titleAttributes) {
   confidentialityCheckbox.checked = settings.Confidentiality;
   autoInsertCheckbox.checked = settings.AutoInsert;
   autoInsertModeSelect.value = settings.AutoInsertMode;
-  internalRecipientsOnlyCheckbox.checked = settings.InternalRecipientsOnly;
+  skipInternalOnlyCheckbox.checked = settings.SkipInternalOnly;
   updateAutoInsertVisibility();
 }
 
@@ -2124,7 +2126,7 @@ async function saveSettings() {
       GreetingLines: Number(greetingLinesSelect.value),
       AutoInsert: autoInsertCheckbox.checked,
       AutoInsertMode: autoInsertModeSelect.value,
-      InternalRecipientsOnly: internalRecipientsOnlyCheckbox.checked,
+      SkipInternalOnly: skipInternalOnlyCheckbox.checked,
       InsertTitleBefore: insertTitleBeforeCheckbox.checked,
       InsertTitleAfter: insertTitleAfterCheckbox.checked,
       MobileUsage: mobileUsageCheckbox.checked,
@@ -2162,7 +2164,7 @@ autoInsertCheckbox.addEventListener("change", () => {
   saveSettings();
 });
 autoInsertModeSelect.addEventListener("change", saveSettings);
-internalRecipientsOnlyCheckbox.addEventListener("change", saveSettings);
+skipInternalOnlyCheckbox.addEventListener("change", saveSettings);
 closeButton.addEventListener("click", () => {
   if (Office.context.ui?.closeContainer) Office.context.ui.closeContainer();
   else window.history.back();
