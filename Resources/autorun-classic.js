@@ -148,7 +148,7 @@
   (*! @azure/msal-browser v5.18.0 2026-08-04 *)
 */
 
-/* Attensam v0.8.23 signature-specific settings extension. */
+/* Attensam v0.8.25 signature-specific settings extension. */
 (function enableVipCustomSignatures() {
   const CUSTOM_KEY = "attensam.signature.custom-signatures.v1";
   const SETTINGS_KEY = "attensam.signature.settings.v2";
@@ -328,16 +328,32 @@
       const composeType = result.status === Office.AsyncResultStatus.Succeeded
         ? String(result.value?.composeType || "")
         : "";
-      callback(Boolean(
-        composeType
-        && (settings.AutoInsertMode === "AllMail" || composeType === "newMail"),
-      ), composeType);
+      const legacyAllMail = settings.AutoInsertMode === "AllMail";
+      const insertReplies = typeof settings.AutoInsertReplies === "boolean"
+        ? settings.AutoInsertReplies
+        : legacyAllMail;
+      const insertForwards = typeof settings.AutoInsertForwards === "boolean"
+        ? settings.AutoInsertForwards
+        : legacyAllMail;
+      callback(
+        composeType === "newMail"
+          || (composeType === "reply" && insertReplies)
+          || (composeType === "forward" && insertForwards),
+        composeType,
+      );
     });
   }
 
   function defaultSettings(settings, customRecord) {
     const custom = selectedCustom(customRecord);
-    return custom?.settings || settings;
+    return custom?.settings || settings || {
+      AutoInsert: true,
+      AutoInsertMode: "NewMail",
+      AutoInsertReplies: false,
+      AutoInsertForwards: false,
+      SkipInternalOnly: false,
+      SkipInternalOnNewMail: false,
+    };
   }
 
   function handleAutomaticInsertion(event) {
@@ -347,7 +363,7 @@
       const standardSettings = newerSettings(roamingSettings.get(SETTINGS_KEY), renderData);
       const customRecord = roamingSettings.get(CUSTOM_KEY);
       const settings = defaultSettings(standardSettings, customRecord);
-      if (!hasValidCachedProfile(renderData) || settings?.AutoInsert !== true) {
+      if (!hasValidCachedProfile(renderData)) {
         completed(event);
         return;
       }

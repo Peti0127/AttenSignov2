@@ -113,8 +113,10 @@ function readableError(error) {
     MfG: "MfG1",
     CustomGreeting: "",
     GreetingLines: 1,
-    AutoInsert: false,
+    AutoInsert: true,
     AutoInsertMode: "NewMail",
+    AutoInsertReplies: false,
+    AutoInsertForwards: false,
     SkipInternalOnly: false,
     SkipInternalOnNewMail: false,
     InsertTitleBefore: false,
@@ -126,7 +128,6 @@ function readableError(error) {
   const ALLOWED_NUMBERS = new Set(["Alles", "Handy", "Festnetz", "Office", "EDVHotline"]);
   const ALLOWED_GREETINGS = new Set(["MfG0", "MfG1", "MfG2", "MfG3", "MfGCustom"]);
   const ALLOWED_GREETING_LINES = new Set([1, 2, 3]);
-  const ALLOWED_AUTO_MODES = new Set(["NewMail", "AllMail"]);
   const LEGACY_NUMBER_MAP = Object.freeze({
     both: "Alles",
     mobile: "Handy",
@@ -304,6 +305,13 @@ function readableError(error) {
 
   function normalizeRecord(value) {
     if (!value || typeof value !== "object") return null;
+    const legacyAllMail = value.AutoInsertMode === "AllMail";
+    const autoInsertReplies = typeof value.AutoInsertReplies === "boolean"
+      ? value.AutoInsertReplies
+      : legacyAllMail;
+    const autoInsertForwards = typeof value.AutoInsertForwards === "boolean"
+      ? value.AutoInsertForwards
+      : legacyAllMail;
     return {
       Nummer: ALLOWED_NUMBERS.has(value?.Nummer) ? value.Nummer : DEFAULT_SETTINGS.Nummer,
       MfG: ALLOWED_GREETINGS.has(value?.MfG) ? value.MfG : DEFAULT_SETTINGS.MfG,
@@ -311,12 +319,10 @@ function readableError(error) {
       GreetingLines: ALLOWED_GREETING_LINES.has(Number(value?.GreetingLines))
         ? Number(value.GreetingLines)
         : DEFAULT_SETTINGS.GreetingLines,
-      AutoInsert: value.AutoInsert === true,
-      AutoInsertMode: ALLOWED_AUTO_MODES.has(value?.AutoInsertMode)
-        ? value.AutoInsertMode
-        : DEFAULT_SETTINGS.AutoInsertMode,
-      // v0.8.21 briefly stored the inverse feature under
-      // InternalRecipientsOnly. Preserve that selection during the rename.
+      AutoInsert: true,
+      AutoInsertMode: autoInsertReplies && autoInsertForwards ? "AllMail" : "NewMail",
+      AutoInsertReplies: autoInsertReplies,
+      AutoInsertForwards: autoInsertForwards,
       SkipInternalOnly: value.SkipInternalOnly === true || value.InternalRecipientsOnly === true,
       SkipInternalOnNewMail: value.SkipInternalOnNewMail === true,
       InsertTitleBefore: value.InsertTitleBefore === true,
@@ -352,6 +358,8 @@ function readableError(error) {
       GreetingLines: record.GreetingLines,
       AutoInsert: record.AutoInsert,
       AutoInsertMode: record.AutoInsertMode,
+      AutoInsertReplies: record.AutoInsertReplies,
+      AutoInsertForwards: record.AutoInsertForwards,
       SkipInternalOnly: record.SkipInternalOnly,
       SkipInternalOnNewMail: record.SkipInternalOnNewMail,
       InsertTitleBefore: record.InsertTitleBefore,
@@ -385,6 +393,8 @@ function readableError(error) {
       GreetingLines: DEFAULT_SETTINGS.GreetingLines,
       AutoInsert: DEFAULT_SETTINGS.AutoInsert,
       AutoInsertMode: DEFAULT_SETTINGS.AutoInsertMode,
+      AutoInsertReplies: DEFAULT_SETTINGS.AutoInsertReplies,
+      AutoInsertForwards: DEFAULT_SETTINGS.AutoInsertForwards,
       SkipInternalOnly: DEFAULT_SETTINGS.SkipInternalOnly,
       SkipInternalOnNewMail: DEFAULT_SETTINGS.SkipInternalOnNewMail,
       InsertTitleBefore: DEFAULT_SETTINGS.InsertTitleBefore,
@@ -402,7 +412,8 @@ function readableError(error) {
       || typeof settings?.CustomGreeting !== "string"
       || !ALLOWED_GREETING_LINES.has(Number(settings?.GreetingLines))
       || typeof settings?.AutoInsert !== "boolean"
-      || !ALLOWED_AUTO_MODES.has(settings?.AutoInsertMode)
+      || typeof settings?.AutoInsertReplies !== "boolean"
+      || typeof settings?.AutoInsertForwards !== "boolean"
       || typeof settings?.SkipInternalOnly !== "boolean"
       || typeof settings?.SkipInternalOnNewMail !== "boolean"
       || typeof settings?.InsertTitleBefore !== "boolean"
@@ -418,8 +429,10 @@ function readableError(error) {
       MfG: settings.MfG,
       CustomGreeting: normalizeCustomGreeting(settings.CustomGreeting),
       GreetingLines: Number(settings.GreetingLines),
-      AutoInsert: settings.AutoInsert,
-      AutoInsertMode: settings.AutoInsertMode,
+      AutoInsert: true,
+      AutoInsertMode: settings.AutoInsertReplies && settings.AutoInsertForwards ? "AllMail" : "NewMail",
+      AutoInsertReplies: settings.AutoInsertReplies,
+      AutoInsertForwards: settings.AutoInsertForwards,
       SkipInternalOnly: settings.SkipInternalOnly,
       SkipInternalOnNewMail: settings.SkipInternalOnNewMail,
       InsertTitleBefore: settings.InsertTitleBefore,
@@ -1430,7 +1443,7 @@ setDefaultButton.addEventListener("click", async () => {
 });
 openSignatureSettingsButton.addEventListener("click", () => {
   const signatureId = contextSignatureId || "standard";
-  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.23`;
+  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.25`;
 });
 editCustomButton.addEventListener("click", () => {
   const item = customSignatures.items.find((entry) => entry.id === contextSignatureId);
@@ -1500,10 +1513,8 @@ const mobileUsageCheckbox = document.getElementById("mobile-usage");
 const mobileUsageTextField = document.getElementById("mobile-usage-text-field");
 const mobileUsageTextInput = document.getElementById("mobile-usage-text");
 const confidentialityCheckbox = document.getElementById("confidentiality");
-const autoInsertCheckbox = document.getElementById("auto-insert");
-const autoInsertModeField = document.getElementById("auto-insert-mode-field");
-const autoInsertModeSelect = document.getElementById("auto-insert-mode");
-const skipInternalField = document.getElementById("skip-internal-field");
+const autoInsertRepliesCheckbox = document.getElementById("auto-insert-replies");
+const autoInsertForwardsCheckbox = document.getElementById("auto-insert-forwards");
 const skipInternalOnlyCheckbox = document.getElementById("skip-internal-only");
 const skipInternalNewMailField = document.getElementById("skip-internal-new-mail-field");
 const skipInternalNewMailCheckbox = document.getElementById("skip-internal-new-mail");
@@ -1516,13 +1527,9 @@ function setSettingsStatus(message) {
   settingsStatus.textContent = message;
 }
 
-function updateAutoInsertVisibility() {
-  autoInsertModeField.hidden = !autoInsertCheckbox.checked;
-  skipInternalField.hidden = !autoInsertCheckbox.checked;
-  skipInternalOnlyCheckbox.disabled = autoInsertCheckbox.disabled || !autoInsertCheckbox.checked;
-  skipInternalNewMailField.hidden = !autoInsertCheckbox.checked || !skipInternalOnlyCheckbox.checked;
-  skipInternalNewMailCheckbox.disabled = autoInsertCheckbox.disabled
-    || !autoInsertCheckbox.checked
+function updateInternalInsertionVisibility() {
+  skipInternalNewMailField.hidden = !skipInternalOnlyCheckbox.checked;
+  skipInternalNewMailCheckbox.disabled = skipInternalOnlyCheckbox.disabled
     || !skipInternalOnlyCheckbox.checked;
 }
 
@@ -1570,12 +1577,10 @@ function setControlsDisabled(disabled) {
   mobileUsageCheckbox.disabled = disabled;
   mobileUsageTextInput.disabled = disabled || !mobileUsageCheckbox.checked;
   confidentialityCheckbox.disabled = disabled;
-  autoInsertCheckbox.disabled = disabled;
-  autoInsertModeSelect.disabled = disabled;
-  skipInternalOnlyCheckbox.disabled = disabled || !autoInsertCheckbox.checked;
-  skipInternalNewMailCheckbox.disabled = disabled
-    || !autoInsertCheckbox.checked
-    || !skipInternalOnlyCheckbox.checked;
+  autoInsertRepliesCheckbox.disabled = disabled;
+  autoInsertForwardsCheckbox.disabled = disabled;
+  skipInternalOnlyCheckbox.disabled = disabled;
+  skipInternalNewMailCheckbox.disabled = disabled || !skipInternalOnlyCheckbox.checked;
 }
 
 function settingsEmailDomain(value) {
@@ -1710,8 +1715,7 @@ async function updateInsertedSignature() {
   // sanitization. In that case, the settings page selected by the user is the
   // best available source of truth. A present, different ID is still rejected.
   if (insertedSignatureId && insertedSignatureId !== SETTINGS_SIGNATURE_ID) return false;
-  const settingsComposeType = currentSettings.AutoInsert === true
-    && currentSettings.SkipInternalOnly === true
+  const settingsComposeType = currentSettings.SkipInternalOnly === true
     ? await getSettingsComposeType()
     : "";
   const skipAppliesToComposeType = Boolean(
@@ -1799,11 +1803,11 @@ async function initializeSettings() {
     mobileUsageTextInput.value = currentSettings.MobileUsageText;
     updateMobileUsageVisibility();
     confidentialityCheckbox.checked = currentSettings.Confidentiality;
-    autoInsertCheckbox.checked = currentSettings.AutoInsert;
-    autoInsertModeSelect.value = currentSettings.AutoInsertMode;
+    autoInsertRepliesCheckbox.checked = currentSettings.AutoInsertReplies;
+    autoInsertForwardsCheckbox.checked = currentSettings.AutoInsertForwards;
     skipInternalOnlyCheckbox.checked = currentSettings.SkipInternalOnly;
     skipInternalNewMailCheckbox.checked = currentSettings.SkipInternalOnNewMail;
-    updateAutoInsertVisibility();
+    updateInternalInsertionVisibility();
     setControlsDisabled(false);
     setSettingsStatus("Einstellungen geladen.");
   } catch (error) {
@@ -1820,8 +1824,9 @@ async function saveSettings() {
       MfG: greetingModeSelect.value,
       CustomGreeting: customGreetingInput.value,
       GreetingLines: Number(greetingLinesSelect.value),
-      AutoInsert: autoInsertCheckbox.checked,
-      AutoInsertMode: autoInsertModeSelect.value,
+      AutoInsert: true,
+      AutoInsertReplies: autoInsertRepliesCheckbox.checked,
+      AutoInsertForwards: autoInsertForwardsCheckbox.checked,
       SkipInternalOnly: skipInternalOnlyCheckbox.checked,
       SkipInternalOnNewMail: skipInternalNewMailCheckbox.checked,
       InsertTitleBefore: insertTitleBeforeCheckbox.checked,
@@ -1864,13 +1869,10 @@ mobileUsageCheckbox.addEventListener("change", () => {
 });
 mobileUsageTextInput.addEventListener("change", saveSettings);
 confidentialityCheckbox.addEventListener("change", saveSettings);
-autoInsertCheckbox.addEventListener("change", () => {
-  updateAutoInsertVisibility();
-  saveSettings();
-});
-autoInsertModeSelect.addEventListener("change", saveSettings);
+autoInsertRepliesCheckbox.addEventListener("change", saveSettings);
+autoInsertForwardsCheckbox.addEventListener("change", saveSettings);
 skipInternalOnlyCheckbox.addEventListener("change", () => {
-  updateAutoInsertVisibility();
+  updateInternalInsertionVisibility();
   saveSettings();
 });
 skipInternalNewMailCheckbox.addEventListener("change", saveSettings);
@@ -1908,10 +1910,8 @@ const mobileUsageCheckbox = document.getElementById("mobile-usage");
 const mobileUsageTextField = document.getElementById("mobile-usage-text-field");
 const mobileUsageTextInput = document.getElementById("mobile-usage-text");
 const confidentialityCheckbox = document.getElementById("confidentiality");
-const autoInsertCheckbox = document.getElementById("auto-insert");
-const autoInsertModeField = document.getElementById("auto-insert-mode-field");
-const autoInsertModeSelect = document.getElementById("auto-insert-mode");
-const skipInternalField = document.getElementById("skip-internal-field");
+const autoInsertRepliesCheckbox = document.getElementById("auto-insert-replies");
+const autoInsertForwardsCheckbox = document.getElementById("auto-insert-forwards");
 const skipInternalOnlyCheckbox = document.getElementById("skip-internal-only");
 const skipInternalNewMailField = document.getElementById("skip-internal-new-mail-field");
 const skipInternalNewMailCheckbox = document.getElementById("skip-internal-new-mail");
@@ -1929,6 +1929,12 @@ function setSettingsStatus(message) {
   settingsStatus.textContent = message;
 }
 
+function updateInternalInsertionVisibility() {
+  skipInternalNewMailField.hidden = !skipInternalOnlyCheckbox.checked;
+  skipInternalNewMailCheckbox.disabled = skipInternalOnlyCheckbox.disabled
+    || !skipInternalOnlyCheckbox.checked;
+}
+
 function setControlsDisabled(disabled) {
   phoneModeSelect.disabled = disabled;
   greetingModeSelect.disabled = disabled;
@@ -1939,22 +1945,10 @@ function setControlsDisabled(disabled) {
   mobileUsageCheckbox.disabled = disabled;
   mobileUsageTextInput.disabled = disabled || !mobileUsageCheckbox.checked;
   confidentialityCheckbox.disabled = disabled;
-  autoInsertCheckbox.disabled = disabled;
-  autoInsertModeSelect.disabled = disabled;
-  skipInternalOnlyCheckbox.disabled = disabled || !autoInsertCheckbox.checked;
-  skipInternalNewMailCheckbox.disabled = disabled
-    || !autoInsertCheckbox.checked
-    || !skipInternalOnlyCheckbox.checked;
-}
-
-function updateAutoInsertVisibility() {
-  autoInsertModeField.hidden = !autoInsertCheckbox.checked;
-  skipInternalField.hidden = !autoInsertCheckbox.checked;
-  skipInternalOnlyCheckbox.disabled = autoInsertCheckbox.disabled || !autoInsertCheckbox.checked;
-  skipInternalNewMailField.hidden = !autoInsertCheckbox.checked || !skipInternalOnlyCheckbox.checked;
-  skipInternalNewMailCheckbox.disabled = autoInsertCheckbox.disabled
-    || !autoInsertCheckbox.checked
-    || !skipInternalOnlyCheckbox.checked;
+  autoInsertRepliesCheckbox.disabled = disabled;
+  autoInsertForwardsCheckbox.disabled = disabled;
+  skipInternalOnlyCheckbox.disabled = disabled;
+  skipInternalNewMailCheckbox.disabled = disabled || !skipInternalOnlyCheckbox.checked;
 }
 
 function updateMobileUsageVisibility() {
@@ -2022,11 +2016,11 @@ function showSettings(settings, department, titleAttributes) {
   mobileUsageTextInput.value = settings.MobileUsageText;
   updateMobileUsageVisibility();
   confidentialityCheckbox.checked = settings.Confidentiality;
-  autoInsertCheckbox.checked = settings.AutoInsert;
-  autoInsertModeSelect.value = settings.AutoInsertMode;
+  autoInsertRepliesCheckbox.checked = settings.AutoInsertReplies;
+  autoInsertForwardsCheckbox.checked = settings.AutoInsertForwards;
   skipInternalOnlyCheckbox.checked = settings.SkipInternalOnly;
   skipInternalNewMailCheckbox.checked = settings.SkipInternalOnNewMail;
-  updateAutoInsertVisibility();
+  updateInternalInsertionVisibility();
 }
 
 async function acquireGraphToken() {
@@ -2174,8 +2168,9 @@ async function saveSettings() {
       MfG: greetingModeSelect.value,
       CustomGreeting: customGreetingInput.value,
       GreetingLines: Number(greetingLinesSelect.value),
-      AutoInsert: autoInsertCheckbox.checked,
-      AutoInsertMode: autoInsertModeSelect.value,
+      AutoInsert: true,
+      AutoInsertReplies: autoInsertRepliesCheckbox.checked,
+      AutoInsertForwards: autoInsertForwardsCheckbox.checked,
       SkipInternalOnly: skipInternalOnlyCheckbox.checked,
       SkipInternalOnNewMail: skipInternalNewMailCheckbox.checked,
       InsertTitleBefore: insertTitleBeforeCheckbox.checked,
@@ -2210,13 +2205,10 @@ mobileUsageCheckbox.addEventListener("change", () => {
 });
 mobileUsageTextInput.addEventListener("change", saveSettings);
 confidentialityCheckbox.addEventListener("change", saveSettings);
-autoInsertCheckbox.addEventListener("change", () => {
-  updateAutoInsertVisibility();
-  saveSettings();
-});
-autoInsertModeSelect.addEventListener("change", saveSettings);
+autoInsertRepliesCheckbox.addEventListener("change", saveSettings);
+autoInsertForwardsCheckbox.addEventListener("change", saveSettings);
 skipInternalOnlyCheckbox.addEventListener("change", () => {
-  updateAutoInsertVisibility();
+  updateInternalInsertionVisibility();
   saveSettings();
 });
 skipInternalNewMailCheckbox.addEventListener("change", saveSettings);
