@@ -116,6 +116,7 @@ function readableError(error) {
     AutoInsert: false,
     AutoInsertMode: "NewMail",
     SkipInternalOnly: false,
+    SkipInternalOnNewMail: false,
     InsertTitleBefore: false,
     InsertTitleAfter: false,
     MobileUsage: false,
@@ -317,6 +318,7 @@ function readableError(error) {
       // v0.8.21 briefly stored the inverse feature under
       // InternalRecipientsOnly. Preserve that selection during the rename.
       SkipInternalOnly: value.SkipInternalOnly === true || value.InternalRecipientsOnly === true,
+      SkipInternalOnNewMail: value.SkipInternalOnNewMail === true,
       InsertTitleBefore: value.InsertTitleBefore === true,
       InsertTitleAfter: value.InsertTitleAfter === true,
       MobileUsage: value.MobileUsage === true,
@@ -351,6 +353,7 @@ function readableError(error) {
       AutoInsert: record.AutoInsert,
       AutoInsertMode: record.AutoInsertMode,
       SkipInternalOnly: record.SkipInternalOnly,
+      SkipInternalOnNewMail: record.SkipInternalOnNewMail,
       InsertTitleBefore: record.InsertTitleBefore,
       InsertTitleAfter: record.InsertTitleAfter,
       MobileUsage: record.MobileUsage,
@@ -383,6 +386,7 @@ function readableError(error) {
       AutoInsert: DEFAULT_SETTINGS.AutoInsert,
       AutoInsertMode: DEFAULT_SETTINGS.AutoInsertMode,
       SkipInternalOnly: DEFAULT_SETTINGS.SkipInternalOnly,
+      SkipInternalOnNewMail: DEFAULT_SETTINGS.SkipInternalOnNewMail,
       InsertTitleBefore: DEFAULT_SETTINGS.InsertTitleBefore,
       InsertTitleAfter: DEFAULT_SETTINGS.InsertTitleAfter,
       MobileUsage: DEFAULT_SETTINGS.MobileUsage,
@@ -400,6 +404,7 @@ function readableError(error) {
       || typeof settings?.AutoInsert !== "boolean"
       || !ALLOWED_AUTO_MODES.has(settings?.AutoInsertMode)
       || typeof settings?.SkipInternalOnly !== "boolean"
+      || typeof settings?.SkipInternalOnNewMail !== "boolean"
       || typeof settings?.InsertTitleBefore !== "boolean"
       || typeof settings?.InsertTitleAfter !== "boolean"
       || typeof settings?.MobileUsage !== "boolean"
@@ -416,6 +421,7 @@ function readableError(error) {
       AutoInsert: settings.AutoInsert,
       AutoInsertMode: settings.AutoInsertMode,
       SkipInternalOnly: settings.SkipInternalOnly,
+      SkipInternalOnNewMail: settings.SkipInternalOnNewMail,
       InsertTitleBefore: settings.InsertTitleBefore,
       InsertTitleAfter: settings.InsertTitleAfter,
       MobileUsage: settings.MobileUsage,
@@ -1424,7 +1430,7 @@ setDefaultButton.addEventListener("click", async () => {
 });
 openSignatureSettingsButton.addEventListener("click", () => {
   const signatureId = contextSignatureId || "standard";
-  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.22`;
+  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.23`;
 });
 editCustomButton.addEventListener("click", () => {
   const item = customSignatures.items.find((entry) => entry.id === contextSignatureId);
@@ -1499,6 +1505,8 @@ const autoInsertModeField = document.getElementById("auto-insert-mode-field");
 const autoInsertModeSelect = document.getElementById("auto-insert-mode");
 const skipInternalField = document.getElementById("skip-internal-field");
 const skipInternalOnlyCheckbox = document.getElementById("skip-internal-only");
+const skipInternalNewMailField = document.getElementById("skip-internal-new-mail-field");
+const skipInternalNewMailCheckbox = document.getElementById("skip-internal-new-mail");
 const settingsStatus = document.getElementById("settings-status");
 const settingsHeading = document.getElementById("settings-heading");
 let currentSettings;
@@ -1512,6 +1520,10 @@ function updateAutoInsertVisibility() {
   autoInsertModeField.hidden = !autoInsertCheckbox.checked;
   skipInternalField.hidden = !autoInsertCheckbox.checked;
   skipInternalOnlyCheckbox.disabled = autoInsertCheckbox.disabled || !autoInsertCheckbox.checked;
+  skipInternalNewMailField.hidden = !autoInsertCheckbox.checked || !skipInternalOnlyCheckbox.checked;
+  skipInternalNewMailCheckbox.disabled = autoInsertCheckbox.disabled
+    || !autoInsertCheckbox.checked
+    || !skipInternalOnlyCheckbox.checked;
 }
 
 function updateMobileUsageVisibility() {
@@ -1561,6 +1573,9 @@ function setControlsDisabled(disabled) {
   autoInsertCheckbox.disabled = disabled;
   autoInsertModeSelect.disabled = disabled;
   skipInternalOnlyCheckbox.disabled = disabled || !autoInsertCheckbox.checked;
+  skipInternalNewMailCheckbox.disabled = disabled
+    || !autoInsertCheckbox.checked
+    || !skipInternalOnlyCheckbox.checked;
 }
 
 function settingsEmailDomain(value) {
@@ -1601,6 +1616,21 @@ async function settingsHasOnlyInternalRecipients(renderData) {
     addresses.length
     && addresses.every((address) => settingsEmailDomain(address) === senderDomain),
   );
+}
+
+function getSettingsComposeType() {
+  return new Promise((resolve) => {
+    const item = Office.context.mailbox.item;
+    if (typeof item?.getComposeTypeAsync !== "function") {
+      resolve("");
+      return;
+    }
+    item.getComposeTypeAsync((result) => {
+      resolve(result.status === Office.AsyncResultStatus.Succeeded
+        ? String(result.value?.composeType || "")
+        : "");
+    });
+  });
 }
 
 function getBodyHtml(body) {
@@ -1680,11 +1710,15 @@ async function updateInsertedSignature() {
   // sanitization. In that case, the settings page selected by the user is the
   // best available source of truth. A present, different ID is still rejected.
   if (insertedSignatureId && insertedSignatureId !== SETTINGS_SIGNATURE_ID) return false;
-  if (
-    currentSettings.AutoInsert === true
+  const settingsComposeType = currentSettings.AutoInsert === true
     && currentSettings.SkipInternalOnly === true
-    && await settingsHasOnlyInternalRecipients(renderData)
-  ) {
+    ? await getSettingsComposeType()
+    : "";
+  const skipAppliesToComposeType = Boolean(
+    settingsComposeType
+    && (settingsComposeType !== "newMail" || currentSettings.SkipInternalOnNewMail === true),
+  );
+  if (skipAppliesToComposeType && await settingsHasOnlyInternalRecipients(renderData)) {
     if (body.setSignatureAsync) {
       await setCurrentSignature(body, "");
       return true;
@@ -1768,6 +1802,7 @@ async function initializeSettings() {
     autoInsertCheckbox.checked = currentSettings.AutoInsert;
     autoInsertModeSelect.value = currentSettings.AutoInsertMode;
     skipInternalOnlyCheckbox.checked = currentSettings.SkipInternalOnly;
+    skipInternalNewMailCheckbox.checked = currentSettings.SkipInternalOnNewMail;
     updateAutoInsertVisibility();
     setControlsDisabled(false);
     setSettingsStatus("Einstellungen geladen.");
@@ -1788,6 +1823,7 @@ async function saveSettings() {
       AutoInsert: autoInsertCheckbox.checked,
       AutoInsertMode: autoInsertModeSelect.value,
       SkipInternalOnly: skipInternalOnlyCheckbox.checked,
+      SkipInternalOnNewMail: skipInternalNewMailCheckbox.checked,
       InsertTitleBefore: insertTitleBeforeCheckbox.checked,
       InsertTitleAfter: insertTitleAfterCheckbox.checked,
       MobileUsage: mobileUsageCheckbox.checked,
@@ -1833,7 +1869,11 @@ autoInsertCheckbox.addEventListener("change", () => {
   saveSettings();
 });
 autoInsertModeSelect.addEventListener("change", saveSettings);
-skipInternalOnlyCheckbox.addEventListener("change", saveSettings);
+skipInternalOnlyCheckbox.addEventListener("change", () => {
+  updateAutoInsertVisibility();
+  saveSettings();
+});
+skipInternalNewMailCheckbox.addEventListener("change", saveSettings);
 
 Office.onReady((info) => {
   if (info.host === Office.HostType.Outlook) initializeSettings();
@@ -1873,6 +1913,8 @@ const autoInsertModeField = document.getElementById("auto-insert-mode-field");
 const autoInsertModeSelect = document.getElementById("auto-insert-mode");
 const skipInternalField = document.getElementById("skip-internal-field");
 const skipInternalOnlyCheckbox = document.getElementById("skip-internal-only");
+const skipInternalNewMailField = document.getElementById("skip-internal-new-mail-field");
+const skipInternalNewMailCheckbox = document.getElementById("skip-internal-new-mail");
 const settingsStatus = document.getElementById("settings-status");
 const closeButton = document.getElementById("close-button");
 const settingsHeading = document.getElementById("settings-heading");
@@ -1900,12 +1942,19 @@ function setControlsDisabled(disabled) {
   autoInsertCheckbox.disabled = disabled;
   autoInsertModeSelect.disabled = disabled;
   skipInternalOnlyCheckbox.disabled = disabled || !autoInsertCheckbox.checked;
+  skipInternalNewMailCheckbox.disabled = disabled
+    || !autoInsertCheckbox.checked
+    || !skipInternalOnlyCheckbox.checked;
 }
 
 function updateAutoInsertVisibility() {
   autoInsertModeField.hidden = !autoInsertCheckbox.checked;
   skipInternalField.hidden = !autoInsertCheckbox.checked;
   skipInternalOnlyCheckbox.disabled = autoInsertCheckbox.disabled || !autoInsertCheckbox.checked;
+  skipInternalNewMailField.hidden = !autoInsertCheckbox.checked || !skipInternalOnlyCheckbox.checked;
+  skipInternalNewMailCheckbox.disabled = autoInsertCheckbox.disabled
+    || !autoInsertCheckbox.checked
+    || !skipInternalOnlyCheckbox.checked;
 }
 
 function updateMobileUsageVisibility() {
@@ -1976,6 +2025,7 @@ function showSettings(settings, department, titleAttributes) {
   autoInsertCheckbox.checked = settings.AutoInsert;
   autoInsertModeSelect.value = settings.AutoInsertMode;
   skipInternalOnlyCheckbox.checked = settings.SkipInternalOnly;
+  skipInternalNewMailCheckbox.checked = settings.SkipInternalOnNewMail;
   updateAutoInsertVisibility();
 }
 
@@ -2127,6 +2177,7 @@ async function saveSettings() {
       AutoInsert: autoInsertCheckbox.checked,
       AutoInsertMode: autoInsertModeSelect.value,
       SkipInternalOnly: skipInternalOnlyCheckbox.checked,
+      SkipInternalOnNewMail: skipInternalNewMailCheckbox.checked,
       InsertTitleBefore: insertTitleBeforeCheckbox.checked,
       InsertTitleAfter: insertTitleAfterCheckbox.checked,
       MobileUsage: mobileUsageCheckbox.checked,
@@ -2164,7 +2215,11 @@ autoInsertCheckbox.addEventListener("change", () => {
   saveSettings();
 });
 autoInsertModeSelect.addEventListener("change", saveSettings);
-skipInternalOnlyCheckbox.addEventListener("change", saveSettings);
+skipInternalOnlyCheckbox.addEventListener("change", () => {
+  updateAutoInsertVisibility();
+  saveSettings();
+});
+skipInternalNewMailCheckbox.addEventListener("change", saveSettings);
 closeButton.addEventListener("click", () => {
   if (Office.context.ui?.closeContainer) Office.context.ui.closeContainer();
   else window.history.back();

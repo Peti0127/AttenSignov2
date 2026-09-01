@@ -148,7 +148,7 @@
   (*! @azure/msal-browser v5.18.0 2026-08-04 *)
 */
 
-/* Attensam v0.8.22 signature-specific settings extension. */
+/* Attensam v0.8.23 signature-specific settings extension. */
 (function enableVipCustomSignatures() {
   const CUSTOM_KEY = "attensam.signature.custom-signatures.v1";
   const SETTINGS_KEY = "attensam.signature.settings.v2";
@@ -324,15 +324,14 @@
   }
 
   function composeModeAllowsInsertion(settings, callback) {
-    if (settings.AutoInsertMode === "AllMail") {
-      callback(true);
-      return;
-    }
     Office.context.mailbox.item.getComposeTypeAsync((result) => {
+      const composeType = result.status === Office.AsyncResultStatus.Succeeded
+        ? String(result.value?.composeType || "")
+        : "";
       callback(Boolean(
-        result.status === Office.AsyncResultStatus.Succeeded
-        && result.value?.composeType === "newMail",
-      ));
+        composeType
+        && (settings.AutoInsertMode === "AllMail" || composeType === "newMail"),
+      ), composeType);
     });
   }
 
@@ -352,7 +351,7 @@
         completed(event);
         return;
       }
-      composeModeAllowsInsertion(settings, (composeModeAllowed) => {
+      composeModeAllowsInsertion(settings, (composeModeAllowed, composeType) => {
         if (!composeModeAllowed) {
           completed(event);
           return;
@@ -360,6 +359,10 @@
         const skipInternalOnly = settings.SkipInternalOnly === true
           || settings.InternalRecipientsOnly === true;
         if (!skipInternalOnly) {
+          insert(event, settings, renderData, customRecord);
+          return;
+        }
+        if (composeType === "newMail" && settings.SkipInternalOnNewMail !== true) {
           insert(event, settings, renderData, customRecord);
           return;
         }
