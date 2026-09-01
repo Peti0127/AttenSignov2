@@ -670,7 +670,7 @@ function phoneLine(profileValue = profile, settings = signatureSettings) {
       }
       // If the department changed, fall back to the standard phone line.
     default:
-      if (phone && mobile) return `Tel. ${phone}&nbsp;&nbsp;Mobil ${mobile}`;
+      if (phone && mobile) return `Tel. ${phone} - Mobil ${mobile}`;
       if (mobile) return `Mobil ${mobile}`;
       if (phone) return `Tel. ${phone}`;
       return "";
@@ -905,7 +905,7 @@ function buildSignature(templateHtml = signatureTemplate, settings = signatureSe
   const fromName = delegatedName(currentDelegation, settings);
   const values = {
     FirstName: sendOnBehalf ? senderName : signatureProfile.firstName,
-    LastName: sendOnBehalf ? `(i.A. ${fromName})` : signatureProfile.lastName,
+    LastName: sendOnBehalf ? `(im Auftrag von ${fromName})` : signatureProfile.lastName,
     Company: signatureProfile.company, City: signatureProfile.city, Street: signatureProfile.street,
     PostalCode: signatureProfile.postalCode, JobTitle: signatureProfile.jobTitle,
     "E-mail": signatureProfile.email, Mobile: signatureProfile.mobile, Phone: signatureProfile.phone,
@@ -1412,7 +1412,7 @@ setDefaultButton.addEventListener("click", async () => {
 });
 openSignatureSettingsButton.addEventListener("click", () => {
   const signatureId = contextSignatureId || "standard";
-  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.18`;
+  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.19`;
 });
 editCustomButton.addEventListener("click", () => {
   const item = customSignatures.items.find((entry) => entry.id === contextSignatureId);
