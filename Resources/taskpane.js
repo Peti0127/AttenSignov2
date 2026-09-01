@@ -115,6 +115,7 @@ function readableError(error) {
     GreetingLines: 1,
     AutoInsert: false,
     AutoInsertMode: "NewMail",
+    InternalRecipientsOnly: false,
     InsertTitleBefore: false,
     InsertTitleAfter: false,
     MobileUsage: false,
@@ -313,6 +314,7 @@ function readableError(error) {
       AutoInsertMode: ALLOWED_AUTO_MODES.has(value?.AutoInsertMode)
         ? value.AutoInsertMode
         : DEFAULT_SETTINGS.AutoInsertMode,
+      InternalRecipientsOnly: value.InternalRecipientsOnly === true,
       InsertTitleBefore: value.InsertTitleBefore === true,
       InsertTitleAfter: value.InsertTitleAfter === true,
       MobileUsage: value.MobileUsage === true,
@@ -346,6 +348,7 @@ function readableError(error) {
       GreetingLines: record.GreetingLines,
       AutoInsert: record.AutoInsert,
       AutoInsertMode: record.AutoInsertMode,
+      InternalRecipientsOnly: record.InternalRecipientsOnly,
       InsertTitleBefore: record.InsertTitleBefore,
       InsertTitleAfter: record.InsertTitleAfter,
       MobileUsage: record.MobileUsage,
@@ -377,6 +380,7 @@ function readableError(error) {
       GreetingLines: DEFAULT_SETTINGS.GreetingLines,
       AutoInsert: DEFAULT_SETTINGS.AutoInsert,
       AutoInsertMode: DEFAULT_SETTINGS.AutoInsertMode,
+      InternalRecipientsOnly: DEFAULT_SETTINGS.InternalRecipientsOnly,
       InsertTitleBefore: DEFAULT_SETTINGS.InsertTitleBefore,
       InsertTitleAfter: DEFAULT_SETTINGS.InsertTitleAfter,
       MobileUsage: DEFAULT_SETTINGS.MobileUsage,
@@ -393,6 +397,7 @@ function readableError(error) {
       || !ALLOWED_GREETING_LINES.has(Number(settings?.GreetingLines))
       || typeof settings?.AutoInsert !== "boolean"
       || !ALLOWED_AUTO_MODES.has(settings?.AutoInsertMode)
+      || typeof settings?.InternalRecipientsOnly !== "boolean"
       || typeof settings?.InsertTitleBefore !== "boolean"
       || typeof settings?.InsertTitleAfter !== "boolean"
       || typeof settings?.MobileUsage !== "boolean"
@@ -408,6 +413,7 @@ function readableError(error) {
       GreetingLines: Number(settings.GreetingLines),
       AutoInsert: settings.AutoInsert,
       AutoInsertMode: settings.AutoInsertMode,
+      InternalRecipientsOnly: settings.InternalRecipientsOnly,
       InsertTitleBefore: settings.InsertTitleBefore,
       InsertTitleAfter: settings.InsertTitleAfter,
       MobileUsage: settings.MobileUsage,
@@ -1416,7 +1422,7 @@ setDefaultButton.addEventListener("click", async () => {
 });
 openSignatureSettingsButton.addEventListener("click", () => {
   const signatureId = contextSignatureId || "standard";
-  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.20`;
+  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.21`;
 });
 editCustomButton.addEventListener("click", () => {
   const item = customSignatures.items.find((entry) => entry.id === contextSignatureId);
@@ -1489,6 +1495,8 @@ const confidentialityCheckbox = document.getElementById("confidentiality");
 const autoInsertCheckbox = document.getElementById("auto-insert");
 const autoInsertModeField = document.getElementById("auto-insert-mode-field");
 const autoInsertModeSelect = document.getElementById("auto-insert-mode");
+const internalRecipientsField = document.getElementById("internal-recipients-field");
+const internalRecipientsOnlyCheckbox = document.getElementById("internal-recipients-only");
 const settingsStatus = document.getElementById("settings-status");
 const settingsHeading = document.getElementById("settings-heading");
 let currentSettings;
@@ -1500,6 +1508,8 @@ function setSettingsStatus(message) {
 
 function updateAutoInsertVisibility() {
   autoInsertModeField.hidden = !autoInsertCheckbox.checked;
+  internalRecipientsField.hidden = !autoInsertCheckbox.checked;
+  internalRecipientsOnlyCheckbox.disabled = autoInsertCheckbox.disabled || !autoInsertCheckbox.checked;
 }
 
 function updateMobileUsageVisibility() {
@@ -1548,6 +1558,47 @@ function setControlsDisabled(disabled) {
   confidentialityCheckbox.disabled = disabled;
   autoInsertCheckbox.disabled = disabled;
   autoInsertModeSelect.disabled = disabled;
+  internalRecipientsOnlyCheckbox.disabled = disabled || !autoInsertCheckbox.checked;
+}
+
+function settingsEmailDomain(value) {
+  const email = String(value || "").trim().toLocaleLowerCase("de-AT");
+  const separator = email.lastIndexOf("@");
+  return separator > 0 && separator < email.length - 1 ? email.slice(separator + 1) : "";
+}
+
+function getSettingsRecipients(field) {
+  if (typeof field?.getAsync !== "function") return Promise.resolve([]);
+  return new Promise((resolve) => {
+    field.getAsync((result) => {
+      if (result.status !== Office.AsyncResultStatus.Succeeded) {
+        resolve(null);
+        return;
+      }
+      resolve((result.value || []).map((recipient) => String(recipient?.emailAddress || "").trim()));
+    });
+  });
+}
+
+async function settingsHasOnlyInternalRecipients(renderData) {
+  const senderDomain = settingsEmailDomain(
+    renderData?.mailboxEmail
+    || renderData?.profile?.email
+    || Office.context.mailbox?.userProfile?.emailAddress,
+  );
+  if (!senderDomain) return false;
+  const item = Office.context.mailbox.item;
+  const recipientGroups = await Promise.all([
+    getSettingsRecipients(item?.to),
+    getSettingsRecipients(item?.cc),
+    getSettingsRecipients(item?.bcc),
+  ]);
+  if (recipientGroups.some((group) => group === null)) return false;
+  const addresses = recipientGroups.flat();
+  return Boolean(
+    addresses.length
+    && addresses.every((address) => settingsEmailDomain(address) === senderDomain),
+  );
 }
 
 function getBodyHtml(body) {
@@ -1627,6 +1678,22 @@ async function updateInsertedSignature() {
   // sanitization. In that case, the settings page selected by the user is the
   // best available source of truth. A present, different ID is still rejected.
   if (insertedSignatureId && insertedSignatureId !== SETTINGS_SIGNATURE_ID) return false;
+  if (
+    currentSettings.AutoInsert === true
+    && currentSettings.InternalRecipientsOnly === true
+    && !(await settingsHasOnlyInternalRecipients(renderData))
+  ) {
+    if (body.setSignatureAsync) {
+      await setCurrentSignature(body, "");
+      return true;
+    }
+    existingSignature.remove();
+    if (body.setAsync) {
+      await setBodyHtml(body, bodyDocument.body.innerHTML);
+      return true;
+    }
+    return false;
+  }
   const delegation = await new Promise((resolve) => {
     AttensamSignatureRuntime.resolveDelegation(renderData, resolve);
   });
@@ -1698,6 +1765,7 @@ async function initializeSettings() {
     confidentialityCheckbox.checked = currentSettings.Confidentiality;
     autoInsertCheckbox.checked = currentSettings.AutoInsert;
     autoInsertModeSelect.value = currentSettings.AutoInsertMode;
+    internalRecipientsOnlyCheckbox.checked = currentSettings.InternalRecipientsOnly;
     updateAutoInsertVisibility();
     setControlsDisabled(false);
     setSettingsStatus("Einstellungen geladen.");
@@ -1717,6 +1785,7 @@ async function saveSettings() {
       GreetingLines: Number(greetingLinesSelect.value),
       AutoInsert: autoInsertCheckbox.checked,
       AutoInsertMode: autoInsertModeSelect.value,
+      InternalRecipientsOnly: internalRecipientsOnlyCheckbox.checked,
       InsertTitleBefore: insertTitleBeforeCheckbox.checked,
       InsertTitleAfter: insertTitleAfterCheckbox.checked,
       MobileUsage: mobileUsageCheckbox.checked,
@@ -1762,6 +1831,7 @@ autoInsertCheckbox.addEventListener("change", () => {
   saveSettings();
 });
 autoInsertModeSelect.addEventListener("change", saveSettings);
+internalRecipientsOnlyCheckbox.addEventListener("change", saveSettings);
 
 Office.onReady((info) => {
   if (info.host === Office.HostType.Outlook) initializeSettings();
@@ -1799,6 +1869,8 @@ const confidentialityCheckbox = document.getElementById("confidentiality");
 const autoInsertCheckbox = document.getElementById("auto-insert");
 const autoInsertModeField = document.getElementById("auto-insert-mode-field");
 const autoInsertModeSelect = document.getElementById("auto-insert-mode");
+const internalRecipientsField = document.getElementById("internal-recipients-field");
+const internalRecipientsOnlyCheckbox = document.getElementById("internal-recipients-only");
 const settingsStatus = document.getElementById("settings-status");
 const closeButton = document.getElementById("close-button");
 const settingsHeading = document.getElementById("settings-heading");
@@ -1825,10 +1897,13 @@ function setControlsDisabled(disabled) {
   confidentialityCheckbox.disabled = disabled;
   autoInsertCheckbox.disabled = disabled;
   autoInsertModeSelect.disabled = disabled;
+  internalRecipientsOnlyCheckbox.disabled = disabled || !autoInsertCheckbox.checked;
 }
 
 function updateAutoInsertVisibility() {
   autoInsertModeField.hidden = !autoInsertCheckbox.checked;
+  internalRecipientsField.hidden = !autoInsertCheckbox.checked;
+  internalRecipientsOnlyCheckbox.disabled = autoInsertCheckbox.disabled || !autoInsertCheckbox.checked;
 }
 
 function updateMobileUsageVisibility() {
@@ -1898,6 +1973,7 @@ function showSettings(settings, department, titleAttributes) {
   confidentialityCheckbox.checked = settings.Confidentiality;
   autoInsertCheckbox.checked = settings.AutoInsert;
   autoInsertModeSelect.value = settings.AutoInsertMode;
+  internalRecipientsOnlyCheckbox.checked = settings.InternalRecipientsOnly;
   updateAutoInsertVisibility();
 }
 
@@ -2048,6 +2124,7 @@ async function saveSettings() {
       GreetingLines: Number(greetingLinesSelect.value),
       AutoInsert: autoInsertCheckbox.checked,
       AutoInsertMode: autoInsertModeSelect.value,
+      InternalRecipientsOnly: internalRecipientsOnlyCheckbox.checked,
       InsertTitleBefore: insertTitleBeforeCheckbox.checked,
       InsertTitleAfter: insertTitleAfterCheckbox.checked,
       MobileUsage: mobileUsageCheckbox.checked,
@@ -2085,6 +2162,7 @@ autoInsertCheckbox.addEventListener("change", () => {
   saveSettings();
 });
 autoInsertModeSelect.addEventListener("change", saveSettings);
+internalRecipientsOnlyCheckbox.addEventListener("change", saveSettings);
 closeButton.addEventListener("click", () => {
   if (Office.context.ui?.closeContainer) Office.context.ui.closeContainer();
   else window.history.back();

@@ -148,7 +148,7 @@
   (*! @azure/msal-browser v5.18.0 2026-08-04 *)
 */
 
-/* Attensam v0.8.20 signature-specific settings extension. */
+/* Attensam v0.8.21 signature-specific settings extension. */
 (function enableVipCustomSignatures() {
   const CUSTOM_KEY = "attensam.signature.custom-signatures.v1";
   const SETTINGS_KEY = "attensam.signature.settings.v2";
@@ -258,6 +258,84 @@
     });
   }
 
+  function clearSignature(event) {
+    disableNativeMobileSignature(() => {
+      try {
+        Office.context.mailbox.item.body.setSignatureAsync(
+          "",
+          { coercionType: Office.CoercionType.Html },
+          () => completed(event),
+        );
+      } catch (error) {
+        console.error("Die automatische Signatur konnte nicht entfernt werden.", error);
+        completed(event);
+      }
+    });
+  }
+
+  function emailDomain(value) {
+    const email = String(value || "").trim().toLocaleLowerCase("de-AT");
+    const separator = email.lastIndexOf("@");
+    return separator > 0 && separator < email.length - 1 ? email.slice(separator + 1) : "";
+  }
+
+  function getAllRecipientAddresses(callback) {
+    const item = Office.context.mailbox.item;
+    const fields = [item?.to, item?.cc, item?.bcc]
+      .filter((field) => typeof field?.getAsync === "function");
+    if (!fields.length) {
+      callback([]);
+      return;
+    }
+    const addresses = [];
+    let pending = fields.length;
+    let failed = false;
+    fields.forEach((field) => {
+      field.getAsync((result) => {
+        if (result.status !== Office.AsyncResultStatus.Succeeded) {
+          failed = true;
+        } else {
+          (result.value || []).forEach((recipient) => {
+            addresses.push(String(recipient?.emailAddress || "").trim());
+          });
+        }
+        pending -= 1;
+        if (pending === 0) callback(failed ? [] : addresses);
+      });
+    });
+  }
+
+  function hasOnlyInternalRecipients(renderData, callback) {
+    const senderDomain = emailDomain(
+      renderData?.mailboxEmail
+      || renderData?.profile?.email
+      || Office.context.mailbox?.userProfile?.emailAddress,
+    );
+    if (!senderDomain) {
+      callback(false);
+      return;
+    }
+    getAllRecipientAddresses((addresses) => {
+      callback(Boolean(
+        addresses.length
+        && addresses.every((address) => emailDomain(address) === senderDomain),
+      ));
+    });
+  }
+
+  function composeModeAllowsInsertion(settings, callback) {
+    if (settings.AutoInsertMode === "AllMail") {
+      callback(true);
+      return;
+    }
+    Office.context.mailbox.item.getComposeTypeAsync((result) => {
+      callback(Boolean(
+        result.status === Office.AsyncResultStatus.Succeeded
+        && result.value?.composeType === "newMail",
+      ));
+    });
+  }
+
   function defaultSettings(settings, customRecord) {
     const custom = selectedCustom(customRecord);
     return custom?.settings || settings;
@@ -274,16 +352,19 @@
         completed(event);
         return;
       }
-      if (settings.AutoInsertMode === "AllMail") {
-        insert(event, settings, renderData, customRecord);
-        return;
-      }
-      Office.context.mailbox.item.getComposeTypeAsync((result) => {
-        if (result.status !== Office.AsyncResultStatus.Succeeded || result.value?.composeType !== "newMail") {
+      composeModeAllowsInsertion(settings, (composeModeAllowed) => {
+        if (!composeModeAllowed) {
           completed(event);
           return;
         }
-        insert(event, settings, renderData, customRecord);
+        if (settings.InternalRecipientsOnly !== true) {
+          insert(event, settings, renderData, customRecord);
+          return;
+        }
+        hasOnlyInternalRecipients(renderData, (onlyInternal) => {
+          if (onlyInternal) insert(event, settings, renderData, customRecord);
+          else clearSignature(event);
+        });
       });
     } catch (error) {
       console.error("Automatische Standardsignatur konnte nicht eingefügt werden.", error);
@@ -294,5 +375,6 @@
   if (Office.actions?.associate) {
     Office.actions.associate("autoInsertSignature", handleAutomaticInsertion);
     Office.actions.associate("updateSignatureForFrom", handleAutomaticInsertion);
+    Office.actions.associate("updateSignatureForRecipients", handleAutomaticInsertion);
   }
 })();
