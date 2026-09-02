@@ -588,6 +588,7 @@ const AUTO_RENDER_DATA_KEY = "attensam.signature.render-data.v1";
 const REQUIRED_ROLE = "ATS.Signature";
 const VIP_ROLE = "ATS.Signature.VIP";
 const CITY_CHANGE_ROLE = "CityChange";
+const EXCLUDED_SUBJECT_PREFIX = "Ihre Objektinformation - ";
 const MAX_CUSTOM_SIGNATURES = 3;
 const SIGNATURE_MARKER_ID = "attensam-signature-root";
 const SIGNATURE_MARKER_TEXT = "Attensam-Signatur";
@@ -647,13 +648,6 @@ const deleteCustomButton = document.getElementById("delete-custom-signature");
 const initialCachedVipState = SignaturePreferences.getVipAuthorizationState();
 if (initialCachedVipState !== null) {
   vipAuthorized = initialCachedVipState;
-  mainSettingsLink.hidden = initialCachedVipState;
-}
-const initialCachedAccessState = SignaturePreferences.getAccessAuthorizationState();
-if (initialCachedAccessState !== null) {
-  accessAuthorized = initialCachedAccessState;
-  signatureMain.hidden = !accessAuthorized;
-  taskpaneAccessDenied.hidden = accessAuthorized;
 }
 const initialCachedCityChangeState = SignaturePreferences.getCityChangeAuthorizationState();
 cityChangeAuthorized = initialCachedCityChangeState === true;
@@ -1360,7 +1354,7 @@ async function refreshDelegationForCurrentFrom() {
 }
 
 async function loadProfile() {
-  setStatus("Signaturdaten werden geladen …");
+  setStatus("App wird geladen...");
   try {
     const token = await acquireGraphToken();
     if (!accessAuthorized) {
@@ -1371,6 +1365,7 @@ async function loadProfile() {
       signatureButton.classList.remove("ready");
       return;
     }
+    setStatus("Signaturdaten werden geladen …");
     const select = [
       "id", "givenName", "surname", "displayName", "mail", "userPrincipalName",
       "companyName", "city", "streetAddress", "postalCode", "jobTitle",
@@ -1447,19 +1442,42 @@ async function saveAccessDeniedState() {
   });
 }
 
+async function subjectExcludesSignature() {
+  if (Office.context?.platform !== Office.PlatformType?.PC) return false;
+  const subject = Office.context.mailbox.item?.subject;
+  if (typeof subject?.getAsync !== "function") return false;
+  return new Promise((resolve) => {
+    subject.getAsync((result) => {
+      resolve(
+        result.status === Office.AsyncResultStatus.Succeeded
+        && String(result.value || "").startsWith(EXCLUDED_SUBJECT_PREFIX),
+      );
+    });
+  });
+}
+
 async function insertSignature(customId = "standard") {
   if (!accessAuthorized || !profileLoaded || signatureButton.getAttribute("aria-disabled") === "true") return;
+  const body = Office.context.mailbox.item?.body;
+  if (!body) {
+    setStatus("Bitte eine neue Nachricht öffnen.");
+    return;
+  }
+  if (await subjectExcludesSignature()) {
+    if (typeof body.setSignatureAsync === "function") {
+      await new Promise((resolve) => {
+        body.setSignatureAsync("", { coercionType: Office.CoercionType.Html }, () => resolve());
+      });
+    }
+    setStatus("Für diese Objektinformation wird keine Signatur eingefügt.");
+    return;
+  }
   if (usingCachedProfile) currentDelegation = null;
   else await refreshDelegationForCurrentFrom();
   const item = vipAuthorized && customId !== "standard"
     ? customSignatures.items.find((entry) => entry.id === customId)
     : null;
   const html = item ? buildSignature(item.html, item.settings || signatureSettings, item.id).html : renderSignature();
-  const body = Office.context.mailbox.item?.body;
-  if (!body) {
-    setStatus("Bitte eine neue Nachricht öffnen.");
-    return;
-  }
   const callback = (result) => {
     if (result.status === Office.AsyncResultStatus.Succeeded) {
       setStatus("Signatur wurde eingefügt.");
@@ -1476,12 +1494,14 @@ async function insertSignature(customId = "standard") {
 
 async function initialize() {
   try {
+    signatureMain.hidden = true;
+    taskpaneAccessDenied.hidden = true;
+    mainSettingsLink.hidden = true;
+    setStatus("App wird geladen...");
     const cachedAccessState = SignaturePreferences.getAccessAuthorizationState();
     accessAuthorized = cachedAccessState === true;
-    if (cachedAccessState !== null) applyAccessView();
     const cachedVipState = SignaturePreferences.getVipAuthorizationState();
     vipAuthorized = cachedVipState === true;
-    mainSettingsLink.hidden = !accessAuthorized || cachedVipState !== false;
     try {
       signatureTemplate = await fetch("template.html", { cache: "no-store" }).then((response) => {
         if (!response.ok) throw new Error("template.html konnte nicht geladen werden.");
@@ -1592,7 +1612,7 @@ setDefaultButton.addEventListener("click", async () => {
 });
 openSignatureSettingsButton.addEventListener("click", () => {
   const signatureId = contextSignatureId || "standard";
-  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.28`;
+  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.31`;
 });
 editCustomButton.addEventListener("click", () => {
   const item = customSignatures.items.find((entry) => entry.id === contextSignatureId);
@@ -1793,6 +1813,20 @@ function getSettingsComposeType() {
   });
 }
 
+function settingsSubjectExcludesSignature() {
+  if (Office.context?.platform !== Office.PlatformType?.PC) return Promise.resolve(false);
+  const subject = Office.context.mailbox.item?.subject;
+  if (typeof subject?.getAsync !== "function") return Promise.resolve(false);
+  return new Promise((resolve) => {
+    subject.getAsync((result) => {
+      resolve(
+        result.status === Office.AsyncResultStatus.Succeeded
+        && String(result.value || "").startsWith("Ihre Objektinformation - "),
+      );
+    });
+  });
+}
+
 function getBodyHtml(body) {
   return new Promise((resolve, reject) => {
     body.getAsync(Office.CoercionType.Html, (result) => {
@@ -1858,35 +1892,32 @@ function readInsertedSignatureId(existingSignature) {
 
 async function updateInsertedSignature() {
   const body = Office.context.mailbox.item?.body;
-  if (!body?.getAsync) return false;
+  if (!body) return false;
   const cachedRenderData = SignaturePreferences.getValidRenderData();
   const renderData = cachedRenderData
     ? { ...cachedRenderData, cityChangeAuthorized: SignaturePreferences.getCityChangeAuthorized() }
     : null;
   if (!renderData) return false;
-  const bodyHtml = await getBodyHtml(body);
-  const bodyDocument = new DOMParser().parseFromString(bodyHtml, "text/html");
-  const existingSignature = findMarkedSignature(bodyDocument);
-  if (!existingSignature) return false;
-  const insertedSignatureId = readInsertedSignatureId(existingSignature);
-  // Older signatures may have lost their data attribute during Outlook's HTML
-  // sanitization. In that case, the settings page selected by the user is the
-  // best available source of truth. A present, different ID is still rejected.
-  if (insertedSignatureId && insertedSignatureId !== SETTINGS_SIGNATURE_ID) return false;
-  const settingsComposeType = currentSettings.SkipInternalOnly === true
-    ? await getSettingsComposeType()
-    : "";
-  const skipAppliesToComposeType = Boolean(
-    settingsComposeType
-    && (settingsComposeType !== "newMail" || currentSettings.SkipInternalOnNewMail === true),
-  );
-  if (skipAppliesToComposeType && await settingsHasOnlyInternalRecipients(renderData)) {
-    if (body.setSignatureAsync) {
+  const settingsComposeType = await getSettingsComposeType();
+  if (!settingsComposeType) return false;
+  const composeModeAllowsInsertion = settingsComposeType === "newMail"
+    || (settingsComposeType === "reply" && currentSettings.AutoInsertReplies === true)
+    || (settingsComposeType === "forward" && currentSettings.AutoInsertForwards === true);
+  const internalSuppressionApplies = currentSettings.SkipInternalOnly === true
+    && (settingsComposeType !== "newMail" || currentSettings.SkipInternalOnNewMail === true)
+    && await settingsHasOnlyInternalRecipients(renderData);
+  const subjectSuppressionApplies = await settingsSubjectExcludesSignature();
+  if (!composeModeAllowsInsertion || internalSuppressionApplies || subjectSuppressionApplies) {
+    if (typeof body.setSignatureAsync === "function") {
       await setCurrentSignature(body, "");
       return true;
     }
-    existingSignature.remove();
-    if (body.setAsync) {
+    if (typeof body.getAsync === "function" && typeof body.setAsync === "function") {
+      const bodyHtml = await getBodyHtml(body);
+      const bodyDocument = new DOMParser().parseFromString(bodyHtml, "text/html");
+      const existingSignature = findMarkedSignature(bodyDocument);
+      if (!existingSignature) return false;
+      existingSignature.remove();
       await setBodyHtml(body, bodyDocument.body.innerHTML);
       return true;
     }
@@ -1912,10 +1943,17 @@ async function updateInsertedSignature() {
     renderCustomRecord,
     SETTINGS_SIGNATURE_ID,
   );
-  if (body.setSignatureAsync) {
+  if (typeof body.setSignatureAsync === "function") {
     await setCurrentSignature(body, html);
     return true;
   }
+  if (typeof body.getAsync !== "function") return false;
+  const bodyHtml = await getBodyHtml(body);
+  const bodyDocument = new DOMParser().parseFromString(bodyHtml, "text/html");
+  const existingSignature = findMarkedSignature(bodyDocument);
+  if (!existingSignature) return false;
+  const insertedSignatureId = readInsertedSignatureId(existingSignature);
+  if (insertedSignatureId && insertedSignatureId !== SETTINGS_SIGNATURE_ID) return false;
   const replacedBodyHtml = replaceMarkedSignature(bodyHtml, html);
   if (replacedBodyHtml !== null && body.setAsync) {
     await setBodyHtml(body, replacedBodyHtml);

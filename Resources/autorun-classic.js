@@ -148,12 +148,13 @@
   (*! @azure/msal-browser v5.18.0 2026-08-04 *)
 */
 
-/* Attensam v0.8.28 signature-specific settings extension. */
+/* Attensam v0.8.31 signature-specific settings extension. */
 (function enableVipCustomSignatures() {
   const CUSTOM_KEY = "attensam.signature.custom-signatures.v1";
   const SETTINGS_KEY = "attensam.signature.settings.v2";
   const RENDER_KEY = "attensam.signature.render-data.v1";
   const VIP_ROLE = "ATS.Signature.VIP";
+  const EXCLUDED_SUBJECT_PREFIX = "Ihre Objektinformation - ";
   const PROFILE_CACHE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
   const CITY_ADDRESS_OVERRIDES = Object.freeze({
     "Neusiedl am See": Object.freeze({ city: "Neusiedl am See", postalCode: "7100", street: "Peter-Floridan-Gasse 4/Top 1" }),
@@ -207,8 +208,9 @@
     resolveDelegation: runtime.resolveDelegation,
   });
 
-  function completed(event) {
-    event.completed();
+  function completed(event, allowSend = false) {
+    if (allowSend) event.completed({ allowEvent: true });
+    else event.completed();
   }
 
   function newerSettings(roaming, renderData) {
@@ -272,18 +274,40 @@
     });
   }
 
-  function clearSignature(event) {
+  function clearSignature(event, allowSend = false) {
     disableNativeMobileSignature(() => {
       try {
         Office.context.mailbox.item.body.setSignatureAsync(
           "",
           { coercionType: Office.CoercionType.Html },
-          () => completed(event),
+          () => completed(event, allowSend),
         );
       } catch (error) {
         console.error("Die automatische Signatur konnte nicht entfernt werden.", error);
-        completed(event);
+        completed(event, allowSend);
       }
+    });
+  }
+
+  function isWindowsPc() {
+    return Office.context?.platform === Office.PlatformType?.PC;
+  }
+
+  function subjectExcludesSignature(callback) {
+    if (!isWindowsPc()) {
+      callback(false);
+      return;
+    }
+    const subject = Office.context.mailbox?.item?.subject;
+    if (typeof subject?.getAsync !== "function") {
+      callback(false);
+      return;
+    }
+    subject.getAsync((result) => {
+      callback(
+        result.status === Office.AsyncResultStatus.Succeeded
+        && String(result.value || "").startsWith(EXCLUDED_SUBJECT_PREFIX),
+      );
     });
   }
 
@@ -370,7 +394,7 @@
     };
   }
 
-  function handleAutomaticInsertion(event) {
+  function continueAutomaticInsertion(event) {
     try {
       const roamingSettings = Office.context.roamingSettings;
       const renderData = roamingSettings.get(RENDER_KEY);
@@ -407,9 +431,34 @@
     }
   }
 
+  function handleAutomaticInsertion(event) {
+    try {
+      subjectExcludesSignature((excluded) => {
+        if (excluded) clearSignature(event);
+        else continueAutomaticInsertion(event);
+      });
+    } catch (error) {
+      console.error("Der Betreff konnte nicht für die automatische Signatur geprüft werden.", error);
+      continueAutomaticInsertion(event);
+    }
+  }
+
+  function removeSignatureForObjectInformation(event) {
+    try {
+      subjectExcludesSignature((excluded) => {
+        if (excluded) clearSignature(event, true);
+        else completed(event, true);
+      });
+    } catch (error) {
+      console.error("Der Betreff konnte vor dem Senden nicht geprüft werden.", error);
+      completed(event, true);
+    }
+  }
+
   if (Office.actions?.associate) {
     Office.actions.associate("autoInsertSignature", handleAutomaticInsertion);
     Office.actions.associate("updateSignatureForFrom", handleAutomaticInsertion);
     Office.actions.associate("updateSignatureForRecipients", handleAutomaticInsertion);
+    Office.actions.associate("removeSignatureForObjectInformation", removeSignatureForObjectInformation);
   }
 })();
