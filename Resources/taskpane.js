@@ -1443,7 +1443,7 @@ setDefaultButton.addEventListener("click", async () => {
 });
 openSignatureSettingsButton.addEventListener("click", () => {
   const signatureId = contextSignatureId || "standard";
-  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.25`;
+  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.26`;
 });
 editCustomButton.addEventListener("click", () => {
   const item = customSignatures.items.find((entry) => entry.id === contextSignatureId);

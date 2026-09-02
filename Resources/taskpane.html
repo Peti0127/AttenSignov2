@@ -12,8 +12,8 @@
   </script>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@5.18.0/lib/msal-browser.min.js"></script>
-  <script defer src="autorun-classic.js?v=0.8.25"></script>
-  <script defer src="taskpane.js?v=0.8.25"></script>
+  <script defer src="autorun-classic.js?v=0.8.26"></script>
+  <script defer src="taskpane.js?v=0.8.26"></script>
   <style>
     :root { color-scheme:light; --red:#e10000; --ink:#090909; --muted:#666; --line:#d2d2d2; --paper:#f7f7f7; --surface:#fff; --control-bg:#fff; --control-ink:#090909; --control-border:#aaa; --hover:#f1f1f1; --footer-bg:rgba(255,255,255,.98); --button-bg:#090909; --button-ink:#fff; }
     :root[data-client-theme="dark"] { color-scheme:dark; --ink:#f2f2f2; --muted:#b8b8b8; --line:#4a4a4a; --paper:#111; --surface:#222; --control-bg:#2b2b2b; --control-ink:#f5f5f5; --control-border:#656565; --hover:#333; --footer-bg:rgba(28,28,28,.98); --button-bg:#ededed; --button-ink:#111; }
@@ -62,6 +62,7 @@
     .context-menu button { display:block; width:100%; border-radius:0; background:var(--control-bg); color:var(--control-ink); font-weight:400; text-align:left; }
     .context-menu button:hover, .context-menu button:focus-visible { color:#fff; background:var(--red); outline:none; }
     .field + .field { margin-top:22px; }
+    .field.nested-field { margin-left:28px; padding-left:12px; border-left:2px solid var(--line); }
     label { display:block; margin-bottom:8px; font-size:13px; font-weight:700; }
     select, input[type="text"] { width:100%; min-height:42px; padding:0 11px; border:1px solid var(--control-border); border-radius:0; background:var(--control-bg); color:var(--control-ink); font:inherit; }
     select:focus, input[type="text"]:focus { border-color:var(--red); box-shadow:0 0 0 2px rgba(225,0,0,.12); outline:none; }
@@ -89,7 +90,7 @@
     <header>
       <div class="logo-frame" aria-hidden="true"><img class="logo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAABKVBMVEUAAADgAADfAAD/AADiAADhAADhAADiAADhAADYAADhAADiAADgAADhAADkAADhAADgAADhAADhAAD/AADiAADhAADgAADlAADhAADhAADgAADhAADgAADhAAD/AADhAADhAADkAADbAADhAADhAADdAADhAADiAADhAADhAADhAADhAADmAADgAADgAADgAADiAADhAADhAADhAADgAADhAADgAADhAADhAADjAADhAADhAADiAADhAADgAADgAADhAADjAADhAADfAADiAADiAADhAADhAADhAADiAADhAADhAADiAADhAADhAADgAADgAADhAADiAADhAADhAADcAADhAADfAADhAADhAADgAAD/AADjAADiAADiAADjAADjAADhAAD///+ZudeEAAAAYXRSTlMAGUAEI/CwlDMN8Zxs9hPTc0PcAq3iSh3740m1hX8B2v4mB+j8HniMXKq77grIZDHQnzv3UqGmd8El/foa3lO3fgmXOINHhvMiUMM8LNaBa8D4aVTyFnAIuZpLAzZGPi0SEn2rxQAAAAFiS0dEYiu5HTwAAAAJcEhZcwAAAdEAAAHRAQyRTPMAAAAHdElNRQflDA8OIxS5I1PQAAABCUlEQVQ4y2NgoDNgZGLGK8/CmsiGVwF7YmIiBx55Ti6gAm48CniA8om8fLgV8IMUJArglBcEyycKCeNSIAKUFQViMRzy4hKJiZJSQAXSOBTIAOVk5eQTExUUscorKScmqqgyqAGVqWNVoAGU4dLU1AJS2jrYFOgmIoAeFnl9JPlEAywKDJEVJBphyPMZA4VNOEDAFMgyw1BgDhS1gDAtrRITrW3Q5IVtgQrsoBx7INuBgRzg6CSOzHV2cUVT4Jbo7uYBU+zplZho5Y0i72MN8qCvoZ+/uXpAINi3QSgKgkMS0YB8KKoV4tzWyNKiYeEYzmQMi4AaIxQZFY3dK9HiMbFx8QlkBQO5AADiCU4jdj6PHwAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAyMS0xMi0xNVQxNDozNToyMCswMDowMJfACAgAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMjEtMTItMTVUMTQ6MzU6MjArMDA6MDDmnbC0AAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAFd6VFh0UmF3IHByb2ZpbGUgdHlwZSBpcHRjAAB4nOPyDAhxVigoyk/LzEnlUgADIwsuYwsTIxNLkxQDEyBEgDTDZAMjs1Qgy9jUyMTMxBzEB8uASKBKLgDqFxF08kI1lQAAAABJRU5ErkJggg==" alt=""></div>
       <div><p class="eyebrow">ATTENSAM</p><h1>Signatur</h1></div>
-      <a id="main-settings-link" class="nav-link" href="taskpane.html?view=settings&amp;signature=standard&amp;v=0.8.25" aria-label="Einstellungen öffnen" title="Einstellungen" hidden>&#9881;</a>
+      <a id="main-settings-link" class="nav-link" href="taskpane.html?view=settings&amp;signature=standard&amp;v=0.8.26" aria-label="Einstellungen öffnen" title="Einstellungen" hidden>&#9881;</a>
     </header>
     <main>
       <section>
@@ -102,7 +103,7 @@
           <div class="field"><label for="custom-signature-title">Titel</label><input id="custom-signature-title" type="text" maxlength="80" autocomplete="off" placeholder="z. B. Messe-Signatur"></div>
           <div class="field"><label for="custom-signature-html">Signatur</label><div id="custom-signature-html" class="rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="Signatur hier eingeben oder aus Outlook einfügen"></div></div>
           <div class="editor-actions"><button id="custom-save-button" class="primary-action" type="button">Speichern</button><button id="custom-cancel-button" class="secondary-action" type="button">Abbrechen</button></div>
-          <p class="hint">Maximal 3 benutzerdefinierte Signaturen sind erlaubt. <a class="inline-link" href="placeholders.html?v=0.8.25" aria-label="Liste der Profilplatzhalter öffnen">Profilplatzhalter</a></p>
+          <p class="hint">Maximal 3 benutzerdefinierte Signaturen sind erlaubt. <a class="inline-link" href="placeholders.html?v=0.8.26" aria-label="Liste der Profilplatzhalter öffnen">Profilplatzhalter</a></p>
         </div>
         <div id="custom-signatures" aria-live="polite"></div>
         <div id="signature-context-menu" class="context-menu" role="menu" hidden>
@@ -120,25 +121,12 @@
     <header>
       <div class="logo-frame" aria-hidden="true"><img class="logo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAABKVBMVEUAAADgAADfAAD/AADiAADhAADhAADiAADhAADYAADhAADiAADgAADhAADkAADhAADgAADhAADhAAD/AADiAADhAADgAADlAADhAADhAADgAADhAADgAADhAAD/AADhAADhAADkAADbAADhAADhAADdAADhAADiAADhAADhAADhAADhAADmAADgAADgAADgAADiAADhAADhAADhAADgAADhAADgAADhAADhAADjAADhAADhAADiAADhAADgAADgAADhAADjAADhAADfAADiAADiAADhAADhAADhAADiAADhAADhAADiAADhAADhAADgAADgAADhAADiAADhAADhAADcAADhAADfAADhAADhAADgAAD/AADjAADiAADiAADjAADjAADhAAD///+ZudeEAAAAYXRSTlMAGUAEI/CwlDMN8Zxs9hPTc0PcAq3iSh3740m1hX8B2v4mB+j8HniMXKq77grIZDHQnzv3UqGmd8El/foa3lO3fgmXOINHhvMiUMM8LNaBa8D4aVTyFnAIuZpLAzZGPi0SEn2rxQAAAAFiS0dEYiu5HTwAAAAJcEhZcwAAAdEAAAHRAQyRTPMAAAAHdElNRQflDA8OIxS5I1PQAAABCUlEQVQ4y2NgoDNgZGLGK8/CmsiGVwF7YmIiBx55Ti6gAm48CniA8om8fLgV8IMUJArglBcEyycKCeNSIAKUFQViMRzy4hKJiZJSQAXSOBTIAOVk5eQTExUUscorKScmqqgyqAGVqWNVoAGU4dLU1AJS2jrYFOgmIoAeFnl9JPlEAywKDJEVJBphyPMZA4VNOEDAFMgyw1BgDhS1gDAtrRITrW3Q5IVtgQrsoBx7INuBgRzg6CSOzHV2cUVT4Jbo7uYBU+zplZho5Y0i72MN8qCvoZ+/uXpAINi3QSgKgkMS0YB8KKoV4tzWyNKiYeEYzmQMi4AaIxQZFY3dK9HiMbFx8QlkBQO5AADiCU4jdj6PHwAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAyMS0xMi0xNVQxNDozNToyMCswMDowMJfACAgAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMjEtMTItMTVUMTQ6MzU6MjArMDA6MDDmnbC0AAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAFd6VFh0UmF3IHByb2ZpbGUgdHlwZSBpcHRjAAB4nOPyDAhxVigoyk/LzEnlUgADIwsuYwsTIxNLkxQDEyBEgDTDZAMjs1Qgy9jUyMTMxBzEB8uASKBKLgDqFxF08kI1lQAAAABJRU5ErkJggg==" alt=""></div>
       <div><p class="eyebrow">ATTENSAM</p><h1 id="settings-heading">Einstellungen</h1></div>
-      <a id="settings-back" class="nav-link" href="taskpane.html?v=0.8.25" aria-label="Zurück" title="Zurück">&#8592;</a>
+      <a id="settings-back" class="nav-link" href="taskpane.html?v=0.8.26" aria-label="Zurück" title="Zurück">&#8592;</a>
     </header>
     <main>
       <span class="step">SIGNATUR</span>
       <h2>Darstellung</h2>
       <div class="field" style="margin-top:22px">
-        <label for="phone-mode">Nummer anzeigen</label>
-        <select id="phone-mode" disabled>
-          <option value="Alles">Handy und Festnetz</option>
-          <option value="Handy">Nur Handy</option>
-          <option value="Festnetz">Nur Festnetz</option>
-          <option value="Office">Office Nummer</option>
-          <option id="edv-hotline-option" value="EDVHotline" hidden disabled>EDV Hotline</option>
-        </select>
-        <div id="combined-phone-warning" class="validation-warnings" role="alert" hidden><p>Informationen über Festnetznummer und Mobilnummer fehlen, bitte EDV kontaktieren!</p></div>
-        <div id="mobile-phone-warning" class="validation-warnings" role="alert" hidden><p>Benutzer hat keine Handynummer, bitte EDV kontaktieren!</p></div>
-        <div id="landline-phone-warning" class="validation-warnings" role="alert" hidden><p>Benutzer hat keine Festnetznummer, bitte EDV kontaktieren!</p></div>
-      </div>
-      <div class="field">
         <label for="greeting-mode">Grußformel</label>
         <select id="greeting-mode" disabled>
           <option value="MfG0">Keine Grußformel</option>
@@ -160,6 +148,19 @@
           <option value="3">3 Zeilen</option>
         </select>
       </div>
+      <div class="field">
+        <label for="phone-mode">Nummer anzeigen</label>
+        <select id="phone-mode" disabled>
+          <option value="Alles">Handy und Festnetz</option>
+          <option value="Handy">Nur Handy</option>
+          <option value="Festnetz">Nur Festnetz</option>
+          <option value="Office">Office Nummer</option>
+          <option id="edv-hotline-option" value="EDVHotline" hidden disabled>EDV Hotline</option>
+        </select>
+        <div id="combined-phone-warning" class="validation-warnings" role="alert" hidden><p>Informationen über Festnetznummer und Mobilnummer fehlen, bitte EDV kontaktieren!</p></div>
+        <div id="mobile-phone-warning" class="validation-warnings" role="alert" hidden><p>Benutzer hat keine Handynummer, bitte EDV kontaktieren!</p></div>
+        <div id="landline-phone-warning" class="validation-warnings" role="alert" hidden><p>Benutzer hat keine Festnetznummer, bitte EDV kontaktieren!</p></div>
+      </div>
       <div id="title-before-field" class="field" hidden>
         <label class="checkbox-row" for="insert-title-before"><input id="insert-title-before" type="checkbox" disabled><span>Titel vorg. einfügen</span></label>
       </div>
@@ -177,16 +178,16 @@
         <label class="checkbox-row" for="confidentiality"><input id="confidentiality" type="checkbox" disabled><span>Vertraulichkeit</span></label>
       </div>
       <div class="field">
+        <label class="checkbox-row" for="skip-internal-only"><input id="skip-internal-only" type="checkbox" disabled><span>Signatur bei internen Emails nicht einfügen</span></label>
+      </div>
+      <div id="skip-internal-new-mail-field" class="field nested-field" hidden>
+        <label class="checkbox-row" for="skip-internal-new-mail"><input id="skip-internal-new-mail" type="checkbox" disabled><span>Auch bei neuen Mails nicht einfügen</span></label>
+      </div>
+      <div class="field">
         <label class="checkbox-row" for="auto-insert-replies"><input id="auto-insert-replies" type="checkbox" disabled><span>Automatisches Einfügen bei Antworten</span></label>
       </div>
       <div class="field">
         <label class="checkbox-row" for="auto-insert-forwards"><input id="auto-insert-forwards" type="checkbox" disabled><span>Automatisches Einfügen bei Weiterleitungen</span></label>
-      </div>
-      <div class="field">
-        <label class="checkbox-row" for="skip-internal-only"><input id="skip-internal-only" type="checkbox" disabled><span>Signatur bei internen Emails nicht einfügen</span></label>
-      </div>
-      <div id="skip-internal-new-mail-field" class="field" hidden>
-        <label class="checkbox-row" for="skip-internal-new-mail"><input id="skip-internal-new-mail" type="checkbox" disabled><span>Auch bei neuen Mails nicht einfügen</span></label>
       </div>
       <p class="hint">Die Auswahl wird für Ihr Microsoft-365-Benutzerkonto gespeichert.</p>
     </main>
