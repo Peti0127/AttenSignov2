@@ -148,13 +148,18 @@
   (*! @azure/msal-browser v5.18.0 2026-08-04 *)
 */
 
-/* Attensam v0.8.26 signature-specific settings extension. */
+/* Attensam v0.8.28 signature-specific settings extension. */
 (function enableVipCustomSignatures() {
   const CUSTOM_KEY = "attensam.signature.custom-signatures.v1";
   const SETTINGS_KEY = "attensam.signature.settings.v2";
   const RENDER_KEY = "attensam.signature.render-data.v1";
   const VIP_ROLE = "ATS.Signature.VIP";
   const PROFILE_CACHE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+  const CITY_ADDRESS_OVERRIDES = Object.freeze({
+    "Neusiedl am See": Object.freeze({ city: "Neusiedl am See", postalCode: "7100", street: "Peter-Floridan-Gasse 4/Top 1" }),
+    Oberwart: Object.freeze({ city: "Oberwart", postalCode: "7400", street: "Schulgasse 42/2" }),
+    "Wr. Neustadt": Object.freeze({ city: "Wr. Neustadt", postalCode: "2700", street: "Badener Straße 16" }),
+  });
   const runtime = typeof window !== "undefined" ? window.AttensamSignatureRuntime : null;
   if (!runtime || typeof runtime.renderSignature !== "function") return;
 
@@ -179,12 +184,21 @@
   }
 
   function renderSignature(renderData, settings, delegation, customRecord, requestedId) {
+    if (renderData?.accessAuthorized !== true) return "";
     const custom = selectedCustom(customRecord, requestedId);
-    if (!custom) return markSignature(baseRender(renderData, settings, delegation), "standard");
+    const activeSettings = custom?.settings || settings;
+    const address = renderData?.cityChangeAuthorized === true
+      ? CITY_ADDRESS_OVERRIDES[String(activeSettings?.CityOverride || "Standard")]
+      : null;
+    const adjustedRenderData = address && !delegation
+      ? { ...renderData, profile: { ...renderData.profile, ...address } }
+      : renderData;
+    const adjustedDelegation = address && delegation ? { ...delegation, ...address } : delegation;
+    if (!custom) return markSignature(baseRender(adjustedRenderData, activeSettings, adjustedDelegation), "standard");
     return markSignature(baseRender(
-      { ...renderData, template: custom.html },
-      custom.settings || settings,
-      delegation,
+      { ...adjustedRenderData, template: custom.html },
+      activeSettings,
+      adjustedDelegation,
     ), custom.id);
   }
 
@@ -363,7 +377,7 @@
       const standardSettings = newerSettings(roamingSettings.get(SETTINGS_KEY), renderData);
       const customRecord = roamingSettings.get(CUSTOM_KEY);
       const settings = defaultSettings(standardSettings, customRecord);
-      if (!hasValidCachedProfile(renderData)) {
+      if (renderData?.accessAuthorized !== true || !hasValidCachedProfile(renderData)) {
         completed(event);
         return;
       }

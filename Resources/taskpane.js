@@ -100,19 +100,24 @@ function readableError(error) {
   const RENDER_DATA_KEY = "attensam.signature.render-data.v1";
   const CUSTOM_SIGNATURES_KEY = "attensam.signature.custom-signatures.v1";
   const CUSTOM_SIGNATURES_CACHE_PREFIX = "attensam.signature.custom-signatures.v1";
+  const REQUIRED_ROLE = "ATS.Signature";
   const VIP_ROLE = "ATS.Signature.VIP";
+  const CITY_CHANGE_ROLE = "CityChange";
   const MAX_CUSTOM_SIGNATURES = 3;
   const PROFILE_CACHE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
   const CACHE_PREFIX = "attensam.signature.settings.v2";
   const DEPARTMENT_CACHE_PREFIX = "attensam.signature.department.v1";
   const TITLE_ATTRIBUTES_CACHE_PREFIX = "attensam.signature.title-attributes.v1";
+  const ACCESS_CACHE_PREFIX = "attensam.signature.access-role.v1";
   const VIP_CACHE_PREFIX = "attensam.signature.vip-role.v1";
+  const CITY_CHANGE_CACHE_PREFIX = "attensam.signature.city-change-role.v1";
   const LEGACY_PHONE_PREFIX = "attensam.signature.phone-mode";
   const DEFAULT_SETTINGS = Object.freeze({
     Nummer: "Alles",
     MfG: "MfG1",
     CustomGreeting: "",
     GreetingLines: 1,
+    CityOverride: "Standard",
     AutoInsert: true,
     AutoInsertMode: "NewMail",
     AutoInsertReplies: false,
@@ -128,6 +133,7 @@ function readableError(error) {
   const ALLOWED_NUMBERS = new Set(["Alles", "Handy", "Festnetz", "Office", "EDVHotline"]);
   const ALLOWED_GREETINGS = new Set(["MfG0", "MfG1", "MfG2", "MfG3", "MfGCustom"]);
   const ALLOWED_GREETING_LINES = new Set([1, 2, 3]);
+  const ALLOWED_CITY_OVERRIDES = new Set(["Standard", "Neusiedl am See", "Oberwart", "Wr. Neustadt"]);
   const LEGACY_NUMBER_MAP = Object.freeze({
     both: "Alles",
     mobile: "Handy",
@@ -176,6 +182,36 @@ function readableError(error) {
     return `${VIP_CACHE_PREFIX}:${currentUserKey()}`;
   }
 
+  function accessStorageKey() {
+    return `${ACCESS_CACHE_PREFIX}:${currentUserKey()}`;
+  }
+
+  function setAccessAuthorized(value) {
+    localStorage.setItem(accessStorageKey(), JSON.stringify({
+      authorized: value === true,
+      role: REQUIRED_ROLE,
+      updatedAt: new Date().toISOString(),
+    }));
+  }
+
+  function getAccessAuthorizationState() {
+    try {
+      const value = JSON.parse(localStorage.getItem(accessStorageKey()) || "null");
+      return typeof value?.authorized === "boolean" ? value.authorized : null;
+    } catch {
+      localStorage.removeItem(accessStorageKey());
+      return null;
+    }
+  }
+
+  function getAccessAuthorized() {
+    return getAccessAuthorizationState() === true;
+  }
+
+  function cityChangeStorageKey() {
+    return `${CITY_CHANGE_CACHE_PREFIX}:${currentUserKey()}`;
+  }
+
   function setVipAuthorized(value) {
     localStorage.setItem(vipStorageKey(), JSON.stringify({
       authorized: value === true,
@@ -195,6 +231,28 @@ function readableError(error) {
 
   function getVipAuthorized() {
     return getVipAuthorizationState() === true;
+  }
+
+  function setCityChangeAuthorized(value) {
+    localStorage.setItem(cityChangeStorageKey(), JSON.stringify({
+      authorized: value === true,
+      role: CITY_CHANGE_ROLE,
+      updatedAt: new Date().toISOString(),
+    }));
+  }
+
+  function getCityChangeAuthorizationState() {
+    try {
+      const value = JSON.parse(localStorage.getItem(cityChangeStorageKey()) || "null");
+      return typeof value?.authorized === "boolean" ? value.authorized : null;
+    } catch {
+      localStorage.removeItem(cityChangeStorageKey());
+      return null;
+    }
+  }
+
+  function getCityChangeAuthorized() {
+    return getCityChangeAuthorizationState() === true;
   }
 
   function normalizeCustomSignatures(value) {
@@ -319,6 +377,9 @@ function readableError(error) {
       GreetingLines: ALLOWED_GREETING_LINES.has(Number(value?.GreetingLines))
         ? Number(value.GreetingLines)
         : DEFAULT_SETTINGS.GreetingLines,
+      CityOverride: ALLOWED_CITY_OVERRIDES.has(value?.CityOverride)
+        ? value.CityOverride
+        : DEFAULT_SETTINGS.CityOverride,
       AutoInsert: true,
       AutoInsertMode: autoInsertReplies && autoInsertForwards ? "AllMail" : "NewMail",
       AutoInsertReplies: autoInsertReplies,
@@ -356,6 +417,7 @@ function readableError(error) {
       MfG: record.MfG,
       CustomGreeting: record.CustomGreeting,
       GreetingLines: record.GreetingLines,
+      CityOverride: record.CityOverride,
       AutoInsert: record.AutoInsert,
       AutoInsertMode: record.AutoInsertMode,
       AutoInsertReplies: record.AutoInsertReplies,
@@ -391,6 +453,7 @@ function readableError(error) {
       MfG: DEFAULT_SETTINGS.MfG,
       CustomGreeting: DEFAULT_SETTINGS.CustomGreeting,
       GreetingLines: DEFAULT_SETTINGS.GreetingLines,
+      CityOverride: DEFAULT_SETTINGS.CityOverride,
       AutoInsert: DEFAULT_SETTINGS.AutoInsert,
       AutoInsertMode: DEFAULT_SETTINGS.AutoInsertMode,
       AutoInsertReplies: DEFAULT_SETTINGS.AutoInsertReplies,
@@ -411,6 +474,7 @@ function readableError(error) {
       || !ALLOWED_GREETINGS.has(settings?.MfG)
       || typeof settings?.CustomGreeting !== "string"
       || !ALLOWED_GREETING_LINES.has(Number(settings?.GreetingLines))
+      || !ALLOWED_CITY_OVERRIDES.has(settings?.CityOverride)
       || typeof settings?.AutoInsert !== "boolean"
       || typeof settings?.AutoInsertReplies !== "boolean"
       || typeof settings?.AutoInsertForwards !== "boolean"
@@ -429,6 +493,7 @@ function readableError(error) {
       MfG: settings.MfG,
       CustomGreeting: normalizeCustomGreeting(settings.CustomGreeting),
       GreetingLines: Number(settings.GreetingLines),
+      CityOverride: settings.CityOverride,
       AutoInsert: true,
       AutoInsertMode: settings.AutoInsertReplies && settings.AutoInsertForwards ? "AllMail" : "NewMail",
       AutoInsertReplies: settings.AutoInsertReplies,
@@ -502,9 +567,15 @@ function readableError(error) {
     getSettingsForSignature,
     saveSettingsForSignature,
     getValidRenderData,
+    getAccessAuthorized,
+    getAccessAuthorizationState,
+    setAccessAuthorized,
     getVipAuthorized,
     getVipAuthorizationState,
     setVipAuthorized,
+    getCityChangeAuthorized,
+    getCityChangeAuthorizationState,
+    setCityChangeAuthorized,
   });
 })(window);
 
@@ -514,7 +585,9 @@ function readableError(error) {
 
 const CONFIG = ATTENSAM_CONFIG;
 const AUTO_RENDER_DATA_KEY = "attensam.signature.render-data.v1";
+const REQUIRED_ROLE = "ATS.Signature";
 const VIP_ROLE = "ATS.Signature.VIP";
+const CITY_CHANGE_ROLE = "CityChange";
 const MAX_CUSTOM_SIGNATURES = 3;
 const SIGNATURE_MARKER_ID = "attensam-signature-root";
 const SIGNATURE_MARKER_TEXT = "Attensam-Signatur";
@@ -531,7 +604,9 @@ let profileLoaded = false;
 let usingCachedProfile = false;
 let currentDelegation = null;
 let userRoles = new Set();
+let accessAuthorized = false;
 let vipAuthorized = false;
+let cityChangeAuthorized = false;
 let customSignatures = { requiredRole: VIP_ROLE, defaultId: "standard", items: [] };
 let contextSignatureId = "standard";
 let editingCustomSignatureId = null;
@@ -541,6 +616,7 @@ let signatureSettings = {
   MfG: "MfG1",
   CustomGreeting: "",
   GreetingLines: 1,
+  CityOverride: "Standard",
   InsertTitleBefore: false,
   InsertTitleAfter: false,
   MobileUsage: false,
@@ -549,6 +625,8 @@ let signatureSettings = {
 };
 
 const statusElement = document.getElementById("status");
+const signatureMain = document.getElementById("signature-main");
+const taskpaneAccessDenied = document.getElementById("taskpane-access-denied");
 const previewElement = document.getElementById("signature-preview");
 const signatureButton = document.getElementById("signature-button");
 const profileWarningsElement = document.getElementById("profile-warnings");
@@ -571,9 +649,24 @@ if (initialCachedVipState !== null) {
   vipAuthorized = initialCachedVipState;
   mainSettingsLink.hidden = initialCachedVipState;
 }
+const initialCachedAccessState = SignaturePreferences.getAccessAuthorizationState();
+if (initialCachedAccessState !== null) {
+  accessAuthorized = initialCachedAccessState;
+  signatureMain.hidden = !accessAuthorized;
+  taskpaneAccessDenied.hidden = accessAuthorized;
+}
+const initialCachedCityChangeState = SignaturePreferences.getCityChangeAuthorizationState();
+cityChangeAuthorized = initialCachedCityChangeState === true;
 
 function setStatus(message) {
   statusElement.textContent = message;
+}
+
+function applyAccessView() {
+  signatureMain.hidden = !accessAuthorized;
+  taskpaneAccessDenied.hidden = accessAuthorized;
+  mainSettingsLink.hidden = !accessAuthorized || vipAuthorized;
+  if (!accessAuthorized) setStatus("Sie haben kein Zugriff auf dieses Add-In, bitte EDV kontaktieren!");
 }
 
 function escapeHtml(value) {
@@ -600,9 +693,13 @@ function rememberAuthenticationRoles(result) {
     ...(Array.isArray(tokenClaims?.roles) ? tokenClaims.roles : []),
   ];
   userRoles = new Set(roles.map((role) => String(role).trim()).filter(Boolean));
+  accessAuthorized = userRoles.has(REQUIRED_ROLE);
   vipAuthorized = userRoles.has(VIP_ROLE);
+  cityChangeAuthorized = userRoles.has(CITY_CHANGE_ROLE) || userRoles.has("ATS.Signature.CityChange");
+  SignaturePreferences.setAccessAuthorized(accessAuthorized);
   SignaturePreferences.setVipAuthorized(vipAuthorized);
-  mainSettingsLink.hidden = vipAuthorized;
+  SignaturePreferences.setCityChangeAuthorized(cityChangeAuthorized);
+  applyAccessView();
 }
 
 function sanitizeCustomSignatureHtml(value) {
@@ -835,6 +932,30 @@ function isFirstNameOnlyProfile(profileValue) {
   return Boolean(displayName && !displayName.includes("@") && !displayName.includes(" "));
 }
 
+const CITY_ADDRESS_OVERRIDES = Object.freeze({
+  "Neusiedl am See": Object.freeze({
+    city: "Neusiedl am See",
+    postalCode: "7100",
+    street: "Peter-Floridan-Gasse 4/Top 1",
+  }),
+  Oberwart: Object.freeze({
+    city: "Oberwart",
+    postalCode: "7400",
+    street: "Schulgasse 42/2",
+  }),
+  "Wr. Neustadt": Object.freeze({
+    city: "Wr. Neustadt",
+    postalCode: "2700",
+    street: "Badener Straße 16",
+  }),
+});
+
+function applyCityOverride(profileValue, settings = signatureSettings) {
+  if (!cityChangeAuthorized) return profileValue;
+  const address = CITY_ADDRESS_OVERRIDES[String(settings.CityOverride || "Standard")];
+  return address ? { ...profileValue, ...address } : profileValue;
+}
+
 function bannerForCity(profileValue = profile) {
   const city = String(profileValue.city || "").trim();
   if (city === "Wien") {
@@ -904,9 +1025,10 @@ function buildSignature(templateHtml = signatureTemplate, settings = signatureSe
   const sendAs = isFirstNameOnlyProfile(currentDelegation);
   const sendOnBehalf = Boolean(currentDelegation) && !sendAs;
   const selectedProfile = currentDelegation || profile;
-  const signatureProfile = sendAs && !String(selectedProfile.firstName || "").trim()
+  const baseSignatureProfile = sendAs && !String(selectedProfile.firstName || "").trim()
     ? { ...selectedProfile, firstName: String(selectedProfile.displayName || "").trim() }
     : selectedProfile;
+  const signatureProfile = applyCityOverride(baseSignatureProfile, settings);
   const sendAsHasDirectNumber = Boolean(
     String(signatureProfile.phone || "").trim()
     || String(signatureProfile.mobile || "").trim(),
@@ -1038,6 +1160,8 @@ async function saveAutoRenderData() {
     template: signatureTemplate,
     officeNumber: CONFIG.officeNumber,
     settings: { ...signatureSettings },
+    accessAuthorized,
+    cityChangeAuthorized,
     settingsUpdatedAt: cachedAt,
     graphAuth: {
       clientId: CONFIG.clientId,
@@ -1078,7 +1202,7 @@ function cachedProfileDate(cached) {
 
 async function restoreCachedProfile() {
   const cached = getValidCachedRenderData();
-  if (!cached) return false;
+  if (!cached || !SignaturePreferences.getAccessAuthorized() || cached.accessAuthorized !== true) return false;
   Object.assign(profile, cached.profile);
   signatureTemplate = cached.template;
   SignaturePreferences.setDepartment(profile.department);
@@ -1239,6 +1363,14 @@ async function loadProfile() {
   setStatus("Signaturdaten werden geladen …");
   try {
     const token = await acquireGraphToken();
+    if (!accessAuthorized) {
+      await saveAccessDeniedState();
+      profileLoaded = false;
+      signatureButton.setAttribute("aria-disabled", "true");
+      signatureButton.tabIndex = -1;
+      signatureButton.classList.remove("ready");
+      return;
+    }
     const select = [
       "id", "givenName", "surname", "displayName", "mail", "userPrincipalName",
       "companyName", "city", "streetAddress", "postalCode", "jobTitle",
@@ -1291,7 +1423,7 @@ async function loadProfile() {
       console.error("Gespeicherte Signaturdaten konnten nicht geladen werden.", cacheError);
     }
     profileLoaded = false;
-    if (SignaturePreferences.getVipAuthorizationState() === null) {
+    if (accessAuthorized && SignaturePreferences.getVipAuthorizationState() === null) {
       mainSettingsLink.hidden = false;
     }
     signatureButton.setAttribute("aria-disabled", "true");
@@ -1301,8 +1433,22 @@ async function loadProfile() {
   }
 }
 
+async function saveAccessDeniedState() {
+  const roamingSettings = Office.context.roamingSettings;
+  if (!roamingSettings) return;
+  const existing = roamingSettings.get(AUTO_RENDER_DATA_KEY) || {};
+  roamingSettings.set(AUTO_RENDER_DATA_KEY, {
+    ...existing,
+    accessAuthorized: false,
+    accessCheckedAt: new Date().toISOString(),
+  });
+  await new Promise((resolve) => {
+    roamingSettings.saveAsync(() => resolve());
+  });
+}
+
 async function insertSignature(customId = "standard") {
-  if (!profileLoaded || signatureButton.getAttribute("aria-disabled") === "true") return;
+  if (!accessAuthorized || !profileLoaded || signatureButton.getAttribute("aria-disabled") === "true") return;
   if (usingCachedProfile) currentDelegation = null;
   else await refreshDelegationForCurrentFrom();
   const item = vipAuthorized && customId !== "standard"
@@ -1330,9 +1476,12 @@ async function insertSignature(customId = "standard") {
 
 async function initialize() {
   try {
+    const cachedAccessState = SignaturePreferences.getAccessAuthorizationState();
+    accessAuthorized = cachedAccessState === true;
+    if (cachedAccessState !== null) applyAccessView();
     const cachedVipState = SignaturePreferences.getVipAuthorizationState();
     vipAuthorized = cachedVipState === true;
-    mainSettingsLink.hidden = cachedVipState !== false;
+    mainSettingsLink.hidden = !accessAuthorized || cachedVipState !== false;
     try {
       signatureTemplate = await fetch("template.html", { cache: "no-store" }).then((response) => {
         if (!response.ok) throw new Error("template.html konnte nicht geladen werden.");
@@ -1443,7 +1592,7 @@ setDefaultButton.addEventListener("click", async () => {
 });
 openSignatureSettingsButton.addEventListener("click", () => {
   const signatureId = contextSignatureId || "standard";
-  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.26`;
+  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.28`;
 });
 editCustomButton.addEventListener("click", () => {
   const item = customSignatures.items.find((entry) => entry.id === contextSignatureId);
@@ -1496,6 +1645,8 @@ const SETTINGS_SIGNATURE_MARKER_ID_PREFIX = "attensam-signature-marker-";
 const SETTINGS_SIGNATURE_ID = String(new URLSearchParams(window.location.search).get("signature") || "standard").replace(/[^a-zA-Z0-9_-]/g, "") || "standard";
 
 const phoneModeSelect = document.getElementById("phone-mode");
+const cityChangeField = document.getElementById("city-change-field");
+const cityChangeSelect = document.getElementById("city-change");
 const edvHotlineOption = document.getElementById("edv-hotline-option");
 const combinedPhoneWarning = document.getElementById("combined-phone-warning");
 const mobilePhoneWarning = document.getElementById("mobile-phone-warning");
@@ -1520,8 +1671,11 @@ const skipInternalNewMailField = document.getElementById("skip-internal-new-mail
 const skipInternalNewMailCheckbox = document.getElementById("skip-internal-new-mail");
 const settingsStatus = document.getElementById("settings-status");
 const settingsHeading = document.getElementById("settings-heading");
+const settingsMain = document.getElementById("settings-main");
+const settingsAccessDenied = document.getElementById("settings-access-denied");
 let currentSettings;
 let settingsProfile = null;
+let cityChangeAuthorized = false;
 
 function setSettingsStatus(message) {
   settingsStatus.textContent = message;
@@ -1569,6 +1723,7 @@ function updateGreetingVisibility() {
 
 function setControlsDisabled(disabled) {
   phoneModeSelect.disabled = disabled;
+  cityChangeSelect.disabled = disabled || !cityChangeAuthorized;
   greetingModeSelect.disabled = disabled;
   customGreetingInput.disabled = disabled || greetingModeSelect.value !== "MfGCustom";
   greetingLinesSelect.disabled = disabled || greetingModeSelect.value === "MfG0";
@@ -1704,7 +1859,10 @@ function readInsertedSignatureId(existingSignature) {
 async function updateInsertedSignature() {
   const body = Office.context.mailbox.item?.body;
   if (!body?.getAsync) return false;
-  const renderData = SignaturePreferences.getValidRenderData();
+  const cachedRenderData = SignaturePreferences.getValidRenderData();
+  const renderData = cachedRenderData
+    ? { ...cachedRenderData, cityChangeAuthorized: SignaturePreferences.getCityChangeAuthorized() }
+    : null;
   if (!renderData) return false;
   const bodyHtml = await getBodyHtml(body);
   const bodyDocument = new DOMParser().parseFromString(bodyHtml, "text/html");
@@ -1768,6 +1926,13 @@ async function updateInsertedSignature() {
 
 async function initializeSettings() {
   try {
+    const accessAuthorized = SignaturePreferences.getAccessAuthorized();
+    settingsMain.hidden = !accessAuthorized;
+    settingsAccessDenied.hidden = accessAuthorized;
+    if (!accessAuthorized) {
+      setSettingsStatus("Sie haben kein Zugriff auf dieses Add-In, bitte EDV kontaktieren!");
+      return;
+    }
     const isVipUser = SignaturePreferences.getVipAuthorized();
     if (!isVipUser && SETTINGS_SIGNATURE_ID !== "standard") {
       throw new Error("Diese Signatur-Einstellungen sind nur für VIP-Benutzer verfügbar.");
@@ -1781,6 +1946,9 @@ async function initializeSettings() {
       ? "Einstellungen: Standard"
       : `Einstellungen: ${selectedItem.title}`;
     currentSettings = await SignaturePreferences.getSettingsForSignature(SETTINGS_SIGNATURE_ID);
+    cityChangeAuthorized = SignaturePreferences.getCityChangeAuthorized();
+    cityChangeField.hidden = !cityChangeAuthorized;
+    cityChangeSelect.value = currentSettings.CityOverride;
     settingsProfile = SignaturePreferences.getValidRenderData()?.profile || null;
     const department = SignaturePreferences.getDepartment();
     const titleAttributes = SignaturePreferences.getTitleAttributes();
@@ -1824,6 +1992,7 @@ async function saveSettings() {
       MfG: greetingModeSelect.value,
       CustomGreeting: customGreetingInput.value,
       GreetingLines: Number(greetingLinesSelect.value),
+      CityOverride: cityChangeAuthorized ? cityChangeSelect.value : currentSettings.CityOverride,
       AutoInsert: true,
       AutoInsertReplies: autoInsertRepliesCheckbox.checked,
       AutoInsertForwards: autoInsertForwardsCheckbox.checked,
@@ -1855,6 +2024,7 @@ phoneModeSelect.addEventListener("change", () => {
   updatePhoneWarnings();
   saveSettings();
 });
+cityChangeSelect.addEventListener("change", saveSettings);
 greetingModeSelect.addEventListener("change", () => {
   updateGreetingVisibility();
   saveSettings();
@@ -1893,6 +2063,8 @@ const AUTO_RENDER_DATA_KEY = "attensam.signature.render-data.v1";
 const MOBILE_SETTINGS_SIGNATURE_ID = String(new URLSearchParams(window.location.search).get("signature") || "standard").replace(/[^a-zA-Z0-9_-]/g, "") || "standard";
 
 const phoneModeSelect = document.getElementById("phone-mode");
+const cityChangeField = document.getElementById("city-change-field");
+const cityChangeSelect = document.getElementById("city-change");
 const edvHotlineOption = document.getElementById("edv-hotline-option");
 const combinedPhoneWarning = document.getElementById("combined-phone-warning");
 const mobilePhoneWarning = document.getElementById("mobile-phone-warning");
@@ -1918,12 +2090,15 @@ const skipInternalNewMailCheckbox = document.getElementById("skip-internal-new-m
 const settingsStatus = document.getElementById("settings-status");
 const closeButton = document.getElementById("close-button");
 const settingsHeading = document.getElementById("settings-heading");
+const settingsMain = document.getElementById("settings-main");
+const settingsAccessDenied = document.getElementById("settings-access-denied");
 
 let currentSettings;
 let currentProfile;
 let signatureTemplate = "";
 let msalInstance;
 let settingsProfile = null;
+let cityChangeAuthorized = SignaturePreferences.getCityChangeAuthorized();
 
 function setSettingsStatus(message) {
   settingsStatus.textContent = message;
@@ -1937,6 +2112,7 @@ function updateInternalInsertionVisibility() {
 
 function setControlsDisabled(disabled) {
   phoneModeSelect.disabled = disabled;
+  cityChangeSelect.disabled = disabled || !cityChangeAuthorized;
   greetingModeSelect.disabled = disabled;
   customGreetingInput.disabled = disabled || greetingModeSelect.value !== "MfGCustom";
   greetingLinesSelect.disabled = disabled || greetingModeSelect.value === "MfG0";
@@ -2000,6 +2176,9 @@ function showSettings(settings, department, titleAttributes) {
     settingsProfile = titleAttributes;
   }
   const canUseEdvHotline = updateDepartmentOption(department);
+  cityChangeAuthorized = SignaturePreferences.getCityChangeAuthorized();
+  cityChangeField.hidden = !cityChangeAuthorized;
+  cityChangeSelect.value = settings.CityOverride;
   phoneModeSelect.value = settings.Nummer === "EDVHotline" && !canUseEdvHotline
     ? "Alles"
     : settings.Nummer;
@@ -2041,11 +2220,36 @@ async function acquireGraphToken() {
   }
   const request = { scopes: ["User.Read"] };
   try {
-    return (await msalInstance.acquireTokenSilent(request)).accessToken;
+    const result = await msalInstance.acquireTokenSilent(request);
+    rememberMobileCityChangeRole(result);
+    return result.accessToken;
   } catch (error) {
     if (!(error instanceof msal.InteractionRequiredAuthError)) throw error;
-    return (await msalInstance.acquireTokenPopup(request)).accessToken;
+    const result = await msalInstance.acquireTokenPopup(request);
+    rememberMobileCityChangeRole(result);
+    return result.accessToken;
   }
+}
+
+function rememberMobileCityChangeRole(result) {
+  let tokenClaims = {};
+  try {
+    const encoded = String(result?.idToken || "").split(".")[1];
+    if (encoded) {
+      const normalized = encoded.replace(/-/g, "+").replace(/_/g, "/");
+      tokenClaims = JSON.parse(atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=")));
+    }
+  } catch {
+    tokenClaims = {};
+  }
+  const roles = [
+    ...(Array.isArray(result?.idTokenClaims?.roles) ? result.idTokenClaims.roles : []),
+    ...(Array.isArray(result?.account?.idTokenClaims?.roles) ? result.account.idTokenClaims.roles : []),
+    ...(Array.isArray(tokenClaims?.roles) ? tokenClaims.roles : []),
+  ].map((role) => String(role).trim());
+  cityChangeAuthorized = roles.includes("CityChange") || roles.includes("ATS.Signature.CityChange");
+  SignaturePreferences.setAccessAuthorized(roles.includes("ATS.Signature"));
+  SignaturePreferences.setCityChangeAuthorized(cityChangeAuthorized);
 }
 
 async function loadProfile() {
@@ -2090,6 +2294,8 @@ async function saveAutomaticRenderData() {
     template: signatureTemplate,
     officeNumber: CONFIG.officeNumber,
     settings: { ...standardSettings },
+    accessAuthorized: SignaturePreferences.getAccessAuthorized(),
+    cityChangeAuthorized,
     settingsUpdatedAt: now,
     graphAuth: {
       clientId: CONFIG.clientId,
@@ -2109,6 +2315,18 @@ async function saveAutomaticRenderData() {
 async function initializeSettings() {
   setControlsDisabled(true);
   try {
+    try {
+      await acquireGraphToken();
+    } catch (roleError) {
+      console.warn("Die aktuelle Add-In-Rolle konnte mobil nicht überprüft werden.", roleError);
+    }
+    const accessAuthorized = SignaturePreferences.getAccessAuthorized();
+    settingsMain.hidden = !accessAuthorized;
+    settingsAccessDenied.hidden = accessAuthorized;
+    if (!accessAuthorized) {
+      setSettingsStatus("Sie haben kein Zugriff auf dieses Add-In, bitte EDV kontaktieren!");
+      return;
+    }
     const isVipUser = SignaturePreferences.getVipAuthorized();
     if (!isVipUser && MOBILE_SETTINGS_SIGNATURE_ID !== "standard") {
       throw new Error("Diese Signatur-Einstellungen sind nur für VIP-Benutzer verfügbar.");
@@ -2168,6 +2386,7 @@ async function saveSettings() {
       MfG: greetingModeSelect.value,
       CustomGreeting: customGreetingInput.value,
       GreetingLines: Number(greetingLinesSelect.value),
+      CityOverride: cityChangeAuthorized ? cityChangeSelect.value : currentSettings.CityOverride,
       AutoInsert: true,
       AutoInsertReplies: autoInsertRepliesCheckbox.checked,
       AutoInsertForwards: autoInsertForwardsCheckbox.checked,
@@ -2191,6 +2410,7 @@ phoneModeSelect.addEventListener("change", () => {
   updatePhoneWarnings();
   saveSettings();
 });
+cityChangeSelect.addEventListener("change", saveSettings);
 greetingModeSelect.addEventListener("change", () => {
   updateGreetingVisibility();
   saveSettings();
