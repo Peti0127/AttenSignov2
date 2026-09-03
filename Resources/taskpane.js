@@ -839,7 +839,7 @@ function noticesHtml(settings = signatureSettings) {
   return html;
 }
 
-function missingProfileFields(profileValue) {
+function missingProfileFields(profileValue, ignoreMissingTitle = false) {
   const requiredFields = [
     ["firstName", "Vorname"],
     ["jobTitle", "Titel"],
@@ -849,6 +849,7 @@ function missingProfileFields(profileValue) {
     ["street", "Straße"],
   ];
   return requiredFields
+    .filter(([key]) => key !== "jobTitle" || !ignoreMissingTitle)
     .filter(([key]) => !String(profileValue?.[key] || "").trim())
     .map(([, label]) => label);
 }
@@ -858,8 +859,8 @@ function joinedFieldNames(fields) {
   return `${fields.slice(0, -1).join(", ")} und ${fields[fields.length - 1]}`;
 }
 
-function profileWarningMessages(profileValue, phoneMode = null) {
-  const missing = missingProfileFields(profileValue);
+function profileWarningMessages(profileValue, phoneMode = null, ignoreMissingTitle = false) {
+  const missing = missingProfileFields(profileValue, ignoreMissingTitle);
   const mobileMissing = !String(profileValue?.mobile || "").trim();
   const phoneMissing = !String(profileValue?.phone || "").trim();
   const needsMobile = phoneMode === null || phoneMode === "Handy" || phoneMode === "Alles";
@@ -873,19 +874,27 @@ function profileWarningMessages(profileValue, phoneMode = null) {
   return [`Informationen über ${joinedFieldNames(missing)} fehlen, bitte EDV kontaktieren!`];
 }
 
-function insertedProfileWarningsHtml(profileValue, phoneMode = signatureSettings.Nummer) {
-  return profileWarningMessages(profileValue, phoneMode)
+function insertedProfileWarningsHtml(
+  profileValue,
+  phoneMode = signatureSettings.Nummer,
+  ignoreMissingTitle = false,
+) {
+  return profileWarningMessages(profileValue, phoneMode, ignoreMissingTitle)
     .map((message) => `<p style="margin: 0 0 6px; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: #c00000; font-weight: bold;"><b>${escapeHtml(message)}</b></p>`)
     .join("");
 }
 
-function showProfileWarnings(profileValue, phoneMode = signatureSettings.Nummer) {
+function showProfileWarnings(
+  profileValue,
+  phoneMode = signatureSettings.Nummer,
+  ignoreMissingTitle = false,
+) {
   if (!profileLoaded) {
     profileWarningsElement.replaceChildren();
     profileWarningsElement.hidden = true;
     return;
   }
-  const messages = profileWarningMessages(profileValue, phoneMode);
+  const messages = profileWarningMessages(profileValue, phoneMode, ignoreMissingTitle);
   profileWarningsElement.replaceChildren(...messages.map((message) => {
     const paragraph = document.createElement("p");
     paragraph.textContent = message;
@@ -1077,14 +1086,18 @@ function buildSignature(templateHtml = signatureTemplate, settings = signatureSe
   const safeSignatureId = escapeHtml(signatureId);
   const marker = `<span id="attensam-signature-marker-${safeSignatureId}" data-attensam-signature-id="${safeSignatureId}" style="display:none!important;mso-hide:all;max-height:0;overflow:hidden;font-size:0;line-height:0;color:transparent;">${SIGNATURE_MARKER_TEXT}</span>`;
   const previewHtml = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2" data-attensam-signature-id="${safeSignatureId}">${marker}${signatureContent}</div>`;
-  const html = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2" data-attensam-signature-id="${safeSignatureId}">${marker}${insertedProfileWarningsHtml(signatureProfile, renderSettings.Nummer)}${signatureContent}</div>`;
-  return { html, previewHtml, signatureProfile, renderSettings };
+  const html = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2" data-attensam-signature-id="${safeSignatureId}">${marker}${insertedProfileWarningsHtml(signatureProfile, renderSettings.Nummer, sendAs)}${signatureContent}</div>`;
+  return { html, previewHtml, signatureProfile, renderSettings, ignoreMissingTitle: sendAs };
 }
 
 function renderSignature() {
   const result = buildSignature();
   previewElement.innerHTML = result.previewHtml;
-  showProfileWarnings(result.signatureProfile, result.renderSettings.Nummer);
+  showProfileWarnings(
+    result.signatureProfile,
+    result.renderSettings.Nummer,
+    result.ignoreMissingTitle,
+  );
   previewElement.querySelectorAll("img").forEach((image) => {
     if (!image.complete) image.addEventListener("load", scaleSignaturePreview, { once: true });
   });
@@ -1370,18 +1383,37 @@ async function loadDelegatedUser(fromDetails) {
     let user;
     if (response.ok) {
       user = await response.json();
-    } else {
+    }
+    if (!user) {
       const address = String(fromDetails.emailAddress || "").replaceAll("'", "''");
       const filter = `mail eq '${address}' or userPrincipalName eq '${address}'`;
       response = await fetch(
         `https://graph.microsoft.com/v1.0/users?$filter=${encodeURIComponent(filter)}&$select=${encodeURIComponent(select)}&$top=1`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
-      if (!response.ok) return fallback;
-      const result = await response.json();
-      user = result.value?.[0];
-      if (!user) return fallback;
+      if (response.ok) {
+        const result = await response.json();
+        user = result.value?.[0];
+      }
     }
+    if (!user) {
+      const address = String(fromDetails.emailAddress || "").replaceAll("'", "''");
+      const filter = `proxyAddresses/any(proxy:proxy eq 'smtp:${address}')`;
+      response = await fetch(
+        `https://graph.microsoft.com/v1.0/users?$filter=${encodeURIComponent(filter)}&$select=${encodeURIComponent(select)}&$count=true&$top=1`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            ConsistencyLevel: "eventual",
+          },
+        },
+      );
+      if (response.ok) {
+        const result = await response.json();
+        user = result.value?.[0];
+      }
+    }
+    if (!user) return fallback;
     return {
       displayName: user.displayName || fallback.displayName,
       id: user.id || "",
@@ -1413,16 +1445,6 @@ async function refreshDelegationForCurrentFrom() {
     normalizeEmail(Office.context.mailbox.userProfile.emailAddress),
   ].filter(Boolean));
   if (!fromEmail || ownEmails.has(fromEmail)) {
-    currentDelegation = null;
-    currentDelegationAddress = "";
-    return;
-  }
-  const fromDomain = emailDomain(fromEmail);
-  const ownDomains = new Set([
-    emailDomain(profile.email),
-    emailDomain(Office.context.mailbox.userProfile.emailAddress),
-  ].filter(Boolean));
-  if (!fromDomain || !ownDomains.has(fromDomain)) {
     currentDelegation = null;
     currentDelegationAddress = "";
     return;
