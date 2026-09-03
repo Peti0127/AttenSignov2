@@ -581,7 +581,8 @@ function readableError(error) {
 })(window);
 
 (function compactRoute(){
-  if (!(new URLSearchParams(window.location.search).get("view") !== "settings")) return;
+  const activeView = new URLSearchParams(window.location.search).get("view");
+  if (activeView === "settings" || activeView === "feedback") return;
 /* global Office, msal, SignaturePreferences */
 
 const CONFIG = ATTENSAM_CONFIG;
@@ -646,8 +647,6 @@ const setDefaultButton = document.getElementById("set-default-signature");
 const editCustomButton = document.getElementById("edit-custom-signature");
 const deleteCustomButton = document.getElementById("delete-custom-signature");
 const feedbackButton = document.getElementById("feedback-button");
-let feedbackDialog = null;
-let feedbackMailToken = "";
 
 const initialCachedVipState = SignaturePreferences.getVipAuthorizationState();
 if (initialCachedVipState !== null) {
@@ -664,6 +663,7 @@ function applyAccessView() {
   signatureMain.hidden = !accessAuthorized;
   taskpaneAccessDenied.hidden = accessAuthorized;
   mainSettingsLink.hidden = !accessAuthorized || vipAuthorized;
+  feedbackButton.hidden = !accessAuthorized;
   feedbackButton.disabled = !accessAuthorized || !profileLoaded;
   if (!accessAuthorized) setStatus("Sie haben kein Zugriff auf dieses Add-In, bitte EDV kontaktieren!");
 }
@@ -1533,121 +1533,21 @@ async function initialize() {
   }
 }
 
-function feedbackSenderName() {
-  return personalName(profile)
-    || Office.context.mailbox?.userProfile?.displayName
-    || Office.context.mailbox?.userProfile?.emailAddress
-    || "Unbekannter Benutzer";
-}
-
-function feedbackSubject(category) {
-  const sender = feedbackSenderName();
-  if (category === "Fehler") return `[ATS Signatures] Fehlermeldung von ${sender}`;
-  if (category === "Wünsche") return `[ATS Signatures] Wunsch von ${sender}`;
-  if (category === "Feedback") return `[ATS Signatures] Feedback von ${sender}`;
-  if (category === "Hilfe") return `[ATS Signatures] ${sender} braucht Hilfe`;
-  throw new Error("Ungültige Feedback-Kategorie.");
-}
-
-function closeFeedbackDialog() {
-  if (feedbackDialog) feedbackDialog.close();
-  feedbackDialog = null;
-  feedbackMailToken = "";
-  feedbackButton.disabled = !accessAuthorized || !profileLoaded;
-}
-
-function notifyFeedbackDialog(payload) {
-  if (typeof feedbackDialog?.messageChild === "function") {
-    feedbackDialog.messageChild(JSON.stringify(payload));
-    return true;
-  }
-  return false;
-}
-
-function reportFeedbackDialogError(message) {
-  if (notifyFeedbackDialog({ type: "feedback-result", success: false, message })) return;
-  closeFeedbackDialog();
-  setStatus(message);
-}
-
-async function handleFeedbackDialogMessage(event) {
-  let payload;
-  try {
-    payload = JSON.parse(String(event.message || ""));
-  } catch {
-    reportFeedbackDialogError("Ungültige Formulardaten.");
-    return;
-  }
-  if (payload?.type === "feedback-close") {
-    closeFeedbackDialog();
-    return;
-  }
-  if (payload?.type !== "feedback-submit") return;
-  const category = String(payload.category || "");
-  const message = String(payload.message || "").trim();
-  if (!["Fehler", "Wünsche", "Feedback", "Hilfe"].includes(category) || !message || message.length > 5000) {
-    reportFeedbackDialogError("Bitte Kategorie und Nachricht überprüfen.");
-    return;
-  }
-  try {
-    const token = feedbackMailToken || await acquireGraphToken(["Mail.Send"]);
-    const response = await fetch("https://graph.microsoft.com/v1.0/me/sendMail", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        message: {
-          subject: feedbackSubject(category),
-          body: { contentType: "Text", content: message },
-          toRecipients: [{ emailAddress: { address: ATTENSAM_CONFIG.feedbackEmail } }],
-        },
-        saveToSentItems: true,
-      }),
-    });
-    if (!response.ok) throw new Error(`Microsoft Graph: ${response.status}`);
-    closeFeedbackDialog();
-    setStatus("Feedback wurde erfolgreich gesendet.");
-  } catch (error) {
-    console.error("Feedback konnte nicht gesendet werden.", error);
-    feedbackMailToken = "";
-    reportFeedbackDialogError(`Feedback konnte nicht gesendet werden: ${readableError(error)}`);
-  }
-}
-
-async function openFeedbackDialog() {
-  if (!accessAuthorized || !profileLoaded || feedbackDialog) return;
+async function openFeedbackPage() {
+  if (!accessAuthorized || !profileLoaded) return;
   feedbackButton.disabled = true;
   setStatus("Feedback wird geöffnet …");
   try {
-    feedbackMailToken = await acquireGraphToken(["Mail.Send"]);
-    const feedbackUrl = new URL("feedback.html?v=0.8.33", window.location.href).href;
-    Office.context.ui.displayDialogAsync(
-      feedbackUrl,
-      { height: 65, width: 45, displayInIframe: true },
-      (result) => {
-        if (result.status !== Office.AsyncResultStatus.Succeeded) {
-          feedbackMailToken = "";
-          feedbackButton.disabled = false;
-          setStatus(result.error?.message || "Feedback konnte nicht geöffnet werden.");
-          return;
-        }
-        feedbackDialog = result.value;
-        feedbackDialog.addEventHandler(Office.EventType.DialogMessageReceived, handleFeedbackDialogMessage);
-        feedbackDialog.addEventHandler(Office.EventType.DialogEventReceived, closeFeedbackDialog);
-        setStatus("Feedback-Formular geöffnet.");
-      },
-    );
+    await acquireGraphToken(["User.Read", "Mail.Send"]);
+    window.location.href = "feedback.html?view=feedback&v=0.8.35";
   } catch (error) {
-    feedbackMailToken = "";
     feedbackButton.disabled = false;
     setStatus(`Feedback konnte nicht geöffnet werden: ${readableError(error)}`);
   }
 }
 
 signatureButton.addEventListener("click", () => insertSignature("standard"));
-feedbackButton.addEventListener("click", openFeedbackDialog);
+feedbackButton.addEventListener("click", openFeedbackPage);
 signatureButton.addEventListener("keydown", (event) => {
   if (event.key === "Enter" || event.key === " ") {
     event.preventDefault();
@@ -1739,7 +1639,7 @@ setDefaultButton.addEventListener("click", async () => {
 });
 openSignatureSettingsButton.addEventListener("click", () => {
   const signatureId = contextSignatureId || "standard";
-  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.33`;
+  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.35`;
 });
 editCustomButton.addEventListener("click", () => {
   const item = customSignatures.items.find((entry) => entry.id === contextSignatureId);
@@ -1777,6 +1677,169 @@ window.addEventListener("resize", scaleSignaturePreview);
 Office.onReady((info) => {
   if (info.host === Office.HostType.Outlook) initialize();
   else setStatus("Diese Seite muss als Outlook-Add-In geöffnet werden.");
+});
+
+})();
+
+(function feedbackRoute(){
+  if (new URLSearchParams(window.location.search).get("view") !== "feedback") return;
+/* global Office, msal, SignaturePreferences */
+
+const REQUIRED_ROLE = "ATS.Signature";
+const form = document.getElementById("feedback-form");
+const feedbackMain = document.getElementById("feedback-main");
+const feedbackAccessDenied = document.getElementById("feedback-access-denied");
+const categorySelect = document.getElementById("feedback-category");
+const messageInput = document.getElementById("feedback-message");
+const sendButton = document.getElementById("send-button");
+const feedbackStatus = document.getElementById("feedback-status");
+let feedbackMsalInstance;
+let senderName = "Unbekannter Benutzer";
+
+function setFeedbackStatus(message, isError = false) {
+  feedbackStatus.textContent = message;
+  feedbackStatus.classList.toggle("error", isError);
+}
+
+function setFeedbackControlsDisabled(disabled) {
+  categorySelect.disabled = disabled;
+  messageInput.disabled = disabled;
+  sendButton.disabled = disabled;
+}
+
+function authenticationRoles(result) {
+  let tokenClaims = {};
+  try {
+    const encoded = String(result?.idToken || "").split(".")[1];
+    if (encoded) {
+      const normalized = encoded.replace(/-/g, "+").replace(/_/g, "/");
+      tokenClaims = JSON.parse(atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=")));
+    }
+  } catch {
+    tokenClaims = {};
+  }
+  return new Set([
+    ...(Array.isArray(result?.idTokenClaims?.roles) ? result.idTokenClaims.roles : []),
+    ...(Array.isArray(result?.account?.idTokenClaims?.roles) ? result.account.idTokenClaims.roles : []),
+    ...(Array.isArray(tokenClaims?.roles) ? tokenClaims.roles : []),
+  ].map((role) => String(role).trim()).filter(Boolean));
+}
+
+async function acquireFeedbackToken() {
+  if (!hasConfiguredEntraApp()) {
+    throw new Error("Bitte Client-ID und Tenant-ID einmal im ATTENSAM_CONFIG-Block oben in taskpane.js eintragen.");
+  }
+  if (!Office.context.requirements.isSetSupported("NestedAppAuth", "1.1")) {
+    throw new Error("Dieser Outlook-Client unterstützt Nested App Authentication 1.1 nicht.");
+  }
+  if (!feedbackMsalInstance) {
+    const authority = ATTENSAM_CONFIG.tenantId.startsWith("https://")
+      ? ATTENSAM_CONFIG.tenantId
+      : `https://login.microsoftonline.com/${ATTENSAM_CONFIG.tenantId}`;
+    feedbackMsalInstance = await msal.createNestablePublicClientApplication({
+      auth: { clientId: ATTENSAM_CONFIG.clientId, authority },
+      cache: { cacheLocation: "localStorage" },
+    });
+  }
+  const request = { scopes: ["User.Read", "Mail.Send"] };
+  try {
+    return await feedbackMsalInstance.acquireTokenSilent(request);
+  } catch (error) {
+    if (!(error instanceof msal.InteractionRequiredAuthError)) throw error;
+    return feedbackMsalInstance.acquireTokenPopup(request);
+  }
+}
+
+function feedbackSubject(category) {
+  if (category === "Fehler") return `[ATS Signatures] Fehlermeldung von ${senderName}`;
+  if (category === "Wünsche") return `[ATS Signatures] Wunsch von ${senderName}`;
+  if (category === "Feedback") return `[ATS Signatures] Feedback von ${senderName}`;
+  if (category === "Hilfe") return `[ATS Signatures] ${senderName} braucht Hilfe`;
+  throw new Error("Ungültige Feedback-Kategorie.");
+}
+
+async function initializeFeedback() {
+  feedbackMain.hidden = true;
+  feedbackAccessDenied.hidden = true;
+  setFeedbackControlsDisabled(true);
+  setFeedbackStatus("App wird geladen...");
+  try {
+    const authentication = await acquireFeedbackToken();
+    const roles = authenticationRoles(authentication);
+    const accessAuthorized = roles.has(REQUIRED_ROLE);
+    SignaturePreferences.setAccessAuthorized(accessAuthorized);
+    feedbackMain.hidden = !accessAuthorized;
+    feedbackAccessDenied.hidden = accessAuthorized;
+    if (!accessAuthorized) {
+      setFeedbackStatus("Sie haben kein Zugriff auf dieses Add-In, bitte EDV kontaktieren!", true);
+      return;
+    }
+    const select = "givenName,surname,displayName,mail,userPrincipalName";
+    const response = await fetch(
+      `https://graph.microsoft.com/v1.0/me?$select=${encodeURIComponent(select)}`,
+      { headers: { Authorization: `Bearer ${authentication.accessToken}` } },
+    );
+    if (!response.ok) throw new Error(`Microsoft Graph: ${response.status}`);
+    const user = await response.json();
+    senderName = [user.givenName, user.surname].map((value) => String(value || "").trim()).filter(Boolean).join(" ")
+      || user.displayName
+      || user.mail
+      || user.userPrincipalName
+      || Office.context.mailbox?.userProfile?.displayName
+      || Office.context.mailbox?.userProfile?.emailAddress
+      || senderName;
+    setFeedbackControlsDisabled(false);
+    setFeedbackStatus("Feedback-Formular ist bereit.");
+  } catch (error) {
+    feedbackMain.hidden = false;
+    setFeedbackControlsDisabled(true);
+    setFeedbackStatus(`Feedback konnte nicht geladen werden: ${readableError(error)}`, true);
+  }
+}
+
+form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const category = String(categorySelect.value || "");
+  const message = String(messageInput.value || "").trim();
+  if (!["Fehler", "Wünsche", "Feedback", "Hilfe"].includes(category) || !message || message.length > 5000) {
+    setFeedbackStatus("Bitte Kategorie und Nachricht überprüfen.", true);
+    return;
+  }
+  setFeedbackControlsDisabled(true);
+  setFeedbackStatus("E-Mail wird gesendet …");
+  try {
+    const authentication = await acquireFeedbackToken();
+    if (!authenticationRoles(authentication).has(REQUIRED_ROLE)) {
+      throw new Error("Sie haben kein Zugriff auf dieses Add-In, bitte EDV kontaktieren!");
+    }
+    const response = await fetch("https://graph.microsoft.com/v1.0/me/sendMail", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${authentication.accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message: {
+          subject: feedbackSubject(category),
+          body: { contentType: "Text", content: message },
+          toRecipients: [{ emailAddress: { address: ATTENSAM_CONFIG.feedbackEmail } }],
+        },
+        saveToSentItems: true,
+      }),
+    });
+    if (!response.ok) throw new Error(`Microsoft Graph: ${response.status}`);
+    messageInput.value = "";
+    setFeedbackStatus("Feedback wurde erfolgreich gesendet.");
+  } catch (error) {
+    setFeedbackStatus(`Feedback konnte nicht gesendet werden: ${readableError(error)}`, true);
+  } finally {
+    setFeedbackControlsDisabled(false);
+  }
+});
+
+Office.onReady((info) => {
+  if (info.host === Office.HostType.Outlook) initializeFeedback();
+  else setFeedbackStatus("Diese Seite muss als Outlook-Add-In geöffnet werden.", true);
 });
 
 })();
