@@ -587,6 +587,7 @@ function readableError(error) {
 
 const CONFIG = ATTENSAM_CONFIG;
 const AUTO_RENDER_DATA_KEY = "attensam.signature.render-data.v1";
+const DELEGATED_PROFILE_LOCAL_CACHE_KEY = "attensam.signature.delegated-profiles.v1";
 const REQUIRED_ROLE = "ATS.Signature";
 const VIP_ROLE = "ATS.Signature.VIP";
 const CITY_CHANGE_ROLE = "CityChange";
@@ -1168,6 +1169,27 @@ function mergedDelegatedProfiles(existingProfiles, delegation, fromAddress, upda
   );
 }
 
+function saveCurrentDelegationLocally() {
+  if (!currentDelegation?.id || !currentDelegationAddress) return;
+  try {
+    const existingRecord = JSON.parse(localStorage.getItem(DELEGATED_PROFILE_LOCAL_CACHE_KEY) || "null");
+    const sameOwner = !existingRecord?.ownerId || !profile.id || existingRecord.ownerId === profile.id;
+    const existingProfiles = sameOwner ? existingRecord?.profiles : null;
+    localStorage.setItem(DELEGATED_PROFILE_LOCAL_CACHE_KEY, JSON.stringify({
+      ownerId: profile.id || "",
+      ownerMailbox: normalizeEmail(Office.context.mailbox?.userProfile?.emailAddress || profile.email),
+      profiles: mergedDelegatedProfiles(
+        existingProfiles,
+        currentDelegation,
+        currentDelegationAddress,
+        new Date().toISOString(),
+      ),
+    }));
+  } catch (error) {
+    console.warn("Das lokale Absenderprofil konnte nicht zwischengespeichert werden.", error);
+  }
+}
+
 async function saveCurrentDelegationCache() {
   if (!profileLoaded || !currentDelegation?.id || !currentDelegationAddress) return;
   const roamingSettings = Office.context.roamingSettings;
@@ -1420,6 +1442,7 @@ async function refreshDelegationForCurrentFrom() {
     return;
   }
   currentDelegationAddress = fromEmail;
+  saveCurrentDelegationLocally();
   if (profileLoaded) {
     try {
       await saveCurrentDelegationCache();
@@ -1605,7 +1628,7 @@ async function openFeedbackPage() {
   setStatus("Feedback wird geöffnet …");
   try {
     await acquireGraphToken(["User.Read", "Mail.Send"]);
-    window.location.href = "feedback.html?view=feedback&v=0.8.38";
+    window.location.href = "feedback.html?view=feedback&v=0.8.39";
   } catch (error) {
     feedbackButton.disabled = false;
     setStatus(`Feedback konnte nicht geöffnet werden: ${readableError(error)}`);
@@ -1705,7 +1728,7 @@ setDefaultButton.addEventListener("click", async () => {
 });
 openSignatureSettingsButton.addEventListener("click", () => {
   const signatureId = contextSignatureId || "standard";
-  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.38`;
+  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.39`;
 });
 editCustomButton.addEventListener("click", () => {
   const item = customSignatures.items.find((entry) => entry.id === contextSignatureId);

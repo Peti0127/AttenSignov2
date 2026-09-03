@@ -148,11 +148,12 @@
   (*! @azure/msal-browser v5.18.0 2026-08-04 *)
 */
 
-/* Attensam v0.8.38 signature-specific settings extension. */
+/* Attensam v0.8.39 signature-specific settings extension. */
 (function enableVipCustomSignatures() {
   const CUSTOM_KEY = "attensam.signature.custom-signatures.v1";
   const SETTINGS_KEY = "attensam.signature.settings.v2";
   const RENDER_KEY = "attensam.signature.render-data.v1";
+  const DELEGATED_LOCAL_CACHE_KEY = "attensam.signature.delegated-profiles.v1";
   const VIP_ROLE = "ATS.Signature.VIP";
   const EXCLUDED_SUBJECT_PREFIX = "Ihre Objektinformation - ";
   const PROFILE_CACHE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
@@ -196,14 +197,27 @@
   }
 
   function cachedDelegation(renderData, address) {
-    const entry = renderData?.delegatedProfiles?.[normalizedEmail(address)];
+    const normalizedAddress = normalizedEmail(address);
+    let localEntry = null;
+    try {
+      if (typeof localStorage !== "undefined") {
+        const localRecord = JSON.parse(localStorage.getItem(DELEGATED_LOCAL_CACHE_KEY) || "null");
+        const ownerMatches = !localRecord?.ownerId
+          || !renderData?.profile?.id
+          || localRecord.ownerId === renderData.profile.id;
+        if (ownerMatches) localEntry = localRecord?.profiles?.[normalizedAddress] || null;
+      }
+    } catch (error) {
+      console.warn("Der lokale Cache für Absenderprofile konnte nicht gelesen werden.", error);
+    }
+    const entry = localEntry || renderData?.delegatedProfiles?.[normalizedAddress];
     const cachedAt = Date.parse(entry?.updatedAt || "");
     if (!entry?.profile?.id || !Number.isFinite(cachedAt)) return null;
     if (Date.now() - cachedAt > PROFILE_CACHE_MAX_AGE_MS) return null;
     return usableDelegation(entry.profile);
   }
 
-  function resolveCachedDelegation(renderData, callback) {
+  function resolveCachedDelegation(renderData, callback, attempt = 0) {
     const from = Office.context.mailbox?.item?.from;
     if (typeof from?.getAsync !== "function") {
       callback(null);
@@ -211,14 +225,28 @@
     }
     from.getAsync((result) => {
       if (result.status !== Office.AsyncResultStatus.Succeeded) {
-        callback(null);
+        if (isWindowsPc() && attempt < 5) {
+          setTimeout(() => resolveCachedDelegation(renderData, callback, attempt + 1), 400);
+        } else {
+          callback(null);
+        }
         return;
       }
       const address = normalizedEmail(result.value?.emailAddress);
       const ownAddresses = [renderData?.mailboxEmail, renderData?.profile?.email]
         .map(normalizedEmail)
         .filter(Boolean);
-      callback(address && !ownAddresses.includes(address) ? cachedDelegation(renderData, address) : null);
+      const cached = address && !ownAddresses.includes(address)
+        ? cachedDelegation(renderData, address)
+        : null;
+      if (cached || !isWindowsPc() || attempt >= 5) {
+        callback(cached);
+        return;
+      }
+      setTimeout(() => {
+        const refreshedRenderData = Office.context.roamingSettings?.get(RENDER_KEY) || renderData;
+        resolveCachedDelegation(refreshedRenderData, callback, attempt + 1);
+      }, 400);
     });
   }
 
