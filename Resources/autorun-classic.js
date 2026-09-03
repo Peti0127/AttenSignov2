@@ -148,7 +148,7 @@
   (*! @azure/msal-browser v5.18.0 2026-08-04 *)
 */
 
-/* Attensam v0.8.39 signature-specific settings extension. */
+/* Attensam signature-specific settings extension. */
 (function enableVipCustomSignatures() {
   const CUSTOM_KEY = "attensam.signature.custom-signatures.v1";
   const SETTINGS_KEY = "attensam.signature.settings.v2";
@@ -187,9 +187,10 @@
 
   function usableDelegation(delegation) {
     if (!delegation) return null;
+    const hasFirstName = Boolean(String(delegation.firstName || "").trim());
     const hasLastName = Boolean(String(delegation.lastName || "").trim());
     const hasDepartment = Boolean(String(delegation.department || "").trim());
-    return hasLastName || hasDepartment ? delegation : null;
+    return hasFirstName || hasLastName || hasDepartment ? delegation : null;
   }
 
   function normalizedEmail(value) {

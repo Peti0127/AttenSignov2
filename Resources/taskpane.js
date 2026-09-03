@@ -1429,6 +1429,8 @@ async function refreshDelegationForCurrentFrom() {
   }
   currentDelegation = await loadDelegatedUser(fromDetails);
   if (
+    !String(currentDelegation.firstName || "").trim()
+    &&
     !String(currentDelegation.lastName || "").trim()
     && !String(currentDelegation.department || "").trim()
   ) {
@@ -1628,7 +1630,7 @@ async function openFeedbackPage() {
   setStatus("Feedback wird geöffnet …");
   try {
     await acquireGraphToken(["User.Read", "Mail.Send"]);
-    window.location.href = "feedback.html?view=feedback&v=0.8.39";
+    window.location.href = "feedback.html?view=feedback";
   } catch (error) {
     feedbackButton.disabled = false;
     setStatus(`Feedback konnte nicht geöffnet werden: ${readableError(error)}`);
@@ -1728,7 +1730,7 @@ setDefaultButton.addEventListener("click", async () => {
 });
 openSignatureSettingsButton.addEventListener("click", () => {
   const signatureId = contextSignatureId || "standard";
-  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.39`;
+  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}`;
 });
 editCustomButton.addEventListener("click", () => {
   const item = customSignatures.items.find((entry) => entry.id === contextSignatureId);
