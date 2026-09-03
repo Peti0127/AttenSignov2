@@ -148,7 +148,7 @@
   (*! @azure/msal-browser v5.18.0 2026-08-04 *)
 */
 
-/* Attensam v0.8.31 signature-specific settings extension. */
+/* Attensam v0.8.32 signature-specific settings extension. */
 (function enableVipCustomSignatures() {
   const CUSTOM_KEY = "attensam.signature.custom-signatures.v1";
   const SETTINGS_KEY = "attensam.signature.settings.v2";
@@ -255,17 +255,29 @@
     }
   }
 
-  function insert(event, settings, renderData, customRecord) {
+  function insert(event, settings, renderData, customRecord, replaceExisting = false) {
     disableNativeMobileSignature(() => {
       runtime.resolveDelegation(renderData, (delegation) => {
         try {
           const verifiedDelegation = delegation?.id ? delegation : null;
           const html = renderSignature(renderData, settings, verifiedDelegation, customRecord);
-          Office.context.mailbox.item.body.setSignatureAsync(
-            html,
-            { coercionType: Office.CoercionType.Html },
-            () => completed(event),
-          );
+          const body = Office.context.mailbox.item.body;
+          const applySignature = () => {
+            body.setSignatureAsync(
+              html,
+              { coercionType: Office.CoercionType.Html },
+              () => completed(event),
+            );
+          };
+          if (replaceExisting && isWindowsPc()) {
+            body.setSignatureAsync(
+              "",
+              { coercionType: Office.CoercionType.Html },
+              applySignature,
+            );
+          } else {
+            applySignature();
+          }
         } catch (error) {
           console.error("Benutzerdefinierte Standardsignatur konnte nicht eingefügt werden.", error);
           completed(event);
@@ -394,7 +406,7 @@
     };
   }
 
-  function continueAutomaticInsertion(event) {
+  function continueAutomaticInsertion(event, replaceExisting = false) {
     try {
       const roamingSettings = Office.context.roamingSettings;
       const renderData = roamingSettings.get(RENDER_KEY);
@@ -413,16 +425,16 @@
         const skipInternalOnly = settings.SkipInternalOnly === true
           || settings.InternalRecipientsOnly === true;
         if (!skipInternalOnly) {
-          insert(event, settings, renderData, customRecord);
+          insert(event, settings, renderData, customRecord, replaceExisting);
           return;
         }
         if (composeType === "newMail" && settings.SkipInternalOnNewMail !== true) {
-          insert(event, settings, renderData, customRecord);
+          insert(event, settings, renderData, customRecord, replaceExisting);
           return;
         }
         hasOnlyInternalRecipients(renderData, (onlyInternal) => {
           if (onlyInternal) clearSignature(event);
-          else insert(event, settings, renderData, customRecord);
+          else insert(event, settings, renderData, customRecord, replaceExisting);
         });
       });
     } catch (error) {
@@ -443,6 +455,18 @@
     }
   }
 
+  function handleFromChanged(event) {
+    try {
+      subjectExcludesSignature((excluded) => {
+        if (excluded) clearSignature(event);
+        else continueAutomaticInsertion(event, true);
+      });
+    } catch (error) {
+      console.error("Die Signatur konnte nach dem Absenderwechsel nicht ersetzt werden.", error);
+      continueAutomaticInsertion(event, true);
+    }
+  }
+
   function removeSignatureForObjectInformation(event) {
     try {
       subjectExcludesSignature((excluded) => {
@@ -457,7 +481,7 @@
 
   if (Office.actions?.associate) {
     Office.actions.associate("autoInsertSignature", handleAutomaticInsertion);
-    Office.actions.associate("updateSignatureForFrom", handleAutomaticInsertion);
+    Office.actions.associate("updateSignatureForFrom", handleFromChanged);
     Office.actions.associate("updateSignatureForRecipients", handleAutomaticInsertion);
     Office.actions.associate("removeSignatureForObjectInformation", removeSignatureForObjectInformation);
   }
