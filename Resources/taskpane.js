@@ -1539,7 +1539,7 @@ async function openFeedbackPage() {
   setStatus("Feedback wird geöffnet …");
   try {
     await acquireGraphToken(["User.Read", "Mail.Send"]);
-    window.location.href = "feedback.html?view=feedback&v=0.8.35";
+    window.location.href = "feedback.html?view=feedback&v=0.8.37";
   } catch (error) {
     feedbackButton.disabled = false;
     setStatus(`Feedback konnte nicht geöffnet werden: ${readableError(error)}`);
@@ -1639,7 +1639,7 @@ setDefaultButton.addEventListener("click", async () => {
 });
 openSignatureSettingsButton.addEventListener("click", () => {
   const signatureId = contextSignatureId || "standard";
-  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.35`;
+  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.37`;
 });
 editCustomButton.addEventListener("click", () => {
   const item = customSignatures.items.find((entry) => entry.id === contextSignatureId);
@@ -1807,6 +1807,7 @@ form.addEventListener("submit", async (event) => {
   }
   setFeedbackControlsDisabled(true);
   setFeedbackStatus("E-Mail wird gesendet …");
+  let sent = false;
   try {
     const authentication = await acquireFeedbackToken();
     if (!authenticationRoles(authentication).has(REQUIRED_ROLE)) {
@@ -1828,12 +1829,19 @@ form.addEventListener("submit", async (event) => {
       }),
     });
     if (!response.ok) throw new Error(`Microsoft Graph: ${response.status}`);
+    sent = true;
     messageInput.value = "";
+    sendButton.textContent = "Gesendet ✅";
     setFeedbackStatus("Feedback wurde erfolgreich gesendet.");
+    window.setTimeout(() => {
+      sendButton.textContent = "E-Mail senden";
+      setFeedbackControlsDisabled(false);
+      setFeedbackStatus("Feedback-Formular ist bereit.");
+    }, 3000);
   } catch (error) {
     setFeedbackStatus(`Feedback konnte nicht gesendet werden: ${readableError(error)}`, true);
   } finally {
-    setFeedbackControlsDisabled(false);
+    if (!sent) setFeedbackControlsDisabled(false);
   }
 });
 
