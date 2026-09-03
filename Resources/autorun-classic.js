@@ -148,7 +148,7 @@
   (*! @azure/msal-browser v5.18.0 2026-08-04 *)
 */
 
-/* Attensam v0.8.32 signature-specific settings extension. */
+/* Attensam v0.8.33 signature-specific settings extension. */
 (function enableVipCustomSignatures() {
   const CUSTOM_KEY = "attensam.signature.custom-signatures.v1";
   const SETTINGS_KEY = "attensam.signature.settings.v2";
@@ -184,8 +184,20 @@
     );
   }
 
+  function usableDelegation(delegation) {
+    if (!delegation) return null;
+    const hasLastName = Boolean(String(delegation.lastName || "").trim());
+    const hasDepartment = Boolean(String(delegation.department || "").trim());
+    return hasLastName || hasDepartment ? delegation : null;
+  }
+
+  function resolveDelegation(renderData, callback) {
+    runtime.resolveDelegation(renderData, (delegation) => callback(usableDelegation(delegation)));
+  }
+
   function renderSignature(renderData, settings, delegation, customRecord, requestedId) {
     if (renderData?.accessAuthorized !== true) return "";
+    delegation = usableDelegation(delegation);
     const custom = selectedCustom(customRecord, requestedId);
     const activeSettings = custom?.settings || settings;
     const address = renderData?.cityChangeAuthorized === true
@@ -205,7 +217,7 @@
 
   window.AttensamSignatureRuntime = Object.freeze({
     renderSignature,
-    resolveDelegation: runtime.resolveDelegation,
+    resolveDelegation,
   });
 
   function completed(event, allowSend = false) {
@@ -257,7 +269,7 @@
 
   function insert(event, settings, renderData, customRecord, replaceExisting = false) {
     disableNativeMobileSignature(() => {
-      runtime.resolveDelegation(renderData, (delegation) => {
+      resolveDelegation(renderData, (delegation) => {
         try {
           const verifiedDelegation = delegation?.id ? delegation : null;
           const html = renderSignature(renderData, settings, verifiedDelegation, customRecord);

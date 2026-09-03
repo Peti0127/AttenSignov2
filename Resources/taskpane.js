@@ -3,6 +3,7 @@ const ATTENSAM_CONFIG = Object.freeze({
   clientId: "89659501-37e7-4916-abeb-4dc5178e3034",
   tenantId: "https://login.microsoftonline.com/1333c2c2-fdf6-4fdc-8559-3dc12559d264",
   officeNumber: "05 7999 100",
+  feedbackEmail: "pnov@attensam.at",
 });
 
 function hasConfiguredEntraApp() {
@@ -644,6 +645,9 @@ const openSignatureSettingsButton = document.getElementById("open-signature-sett
 const setDefaultButton = document.getElementById("set-default-signature");
 const editCustomButton = document.getElementById("edit-custom-signature");
 const deleteCustomButton = document.getElementById("delete-custom-signature");
+const feedbackButton = document.getElementById("feedback-button");
+let feedbackDialog = null;
+let feedbackMailToken = "";
 
 const initialCachedVipState = SignaturePreferences.getVipAuthorizationState();
 if (initialCachedVipState !== null) {
@@ -660,6 +664,7 @@ function applyAccessView() {
   signatureMain.hidden = !accessAuthorized;
   taskpaneAccessDenied.hidden = accessAuthorized;
   mainSettingsLink.hidden = !accessAuthorized || vipAuthorized;
+  feedbackButton.disabled = !accessAuthorized || !profileLoaded;
   if (!accessAuthorized) setStatus("Sie haben kein Zugriff auf dieses Add-In, bitte EDV kontaktieren!");
 }
 
@@ -1174,6 +1179,7 @@ async function saveAutoRenderData() {
 
 function showProfile() {
   renderSignature();
+  feedbackButton.disabled = !accessAuthorized || !profileLoaded;
 }
 
 function applyMailboxBasics() {
@@ -1348,6 +1354,13 @@ async function refreshDelegationForCurrentFrom() {
     return;
   }
   currentDelegation = await loadDelegatedUser(fromDetails);
+  if (
+    !String(currentDelegation.lastName || "").trim()
+    && !String(currentDelegation.department || "").trim()
+  ) {
+    currentDelegation = null;
+    return;
+  }
   if (currentDelegation.id && profile.id && currentDelegation.id === profile.id) {
     currentDelegation = null;
   }
@@ -1520,7 +1533,121 @@ async function initialize() {
   }
 }
 
+function feedbackSenderName() {
+  return personalName(profile)
+    || Office.context.mailbox?.userProfile?.displayName
+    || Office.context.mailbox?.userProfile?.emailAddress
+    || "Unbekannter Benutzer";
+}
+
+function feedbackSubject(category) {
+  const sender = feedbackSenderName();
+  if (category === "Fehler") return `[ATS Signatures] Fehlermeldung von ${sender}`;
+  if (category === "Wünsche") return `[ATS Signatures] Wunsch von ${sender}`;
+  if (category === "Feedback") return `[ATS Signatures] Feedback von ${sender}`;
+  if (category === "Hilfe") return `[ATS Signatures] ${sender} braucht Hilfe`;
+  throw new Error("Ungültige Feedback-Kategorie.");
+}
+
+function closeFeedbackDialog() {
+  if (feedbackDialog) feedbackDialog.close();
+  feedbackDialog = null;
+  feedbackMailToken = "";
+  feedbackButton.disabled = !accessAuthorized || !profileLoaded;
+}
+
+function notifyFeedbackDialog(payload) {
+  if (typeof feedbackDialog?.messageChild === "function") {
+    feedbackDialog.messageChild(JSON.stringify(payload));
+    return true;
+  }
+  return false;
+}
+
+function reportFeedbackDialogError(message) {
+  if (notifyFeedbackDialog({ type: "feedback-result", success: false, message })) return;
+  closeFeedbackDialog();
+  setStatus(message);
+}
+
+async function handleFeedbackDialogMessage(event) {
+  let payload;
+  try {
+    payload = JSON.parse(String(event.message || ""));
+  } catch {
+    reportFeedbackDialogError("Ungültige Formulardaten.");
+    return;
+  }
+  if (payload?.type === "feedback-close") {
+    closeFeedbackDialog();
+    return;
+  }
+  if (payload?.type !== "feedback-submit") return;
+  const category = String(payload.category || "");
+  const message = String(payload.message || "").trim();
+  if (!["Fehler", "Wünsche", "Feedback", "Hilfe"].includes(category) || !message || message.length > 5000) {
+    reportFeedbackDialogError("Bitte Kategorie und Nachricht überprüfen.");
+    return;
+  }
+  try {
+    const token = feedbackMailToken || await acquireGraphToken(["Mail.Send"]);
+    const response = await fetch("https://graph.microsoft.com/v1.0/me/sendMail", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message: {
+          subject: feedbackSubject(category),
+          body: { contentType: "Text", content: message },
+          toRecipients: [{ emailAddress: { address: ATTENSAM_CONFIG.feedbackEmail } }],
+        },
+        saveToSentItems: true,
+      }),
+    });
+    if (!response.ok) throw new Error(`Microsoft Graph: ${response.status}`);
+    closeFeedbackDialog();
+    setStatus("Feedback wurde erfolgreich gesendet.");
+  } catch (error) {
+    console.error("Feedback konnte nicht gesendet werden.", error);
+    feedbackMailToken = "";
+    reportFeedbackDialogError(`Feedback konnte nicht gesendet werden: ${readableError(error)}`);
+  }
+}
+
+async function openFeedbackDialog() {
+  if (!accessAuthorized || !profileLoaded || feedbackDialog) return;
+  feedbackButton.disabled = true;
+  setStatus("Feedback wird geöffnet …");
+  try {
+    feedbackMailToken = await acquireGraphToken(["Mail.Send"]);
+    const feedbackUrl = new URL("feedback.html?v=0.8.33", window.location.href).href;
+    Office.context.ui.displayDialogAsync(
+      feedbackUrl,
+      { height: 65, width: 45, displayInIframe: true },
+      (result) => {
+        if (result.status !== Office.AsyncResultStatus.Succeeded) {
+          feedbackMailToken = "";
+          feedbackButton.disabled = false;
+          setStatus(result.error?.message || "Feedback konnte nicht geöffnet werden.");
+          return;
+        }
+        feedbackDialog = result.value;
+        feedbackDialog.addEventHandler(Office.EventType.DialogMessageReceived, handleFeedbackDialogMessage);
+        feedbackDialog.addEventHandler(Office.EventType.DialogEventReceived, closeFeedbackDialog);
+        setStatus("Feedback-Formular geöffnet.");
+      },
+    );
+  } catch (error) {
+    feedbackMailToken = "";
+    feedbackButton.disabled = false;
+    setStatus(`Feedback konnte nicht geöffnet werden: ${readableError(error)}`);
+  }
+}
+
 signatureButton.addEventListener("click", () => insertSignature("standard"));
+feedbackButton.addEventListener("click", openFeedbackDialog);
 signatureButton.addEventListener("keydown", (event) => {
   if (event.key === "Enter" || event.key === " ") {
     event.preventDefault();
@@ -1612,7 +1739,7 @@ setDefaultButton.addEventListener("click", async () => {
 });
 openSignatureSettingsButton.addEventListener("click", () => {
   const signatureId = contextSignatureId || "standard";
-  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.32`;
+  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.33`;
 });
 editCustomButton.addEventListener("click", () => {
   const item = customSignatures.items.find((entry) => entry.id === contextSignatureId);
