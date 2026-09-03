@@ -1,9 +1,9 @@
 /* Attensam compact UI bundle. Generated from the tested UI modules. */
 const ATTENSAM_CONFIG = Object.freeze({
-  clientId: "89659501-37e7-4916-abeb-4dc5178e3034",
-  tenantId: "https://login.microsoftonline.com/1333c2c2-fdf6-4fdc-8559-3dc12559d264",
-  officeNumber: "05 7999 100",
-  feedbackEmail: "pnov@attensam.at",
+  clientId: "asd",
+  tenantId: "https://login.microsoftonline.com/asd",
+  officeNumber: "YOUR_FIXED_OFFICE_NUMBER",
+  feedbackEmail: "asd@asd.asd",
 });
 
 function hasConfiguredEntraApp() {
@@ -606,6 +606,7 @@ let msalInstance;
 let profileLoaded = false;
 let usingCachedProfile = false;
 let currentDelegation = null;
+let currentDelegationAddress = "";
 let userRoles = new Set();
 let accessAuthorized = false;
 let vipAuthorized = false;
@@ -1149,10 +1150,52 @@ function closeSignatureMenu() {
   contextMenu.hidden = true;
 }
 
+function mergedDelegatedProfiles(existingProfiles, delegation, fromAddress, updatedAt) {
+  const validAfter = Date.now() - (14 * 24 * 60 * 60 * 1000);
+  const entries = Object.entries(existingProfiles || {}).filter(([, entry]) => {
+    const cachedAt = Date.parse(entry?.updatedAt || "");
+    return entry?.profile?.id && Number.isFinite(cachedAt) && cachedAt >= validAfter;
+  });
+  const result = Object.fromEntries(entries);
+  const address = normalizeEmail(fromAddress);
+  if (address && delegation?.id) {
+    result[address] = { profile: { ...delegation }, updatedAt };
+  }
+  return Object.fromEntries(
+    Object.entries(result)
+      .sort((left, right) => Date.parse(right[1].updatedAt || "") - Date.parse(left[1].updatedAt || ""))
+      .slice(0, 6),
+  );
+}
+
+async function saveCurrentDelegationCache() {
+  if (!profileLoaded || !currentDelegation?.id || !currentDelegationAddress) return;
+  const roamingSettings = Office.context.roamingSettings;
+  const renderData = roamingSettings?.get(AUTO_RENDER_DATA_KEY);
+  if (!roamingSettings || !renderData) return;
+  const updatedAt = new Date().toISOString();
+  roamingSettings.set(AUTO_RENDER_DATA_KEY, {
+    ...renderData,
+    delegatedProfiles: mergedDelegatedProfiles(
+      renderData.delegatedProfiles,
+      currentDelegation,
+      currentDelegationAddress,
+      updatedAt,
+    ),
+  });
+  await new Promise((resolve, reject) => {
+    roamingSettings.saveAsync((result) => {
+      if (result.status === Office.AsyncResultStatus.Succeeded) resolve();
+      else reject(new Error(result.error?.message || "Absenderprofil konnte nicht zwischengespeichert werden."));
+    });
+  });
+}
+
 async function saveAutoRenderData() {
   const roamingSettings = Office.context.roamingSettings;
   if (!roamingSettings || !signatureTemplate || !profileLoaded) return;
   const cachedAt = new Date().toISOString();
+  const existingRenderData = roamingSettings.get(AUTO_RENDER_DATA_KEY);
   roamingSettings.set(AUTO_RENDER_DATA_KEY, {
     profile: { ...profile },
     mailboxEmail: Office.context.mailbox.userProfile?.emailAddress || profile.email,
@@ -1166,6 +1209,12 @@ async function saveAutoRenderData() {
       clientId: CONFIG.clientId,
       tenantId: CONFIG.tenantId,
     },
+    delegatedProfiles: mergedDelegatedProfiles(
+      existingRenderData?.delegatedProfiles,
+      currentDelegation,
+      currentDelegationAddress,
+      cachedAt,
+    ),
     profileUpdatedAt: cachedAt,
     updatedAt: cachedAt,
   });
@@ -1213,6 +1262,7 @@ async function restoreCachedProfile() {
     ? await SignaturePreferences.getCustomSignatures()
     : { requiredRole: VIP_ROLE, defaultId: "standard", items: [] };
   currentDelegation = null;
+  currentDelegationAddress = "";
   usingCachedProfile = true;
   profileLoaded = true;
   showProfile();
@@ -1342,6 +1392,7 @@ async function refreshDelegationForCurrentFrom() {
   ].filter(Boolean));
   if (!fromEmail || ownEmails.has(fromEmail)) {
     currentDelegation = null;
+    currentDelegationAddress = "";
     return;
   }
   const fromDomain = emailDomain(fromEmail);
@@ -1351,6 +1402,7 @@ async function refreshDelegationForCurrentFrom() {
   ].filter(Boolean));
   if (!fromDomain || !ownDomains.has(fromDomain)) {
     currentDelegation = null;
+    currentDelegationAddress = "";
     return;
   }
   currentDelegation = await loadDelegatedUser(fromDetails);
@@ -1359,10 +1411,21 @@ async function refreshDelegationForCurrentFrom() {
     && !String(currentDelegation.department || "").trim()
   ) {
     currentDelegation = null;
+    currentDelegationAddress = "";
     return;
   }
   if (currentDelegation.id && profile.id && currentDelegation.id === profile.id) {
     currentDelegation = null;
+    currentDelegationAddress = "";
+    return;
+  }
+  currentDelegationAddress = fromEmail;
+  if (profileLoaded) {
+    try {
+      await saveCurrentDelegationCache();
+    } catch (error) {
+      console.warn("Das Profil der abweichenden Absenderadresse konnte nicht zwischengespeichert werden.", error);
+    }
   }
 }
 
@@ -1485,7 +1548,10 @@ async function insertSignature(customId = "standard") {
     setStatus("Für diese Objektinformation wird keine Signatur eingefügt.");
     return;
   }
-  if (usingCachedProfile) currentDelegation = null;
+  if (usingCachedProfile) {
+    currentDelegation = null;
+    currentDelegationAddress = "";
+  }
   else await refreshDelegationForCurrentFrom();
   const item = vipAuthorized && customId !== "standard"
     ? customSignatures.items.find((entry) => entry.id === customId)
@@ -1539,7 +1605,7 @@ async function openFeedbackPage() {
   setStatus("Feedback wird geöffnet …");
   try {
     await acquireGraphToken(["User.Read", "Mail.Send"]);
-    window.location.href = "feedback.html?view=feedback&v=0.8.37";
+    window.location.href = "feedback.html?view=feedback&v=0.8.38";
   } catch (error) {
     feedbackButton.disabled = false;
     setStatus(`Feedback konnte nicht geöffnet werden: ${readableError(error)}`);
@@ -1639,7 +1705,7 @@ setDefaultButton.addEventListener("click", async () => {
 });
 openSignatureSettingsButton.addEventListener("click", () => {
   const signatureId = contextSignatureId || "standard";
-  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.37`;
+  window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}&v=0.8.38`;
 });
 editCustomButton.addEventListener("click", () => {
   const item = customSignatures.items.find((entry) => entry.id === contextSignatureId);

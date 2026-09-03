@@ -148,7 +148,7 @@
   (*! @azure/msal-browser v5.18.0 2026-08-04 *)
 */
 
-/* Attensam v0.8.37 signature-specific settings extension. */
+/* Attensam v0.8.38 signature-specific settings extension. */
 (function enableVipCustomSignatures() {
   const CUSTOM_KEY = "attensam.signature.custom-signatures.v1";
   const SETTINGS_KEY = "attensam.signature.settings.v2";
@@ -191,8 +191,46 @@
     return hasLastName || hasDepartment ? delegation : null;
   }
 
+  function normalizedEmail(value) {
+    return String(value || "").trim().toLocaleLowerCase("de-AT");
+  }
+
+  function cachedDelegation(renderData, address) {
+    const entry = renderData?.delegatedProfiles?.[normalizedEmail(address)];
+    const cachedAt = Date.parse(entry?.updatedAt || "");
+    if (!entry?.profile?.id || !Number.isFinite(cachedAt)) return null;
+    if (Date.now() - cachedAt > PROFILE_CACHE_MAX_AGE_MS) return null;
+    return usableDelegation(entry.profile);
+  }
+
+  function resolveCachedDelegation(renderData, callback) {
+    const from = Office.context.mailbox?.item?.from;
+    if (typeof from?.getAsync !== "function") {
+      callback(null);
+      return;
+    }
+    from.getAsync((result) => {
+      if (result.status !== Office.AsyncResultStatus.Succeeded) {
+        callback(null);
+        return;
+      }
+      const address = normalizedEmail(result.value?.emailAddress);
+      const ownAddresses = [renderData?.mailboxEmail, renderData?.profile?.email]
+        .map(normalizedEmail)
+        .filter(Boolean);
+      callback(address && !ownAddresses.includes(address) ? cachedDelegation(renderData, address) : null);
+    });
+  }
+
   function resolveDelegation(renderData, callback) {
-    runtime.resolveDelegation(renderData, (delegation) => callback(usableDelegation(delegation)));
+    runtime.resolveDelegation(renderData, (delegation) => {
+      const verified = usableDelegation(delegation);
+      if (verified?.id) {
+        callback(verified);
+        return;
+      }
+      resolveCachedDelegation(renderData, callback);
+    });
   }
 
   function renderSignature(renderData, settings, delegation, customRecord, requestedId) {
@@ -468,15 +506,19 @@
   }
 
   function handleFromChanged(event) {
-    try {
-      subjectExcludesSignature((excluded) => {
-        if (excluded) clearSignature(event);
-        else continueAutomaticInsertion(event, true);
-      });
-    } catch (error) {
-      console.error("Die Signatur konnte nach dem Absenderwechsel nicht ersetzt werden.", error);
-      continueAutomaticInsertion(event, true);
-    }
+    const update = () => {
+      try {
+        subjectExcludesSignature((excluded) => {
+          if (excluded) clearSignature(event);
+          else continueAutomaticInsertion(event, true);
+        });
+      } catch (error) {
+        console.error("Die Signatur konnte nach dem Absenderwechsel nicht ersetzt werden.", error);
+        continueAutomaticInsertion(event, true);
+      }
+    };
+    if (isWindowsPc()) setTimeout(update, 750);
+    else update();
   }
 
   function removeSignatureForObjectInformation(event) {
