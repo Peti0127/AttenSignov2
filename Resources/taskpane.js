@@ -123,6 +123,7 @@ function readableError(error) {
     AutoInsertMode: "NewMail",
     AutoInsertReplies: false,
     AutoInsertForwards: false,
+    AutoInsertMeetings: false,
     SkipInternalOnly: false,
     SkipInternalOnNewMail: false,
     InsertTitleBefore: false,
@@ -385,6 +386,7 @@ function readableError(error) {
       AutoInsertMode: autoInsertReplies && autoInsertForwards ? "AllMail" : "NewMail",
       AutoInsertReplies: autoInsertReplies,
       AutoInsertForwards: autoInsertForwards,
+      AutoInsertMeetings: value.AutoInsertMeetings === true,
       SkipInternalOnly: value.SkipInternalOnly === true || value.InternalRecipientsOnly === true,
       SkipInternalOnNewMail: value.SkipInternalOnNewMail === true,
       InsertTitleBefore: value.InsertTitleBefore === true,
@@ -423,6 +425,7 @@ function readableError(error) {
       AutoInsertMode: record.AutoInsertMode,
       AutoInsertReplies: record.AutoInsertReplies,
       AutoInsertForwards: record.AutoInsertForwards,
+      AutoInsertMeetings: record.AutoInsertMeetings,
       SkipInternalOnly: record.SkipInternalOnly,
       SkipInternalOnNewMail: record.SkipInternalOnNewMail,
       InsertTitleBefore: record.InsertTitleBefore,
@@ -459,6 +462,7 @@ function readableError(error) {
       AutoInsertMode: DEFAULT_SETTINGS.AutoInsertMode,
       AutoInsertReplies: DEFAULT_SETTINGS.AutoInsertReplies,
       AutoInsertForwards: DEFAULT_SETTINGS.AutoInsertForwards,
+      AutoInsertMeetings: DEFAULT_SETTINGS.AutoInsertMeetings,
       SkipInternalOnly: DEFAULT_SETTINGS.SkipInternalOnly,
       SkipInternalOnNewMail: DEFAULT_SETTINGS.SkipInternalOnNewMail,
       InsertTitleBefore: DEFAULT_SETTINGS.InsertTitleBefore,
@@ -479,6 +483,7 @@ function readableError(error) {
       || typeof settings?.AutoInsert !== "boolean"
       || typeof settings?.AutoInsertReplies !== "boolean"
       || typeof settings?.AutoInsertForwards !== "boolean"
+      || typeof settings?.AutoInsertMeetings !== "boolean"
       || typeof settings?.SkipInternalOnly !== "boolean"
       || typeof settings?.SkipInternalOnNewMail !== "boolean"
       || typeof settings?.InsertTitleBefore !== "boolean"
@@ -499,6 +504,7 @@ function readableError(error) {
       AutoInsertMode: settings.AutoInsertReplies && settings.AutoInsertForwards ? "AllMail" : "NewMail",
       AutoInsertReplies: settings.AutoInsertReplies,
       AutoInsertForwards: settings.AutoInsertForwards,
+      AutoInsertMeetings: settings.AutoInsertMeetings,
       SkipInternalOnly: settings.SkipInternalOnly,
       SkipInternalOnNewMail: settings.SkipInternalOnNewMail,
       InsertTitleBefore: settings.InsertTitleBefore,
@@ -1997,6 +2003,7 @@ const mobileUsageTextInput = document.getElementById("mobile-usage-text");
 const confidentialityCheckbox = document.getElementById("confidentiality");
 const autoInsertRepliesCheckbox = document.getElementById("auto-insert-replies");
 const autoInsertForwardsCheckbox = document.getElementById("auto-insert-forwards");
+const autoInsertMeetingsCheckbox = document.getElementById("auto-insert-meetings");
 const skipInternalOnlyCheckbox = document.getElementById("skip-internal-only");
 const skipInternalNewMailField = document.getElementById("skip-internal-new-mail-field");
 const skipInternalNewMailCheckbox = document.getElementById("skip-internal-new-mail");
@@ -2065,6 +2072,7 @@ function setControlsDisabled(disabled) {
   confidentialityCheckbox.disabled = disabled;
   autoInsertRepliesCheckbox.disabled = disabled;
   autoInsertForwardsCheckbox.disabled = disabled;
+  autoInsertMeetingsCheckbox.disabled = disabled;
   skipInternalOnlyCheckbox.disabled = disabled;
   skipInternalNewMailCheckbox.disabled = disabled || !skipInternalOnlyCheckbox.checked;
 }
@@ -2322,6 +2330,7 @@ async function initializeSettings() {
     confidentialityCheckbox.checked = currentSettings.Confidentiality;
     autoInsertRepliesCheckbox.checked = currentSettings.AutoInsertReplies;
     autoInsertForwardsCheckbox.checked = currentSettings.AutoInsertForwards;
+    autoInsertMeetingsCheckbox.checked = currentSettings.AutoInsertMeetings;
     skipInternalOnlyCheckbox.checked = currentSettings.SkipInternalOnly;
     skipInternalNewMailCheckbox.checked = currentSettings.SkipInternalOnNewMail;
     updateInternalInsertionVisibility();
@@ -2345,6 +2354,7 @@ async function saveSettings() {
       AutoInsert: true,
       AutoInsertReplies: autoInsertRepliesCheckbox.checked,
       AutoInsertForwards: autoInsertForwardsCheckbox.checked,
+      AutoInsertMeetings: autoInsertMeetingsCheckbox.checked,
       SkipInternalOnly: skipInternalOnlyCheckbox.checked,
       SkipInternalOnNewMail: skipInternalNewMailCheckbox.checked,
       InsertTitleBefore: insertTitleBeforeCheckbox.checked,
@@ -2390,6 +2400,7 @@ mobileUsageTextInput.addEventListener("change", saveSettings);
 confidentialityCheckbox.addEventListener("change", saveSettings);
 autoInsertRepliesCheckbox.addEventListener("change", saveSettings);
 autoInsertForwardsCheckbox.addEventListener("change", saveSettings);
+autoInsertMeetingsCheckbox.addEventListener("change", saveSettings);
 skipInternalOnlyCheckbox.addEventListener("change", () => {
   updateInternalInsertionVisibility();
   saveSettings();
@@ -2433,6 +2444,7 @@ const mobileUsageTextInput = document.getElementById("mobile-usage-text");
 const confidentialityCheckbox = document.getElementById("confidentiality");
 const autoInsertRepliesCheckbox = document.getElementById("auto-insert-replies");
 const autoInsertForwardsCheckbox = document.getElementById("auto-insert-forwards");
+const autoInsertMeetingsCheckbox = document.getElementById("auto-insert-meetings");
 const skipInternalOnlyCheckbox = document.getElementById("skip-internal-only");
 const skipInternalNewMailField = document.getElementById("skip-internal-new-mail-field");
 const skipInternalNewMailCheckbox = document.getElementById("skip-internal-new-mail");
@@ -2472,6 +2484,7 @@ function setControlsDisabled(disabled) {
   confidentialityCheckbox.disabled = disabled;
   autoInsertRepliesCheckbox.disabled = disabled;
   autoInsertForwardsCheckbox.disabled = disabled;
+  autoInsertMeetingsCheckbox.disabled = disabled;
   skipInternalOnlyCheckbox.disabled = disabled;
   skipInternalNewMailCheckbox.disabled = disabled || !skipInternalOnlyCheckbox.checked;
 }
@@ -2546,6 +2559,7 @@ function showSettings(settings, department, titleAttributes) {
   confidentialityCheckbox.checked = settings.Confidentiality;
   autoInsertRepliesCheckbox.checked = settings.AutoInsertReplies;
   autoInsertForwardsCheckbox.checked = settings.AutoInsertForwards;
+  autoInsertMeetingsCheckbox.checked = settings.AutoInsertMeetings;
   skipInternalOnlyCheckbox.checked = settings.SkipInternalOnly;
   skipInternalNewMailCheckbox.checked = settings.SkipInternalOnNewMail;
   updateInternalInsertionVisibility();
@@ -2739,6 +2753,7 @@ async function saveSettings() {
       AutoInsert: true,
       AutoInsertReplies: autoInsertRepliesCheckbox.checked,
       AutoInsertForwards: autoInsertForwardsCheckbox.checked,
+      AutoInsertMeetings: autoInsertMeetingsCheckbox.checked,
       SkipInternalOnly: skipInternalOnlyCheckbox.checked,
       SkipInternalOnNewMail: skipInternalNewMailCheckbox.checked,
       InsertTitleBefore: insertTitleBeforeCheckbox.checked,
@@ -2776,6 +2791,7 @@ mobileUsageTextInput.addEventListener("change", saveSettings);
 confidentialityCheckbox.addEventListener("change", saveSettings);
 autoInsertRepliesCheckbox.addEventListener("change", saveSettings);
 autoInsertForwardsCheckbox.addEventListener("change", saveSettings);
+autoInsertMeetingsCheckbox.addEventListener("change", saveSettings);
 skipInternalOnlyCheckbox.addEventListener("change", () => {
   updateInternalInsertionVisibility();
   saveSettings();
