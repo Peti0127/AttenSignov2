@@ -670,7 +670,7 @@ function setStatus(message) {
 function applyAccessView() {
   signatureMain.hidden = !accessAuthorized;
   taskpaneAccessDenied.hidden = accessAuthorized;
-  mainSettingsLink.hidden = !accessAuthorized || vipAuthorized;
+  mainSettingsLink.hidden = true;
   feedbackButton.hidden = !accessAuthorized;
   feedbackButton.disabled = !accessAuthorized || !profileLoaded;
   if (!accessAuthorized) setStatus("Sie haben kein Zugriff auf dieses Add-In, bitte EDV kontaktieren!");
@@ -789,6 +789,9 @@ function phoneLine(profileValue = profile, settings = signatureSettings) {
     : escapeHtml(CONFIG.officeNumber.trim());
 
   switch (settings.Nummer) {
+    case "OnBehalf":
+      if (!mobile) return officeNumber ? `Tel. ${officeNumber}` : "";
+      return [phone || officeNumber ? `Tel. ${phone || officeNumber}` : "", `Mobil ${mobile}`].filter(Boolean).join(" - ");
     case "Handy":
       return mobile ? `Mobil ${mobile}` : "";
     case "Festnetz":
@@ -1057,7 +1060,7 @@ function buildSignature(templateHtml = signatureTemplate, settings = signatureSe
         MobileUsage: false,
         MobileUsageText: "",
       }
-    : settings;
+    : sendOnBehalf ? { ...settings, Nummer: "OnBehalf" } : settings;
   const titleBefore = !sendOnBehalf
     && settings.InsertTitleBefore && String(signatureProfile.customAttribute10 || "").trim()
     ? `${String(signatureProfile.customAttribute10).trim()} `
@@ -1149,19 +1152,20 @@ function renderCustomSignatureCards() {
 }
 
 function openSignatureMenu(event, id) {
-  if (!vipAuthorized) return;
+  if (!accessAuthorized || (!vipAuthorized && id !== "standard")) return;
   event.preventDefault();
   contextSignatureId = id;
   deleteConfirmationArmed = false;
   deleteCustomButton.textContent = "Signatur löschen";
-  editCustomButton.hidden = id === "standard";
-  deleteCustomButton.hidden = id === "standard";
+  editCustomButton.hidden = !vipAuthorized || id === "standard";
+  deleteCustomButton.hidden = !vipAuthorized || id === "standard";
+  setDefaultButton.hidden = !vipAuthorized;
   setDefaultButton.disabled = customSignatures.defaultId === id;
   contextMenu.hidden = false;
   const width = 195;
   contextMenu.style.left = `${Math.min(event.clientX, window.innerWidth - width - 8)}px`;
   contextMenu.style.top = `${Math.min(event.clientY, window.innerHeight - 100)}px`;
-  setDefaultButton.focus();
+  (vipAuthorized ? setDefaultButton : openSignatureSettingsButton).focus();
 }
 
 function closeSignatureMenu() {
@@ -1298,7 +1302,7 @@ async function restoreCachedProfile() {
   SignaturePreferences.setDepartment(profile.department);
   SignaturePreferences.setTitleAttributes(profile.customAttribute10, profile.customAttribute11);
   customAddButton.hidden = !vipAuthorized;
-  mainSettingsLink.hidden = vipAuthorized;
+  mainSettingsLink.hidden = true;
   customSignatures = vipAuthorized
     ? await SignaturePreferences.getCustomSignatures()
     : { requiredRole: VIP_ROLE, defaultId: "standard", items: [] };
@@ -1526,7 +1530,7 @@ async function loadProfile() {
     SignaturePreferences.setDepartment(profile.department);
     SignaturePreferences.setTitleAttributes(profile.customAttribute10, profile.customAttribute11);
     customAddButton.hidden = !vipAuthorized;
-    mainSettingsLink.hidden = vipAuthorized;
+    mainSettingsLink.hidden = true;
     customSignatures = vipAuthorized
       ? await SignaturePreferences.getCustomSignatures()
       : { requiredRole: VIP_ROLE, defaultId: "standard", items: [] };
@@ -1548,7 +1552,7 @@ async function loadProfile() {
     }
     profileLoaded = false;
     if (accessAuthorized && SignaturePreferences.getVipAuthorizationState() === null) {
-      mainSettingsLink.hidden = false;
+      mainSettingsLink.hidden = true;
     }
     signatureButton.setAttribute("aria-disabled", "true");
     signatureButton.tabIndex = -1;
@@ -1758,6 +1762,7 @@ setDefaultButton.addEventListener("click", async () => {
 });
 openSignatureSettingsButton.addEventListener("click", () => {
   const signatureId = contextSignatureId || "standard";
+  if (!accessAuthorized || (!vipAuthorized && signatureId !== "standard")) return;
   window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}`;
 });
 editCustomButton.addEventListener("click", () => {
