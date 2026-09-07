@@ -597,7 +597,7 @@ const DELEGATED_PROFILE_LOCAL_CACHE_KEY = "attensam.signature.delegated-profiles
 const REQUIRED_ROLE = "ATS.Signature";
 const VIP_ROLE = "ATS.Signature.VIP";
 const CITY_CHANGE_ROLE = "CityChange";
-const EXCLUDED_SUBJECT_PREFIX = "Ihre Objektinformation - ";
+const EXCLUDED_SUBJECT_PREFIXES = ["Ihre Objektinformation - ", "Durchführungsbestätigung - "];
 const MAX_CUSTOM_SIGNATURES = 3;
 const SIGNATURE_MARKER_ID = "attensam-signature-root";
 const SIGNATURE_MARKER_TEXT = "Attensam-Signatur";
@@ -1583,7 +1583,7 @@ async function subjectExcludesSignature() {
     subject.getAsync((result) => {
       resolve(
         result.status === Office.AsyncResultStatus.Succeeded
-        && String(result.value || "").startsWith(EXCLUDED_SUBJECT_PREFIX),
+        && EXCLUDED_SUBJECT_PREFIXES.some((prefix) => String(result.value || "").startsWith(prefix)),
       );
     });
   });
@@ -2145,7 +2145,7 @@ function settingsSubjectExcludesSignature() {
     subject.getAsync((result) => {
       resolve(
         result.status === Office.AsyncResultStatus.Succeeded
-        && String(result.value || "").startsWith("Ihre Objektinformation - "),
+        && ["Ihre Objektinformation - ", "Durchführungsbestätigung - "].some((prefix) => String(result.value || "").startsWith(prefix)),
       );
     });
   });
