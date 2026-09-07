@@ -594,7 +594,7 @@ function readableError(error) {
 
 (function compactRoute(){
   const activeView = new URLSearchParams(window.location.search).get("view");
-  if (activeView === "settings" || activeView === "feedback") return;
+  if (["settings", "feedback", "help", "news"].includes(activeView)) return;
 /* global Office, msal, SignaturePreferences */
 
 const CONFIG = ATTENSAM_CONFIG;
@@ -2833,4 +2833,45 @@ Office.onReady((info) => {
   else setSettingsStatus("Diese Seite muss als Outlook-Add-In geöffnet werden.");
 });
 
+})();
+
+// Release maintenance: add every new release to neuigkeiten.json, newest first.
+(function informationRoute() {
+  const view = new URLSearchParams(window.location.search).get("view");
+  if (view !== "help" && view !== "news") return;
+  Office.onReady(() => {
+    const vipHelp = document.getElementById("help-vip");
+    vipHelp.hidden = !(SignaturePreferences.getAccessAuthorized() && SignaturePreferences.getVipAuthorized());
+  });
+  fetch("neuigkeiten.json", { cache: "no-store" })
+    .then((response) => {
+      if (!response.ok) throw new Error("Neuigkeiten konnten nicht geladen werden.");
+      return response.json();
+    })
+    .then((data) => {
+      document.querySelectorAll("[data-release-version]").forEach((element) => {
+        element.textContent = `Version ${data.version}`;
+      });
+      if (view !== "news") return;
+      const history = document.getElementById("release-history");
+      history.textContent = "";
+      for (const release of data.releases) {
+        const article = document.createElement("article");
+        const heading = document.createElement("h2");
+        heading.textContent = release.version;
+        article.appendChild(heading);
+        const list = document.createElement("ul");
+        for (const change of release.changes) {
+          const item = document.createElement("li");
+          item.textContent = change;
+          list.appendChild(item);
+        }
+        article.appendChild(list);
+        history.appendChild(article);
+      }
+    })
+    .catch(() => {
+      if (view === "news") document.getElementById("release-history").textContent = "Neuigkeiten konnten nicht geladen werden. Bitte öffnen Sie die Seite später erneut.";
+      document.querySelectorAll("[data-release-version]").forEach((element) => { element.textContent = "Versionsinformation derzeit nicht verfügbar."; });
+    });
 })();

@@ -1,0 +1,153 @@
+{
+  "version": "0.8.51",
+  "releases": [
+    {
+      "version": "0.8.51",
+      "changes": [
+        "Hilfe mit Fragezeichen-Symbol im Kopfbereich hinzugefügt.",
+        "Neuigkeiten mit Versionshistorie links neben Feedback hinzugefügt.",
+        "Statusanzeige unter die Schaltflächen verschoben."
+      ]
+    },
+    {
+      "version": "0.8.50",
+      "changes": [
+        "Neue Checkbox „Bei ASE generierten Mails keine Signatur einfügen“ steuert beide Betreffregeln; standardmäßig deaktiviert."
+      ]
+    },
+    {
+      "version": "0.8.49",
+      "changes": [
+        "PC-Betreffregel um „Durchführungsbestätigung - “ erweitert."
+      ]
+    },
+    {
+      "version": "0.8.48",
+      "changes": [
+        "Standard für neue Benutzer: keine Grußformel, Handy und Festnetz, alle optionalen Checkboxen deaktiviert."
+      ]
+    },
+    {
+      "version": "0.8.47",
+      "changes": [
+        "Nicht-VIP-Benutzer öffnen Einstellungen über das Kontextmenü der Signatur.",
+        "Hinweis zur Speicherung im Microsoft-365-Benutzerkonto entfernt."
+      ]
+    },
+    {
+      "version": "0.8.46",
+      "changes": [
+        "Telefonnummern bei „im Auftrag von“ angepasst: Telefonnummer und Mobilnummer des Von-Benutzers, mit Office-Nummer als Rückfall. Ohne Mobilnummer wird nur die Office-Nummer angezeigt."
+      ]
+    },
+    {
+      "version": "0.8.45",
+      "changes": [
+        "Automatische Signaturen bei Besprechungen: Registrierung des Ereignishandlers korrigiert."
+      ]
+    },
+    {
+      "version": "Frühere Weiterentwicklung nach 0.8.18",
+      "changes": [
+        "Die genaue Versionszuordnung dieser Änderungen ist in der verfügbaren Historie nicht vollständig dokumentiert.",
+        "Separate Optionen für Antworten, Weiterleitungen, interne E-Mails und neue interne E-Mails eingeführt.",
+        "Zugriff über die Rolle ATS.Signature abgesichert; Stadtwahl für CityChange ergänzt.",
+        "Betreffregel „Ihre Objektinformation - “ auf dem PC ergänzt.",
+        "Absenderwechsel und „im Auftrag von“ in Outlook Classic verbessert.",
+        "Feedbackformular mit Kategorien und Versand über das Benutzerkonto hinzugefügt.",
+        "Automatische Signaturen für neu erstellte Besprechungen als Organisator ergänzt.",
+        "Dateibezogene Cache-Versionen eingeführt, damit unveränderte Dateien seltener neu hochgeladen werden müssen."
+      ]
+    },
+    {
+      "version": "0.8.18",
+      "changes": [
+        "Gespeicherte Profildaten mit 14 Tagen Gültigkeit und Prüfung der Postfachzugehörigkeit als Rückfall ergänzt."
+      ]
+    },
+    {
+      "version": "0.8.17",
+      "changes": [
+        "Aktualisierung eingefügter Signaturen nach Einstellungsänderungen durch robustere Erkennung repariert."
+      ]
+    },
+    {
+      "version": "0.8.16",
+      "changes": [
+        "Erkennung und Aktualisierung benutzerdefinierter VIP-Signaturen verbessert."
+      ]
+    },
+    {
+      "version": "0.8.15",
+      "changes": [
+        "Neue funktionale Titelplatzhalter {TitelVor} und {TitelNach} offiziell versioniert."
+      ]
+    },
+    {
+      "version": "0.8.14",
+      "changes": [
+        "Profilplatzhalter-Seite mit Erklärungen und Zurück-Schaltfläche ergänzt."
+      ]
+    },
+    {
+      "version": "0.8.13",
+      "changes": [
+        "Verborgene Signaturmarkierung in „Attensam-Signatur“ umbenannt."
+      ]
+    },
+    {
+      "version": "0.8.12",
+      "changes": [
+        "Bei automatischem Einfügen auf Mobilgeräten wird die native Outlook-Signatur deaktiviert."
+      ]
+    },
+    {
+      "version": "0.8.11",
+      "changes": [
+        "Automatische Anpassung an das helle, graue oder dunkle Client-Design hinzugefügt."
+      ]
+    },
+    {
+      "version": "0.8.10",
+      "changes": [
+        "Statusmeldungen auf „Signaturdaten“ umgestellt."
+      ]
+    },
+    {
+      "version": "0.8.9",
+      "changes": [
+        "Beschreibung und Beschriftungen im Manifest aktualisiert."
+      ]
+    },
+    {
+      "version": "0.8.8",
+      "changes": [
+        "Kopfzeile in „Signatur“ umbenannt und Einführungstexte entfernt."
+      ]
+    },
+    {
+      "version": "0.8.7",
+      "changes": [
+        "Helles Design, eingebettetes Symbol und Navigation mit Symbolschaltflächen eingeführt."
+      ]
+    },
+    {
+      "version": "0.8.5",
+      "changes": [
+        "Kurzes Anzeigen der falschen rollenabhängigen Oberfläche beim Start verhindert."
+      ]
+    },
+    {
+      "version": "0.8.4",
+      "changes": [
+        "Darstellung der Einstellungen nach VIP-Rolle getrennt."
+      ]
+    },
+    {
+      "version": "0.8.3",
+      "changes": [
+        "Unabhängige Einstellungen je Signatur und Kontextmenü für VIP-Signaturen eingeführt."
+      ]
+    }
+  ]
+}

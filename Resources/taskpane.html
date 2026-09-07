@@ -7,13 +7,13 @@
   <link rel="icon" type="image/png" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAABKVBMVEUAAADgAADfAAD/AADiAADhAADhAADiAADhAADYAADhAADiAADgAADhAADkAADhAADgAADhAADhAAD/AADiAADhAADgAADlAADhAADhAADgAADhAADgAADhAAD/AADhAADhAADkAADbAADhAADhAADdAADhAADiAADhAADhAADhAADhAADmAADgAADgAADgAADiAADhAADhAADhAADgAADhAADgAADhAADhAADjAADhAADhAADiAADhAADgAADgAADhAADjAADhAADfAADiAADiAADhAADhAADhAADiAADhAADhAADiAADhAADhAADgAADgAADhAADiAADhAADhAADcAADhAADfAADhAADhAADgAAD/AADjAADiAADiAADjAADjAADhAAD///+ZudeEAAAAYXRSTlMAGUAEI/CwlDMN8Zxs9hPTc0PcAq3iSh3740m1hX8B2v4mB+j8HniMXKq77grIZDHQnzv3UqGmd8El/foa3lO3fgmXOINHhvMiUMM8LNaBa8D4aVTyFnAIuZpLAzZGPi0SEn2rxQAAAAFiS0dEYiu5HTwAAAAJcEhZcwAAAdEAAAHRAQyRTPMAAAAHdElNRQflDA8OIxS5I1PQAAABCUlEQVQ4y2NgoDNgZGLGK8/CmsiGVwF7YmIiBx55Ti6gAm48CniA8om8fLgV8IMUJArglBcEyycKCeNSIAKUFQViMRzy4hKJiZJSQAXSOBTIAOVk5eQTExUUscorKScmqqgyqAGVqWNVoAGU4dLU1AJS2jrYFOgmIoAeFnl9JPlEAywKDJEVJBphyPMZA4VNOEDAFMgyw1BgDhS1gDAtrRITrW3Q5IVtgQrsoBx7INuBgRzg6CSOzHV2cUVT4Jbo7uYBU+zplZho5Y0i72MN8qCvoZ+/uXpAINi3QSgKgkMS0YB8KKoV4tzWyNKiYeEYzmQMi4AaIxQZFY3dK9HiMbFx8QlkBQO5AADiCU4jdj6PHwAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAyMS0xMi0xNVQxNDozNToyMCswMDowMJfACAgAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMjEtMTItMTVUMTQ6MzU6MjArMDA6MDDmnbC0AAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAFd6VFh0UmF3IHByb2ZpbGUgdHlwZSBpcHRjAAB4nOPyDAhxVigoyk/LzEnlUgADIwsuYwsTIxNLkxQDEyBEgDTDZAMjs1Qgy9jUyMTMxBzEB8uASKBKLgDqFxF08kI1lQAAAABJRU5ErkJggg==">
   <script>
     const route = new URLSearchParams(window.location.search);
-    document.documentElement.dataset.view = route.get("view") === "settings" ? "settings" : "taskpane";
+    document.documentElement.dataset.view = ["settings", "help", "news"].includes(route.get("view")) ? route.get("view") : "taskpane";
     document.documentElement.dataset.mobile = route.get("mobile") === "1" ? "true" : "false";
   </script>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@5.18.0/lib/msal-browser.min.js"></script>
   <script defer src="autorun-classic.js?rev=9"></script>
-  <script defer src="taskpane.js?rev=9"></script>
+  <script defer src="taskpane.js?rev=10"></script>
   <style>
     :root { color-scheme:light; --red:#e10000; --ink:#090909; --muted:#666; --line:#d2d2d2; --paper:#f7f7f7; --surface:#fff; --control-bg:#fff; --control-ink:#090909; --control-border:#aaa; --hover:#f1f1f1; --footer-bg:rgba(255,255,255,.98); --button-bg:#090909; --button-ink:#fff; }
     :root[data-client-theme="dark"] { color-scheme:dark; --ink:#f2f2f2; --muted:#b8b8b8; --line:#4a4a4a; --paper:#111; --surface:#222; --control-bg:#2b2b2b; --control-ink:#f5f5f5; --control-border:#656565; --hover:#333; --footer-bg:rgba(28,28,28,.98); --button-bg:#ededed; --button-ink:#111; }
@@ -24,7 +24,9 @@
     body { min-height:100vh; margin:0; color:var(--ink); background:var(--paper); font-family:Inter,"Segoe UI",Arial,sans-serif; }
     .route-view { display:none; }
     html[data-view="taskpane"] #taskpane-view,
-    html[data-view="settings"] #settings-view { display:block; }
+    html[data-view="settings"] #settings-view,
+    html[data-view="help"] #help-view,
+    html[data-view="news"] #news-view { display:block; }
     header { display:flex; align-items:center; gap:12px; min-height:72px; padding:15px 18px; background:var(--surface); border-bottom:3px solid var(--red); }
     .logo-frame { display:grid; place-items:center; width:38px; height:34px; flex:0 0 auto; padding-right:12px; border-right:1px solid var(--line); }
     .logo { display:block; width:24px; height:24px; object-fit:contain; }
@@ -81,7 +83,17 @@
     .status-footer { position:fixed; inset:auto 0 0; padding:12px 18px calc(12px + env(safe-area-inset-bottom)); border-top:1px solid var(--line); background:var(--footer-bg); }
     .status-footer p { margin:0; color:var(--muted); font-size:10px; line-height:1.4; }
     .footer-inner { display:flex; align-items:center; gap:12px; max-width:560px; margin:0 auto; }
-    #status { flex:1; min-width:0; }
+    #taskpane-view .footer-inner { flex-direction:column; align-items:stretch; gap:8px; }
+    .footer-actions { display:flex; justify-content:flex-end; gap:8px; }
+    .footer-actions a { display:inline-flex; align-items:center; text-decoration:none; }
+    #taskpane-view main { padding-bottom:150px; }
+    .info-content { max-width:560px; margin:auto; font-size:13px; line-height:1.6; }
+    .info-content h2 { font-size:16px; margin:22px 0 8px; }
+    .info-content p { margin:8px 0; }
+    .info-content article { border-bottom:1px solid var(--line); padding-bottom:12px; }
+    .info-content ul { padding-left:20px; }
+    .info-version { color:var(--muted); font-size:11px; }
+    #status { min-width:0; }
     #settings-status { flex:1; }
     #close-button { display:none; min-height:40px; padding:0 16px; border:1px solid var(--red); color:#fff; background:var(--red); font-size:13px; }
     html[data-mobile="true"] #settings-view main { max-width:560px; margin:0 auto; padding-bottom:110px; }
@@ -95,6 +107,7 @@
       <div class="logo-frame" aria-hidden="true"><img class="logo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAABKVBMVEUAAADgAADfAAD/AADiAADhAADhAADiAADhAADYAADhAADiAADgAADhAADkAADhAADgAADhAADhAAD/AADiAADhAADgAADlAADhAADhAADgAADhAADgAADhAAD/AADhAADhAADkAADbAADhAADhAADdAADhAADiAADhAADhAADhAADhAADmAADgAADgAADgAADiAADhAADhAADhAADgAADhAADgAADhAADhAADjAADhAADhAADiAADhAADgAADgAADhAADjAADhAADfAADiAADiAADhAADhAADhAADiAADhAADhAADiAADhAADhAADgAADgAADhAADiAADhAADhAADcAADhAADfAADhAADhAADgAAD/AADjAADiAADiAADjAADjAADhAAD///+ZudeEAAAAYXRSTlMAGUAEI/CwlDMN8Zxs9hPTc0PcAq3iSh3740m1hX8B2v4mB+j8HniMXKq77grIZDHQnzv3UqGmd8El/foa3lO3fgmXOINHhvMiUMM8LNaBa8D4aVTyFnAIuZpLAzZGPi0SEn2rxQAAAAFiS0dEYiu5HTwAAAAJcEhZcwAAAdEAAAHRAQyRTPMAAAAHdElNRQflDA8OIxS5I1PQAAABCUlEQVQ4y2NgoDNgZGLGK8/CmsiGVwF7YmIiBx55Ti6gAm48CniA8om8fLgV8IMUJArglBcEyycKCeNSIAKUFQViMRzy4hKJiZJSQAXSOBTIAOVk5eQTExUUscorKScmqqgyqAGVqWNVoAGU4dLU1AJS2jrYFOgmIoAeFnl9JPlEAywKDJEVJBphyPMZA4VNOEDAFMgyw1BgDhS1gDAtrRITrW3Q5IVtgQrsoBx7INuBgRzg6CSOzHV2cUVT4Jbo7uYBU+zplZho5Y0i72MN8qCvoZ+/uXpAINi3QSgKgkMS0YB8KKoV4tzWyNKiYeEYzmQMi4AaIxQZFY3dK9HiMbFx8QlkBQO5AADiCU4jdj6PHwAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAyMS0xMi0xNVQxNDozNToyMCswMDowMJfACAgAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMjEtMTItMTVUMTQ6MzU6MjArMDA6MDDmnbC0AAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAFd6VFh0UmF3IHByb2ZpbGUgdHlwZSBpcHRjAAB4nOPyDAhxVigoyk/LzEnlUgADIwsuYwsTIxNLkxQDEyBEgDTDZAMjs1Qgy9jUyMTMxBzEB8uASKBKLgDqFxF08kI1lQAAAABJRU5ErkJggg==" alt=""></div>
       <div><p class="eyebrow">ATTENSAM</p><h1>Signatur</h1></div>
       <a id="main-settings-link" class="nav-link" href="taskpane.html?view=settings&amp;signature=standard" aria-label="Einstellungen öffnen" title="Einstellungen" hidden>&#9881;</a>
+      <a class="nav-link" href="taskpane.html?view=help" aria-label="Hilfe öffnen" title="Hilfe"><svg width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 0 1 5 0c0 2-2.5 2-2.5 4"/><circle cx="12" cy="16.5" r=".6" fill="currentColor"/></svg></a>
     </header>
     <main id="signature-main" hidden>
       <section>
@@ -123,8 +136,11 @@
     </main>
     <footer class="status-footer">
       <div class="footer-inner">
+        <div class="footer-actions">
+          <a class="feedback-button" href="taskpane.html?view=news">Neuigkeiten</a>
+          <button id="feedback-button" class="feedback-button" type="button" disabled hidden>Feedback</button>
+        </div>
         <p id="status" role="status" aria-live="polite">App wird geladen...</p>
-        <button id="feedback-button" class="feedback-button" type="button" disabled hidden>Feedback</button>
       </div>
     </footer>
   </section>
@@ -226,6 +242,32 @@
         <button id="close-button" type="button">Fertig</button>
       </div>
     </footer>
+  </section>
+  <section id="help-view" class="route-view">
+    <header>
+      <div class="logo-frame" aria-hidden="true"><img class="logo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAABKVBMVEUAAADgAADfAAD/AADiAADhAADhAADiAADhAADYAADhAADiAADgAADhAADkAADhAADgAADhAADhAAD/AADiAADhAADgAADlAADhAADhAADgAADhAADgAADhAAD/AADhAADhAADkAADbAADhAADhAADdAADhAADiAADhAADhAADhAADhAADmAADgAADgAADgAADiAADhAADhAADhAADgAADhAADgAADhAADhAADjAADhAADhAADiAADhAADgAADgAADhAADjAADhAADfAADiAADiAADhAADhAADhAADiAADhAADhAADiAADhAADhAADgAADgAADhAADiAADhAADhAADcAADhAADfAADhAADhAADgAAD/AADjAADiAADiAADjAADjAADhAAD///+ZudeEAAAAYXRSTlMAGUAEI/CwlDMN8Zxs9hPTc0PcAq3iSh3740m1hX8B2v4mB+j8HniMXKq77grIZDHQnzv3UqGmd8El/foa3lO3fgmXOINHhvMiUMM8LNaBa8D4aVTyFnAIuZpLAzZGPi0SEn2rxQAAAAFiS0dEYiu5HTwAAAAJcEhZcwAAAdEAAAHRAQyRTPMAAAAHdElNRQflDA8OIxS5I1PQAAABCUlEQVQ4y2NgoDNgZGLGK8/CmsiGVwF7YmIiBx55Ti6gAm48CniA8om8fLgV8IMUJArglBcEyycKCeNSIAKUFQViMRzy4hKJiZJSQAXSOBTIAOVk5eQTExUUscorKScmqqgyqAGVqWNVoAGU4dLU1AJS2jrYFOgmIoAeFnl9JPlEAywKDJEVJBphyPMZA4VNOEDAFMgyw1BgDhS1gDAtrRITrW3Q5IVtgQrsoBx7INuBgRzg6CSOzHV2cUVT4Jbo7uYBU+zplZho5Y0i72MN8qCvoZ+/uXpAINi3QSgKgkMS0YB8KKoV4tzWyNKiYeEYzmQMi4AaIxQZFY3dK9HiMbFx8QlkBQO5AADiCU4jdj6PHwAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAyMS0xMi0xNVQxNDozNToyMCswMDowMJfACAgAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMjEtMTItMTVUMTQ6MzU6MjArMDA6MDDmnbC0AAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAFd6VFh0UmF3IHByb2ZpbGUgdHlwZSBpcHRjAAB4nOPyDAhxVigoyk/LzEnlUgADIwsuYwsTIxNLkxQDEyBEgDTDZAMjs1Qgy9jUyMTMxBzEB8uASKBKLgDqFxF08kI1lQAAAABJRU5ErkJggg==" alt=""></div>
+      <h1>Hilfe</h1>
+      <a class="nav-link" href="taskpane.html" aria-label="Zurück zur Signatur" title="Zurück">&#8592;</a>
+    </header>
+    <main class="info-content"><h2>Signatur einfügen</h2><p>Öffnen Sie das Add-In in einer E-Mail und warten Sie, bis die Signaturdaten geladen sind. Klicken Sie auf die Vorschau, um die Signatur einzufügen.</p>
+<h2>Einstellungen öffnen</h2><p>Klicken Sie mit der rechten Maustaste auf die Signatur und wählen Sie „Einstellungen“. Änderungen werden gespeichert und können die bereits eingefügte Signatur aktualisieren.</p>
+<h2>Grußformel und Telefonnummern</h2><p>Wählen Sie eine Grußformel und die anzuzeigenden Telefonnummern. Vorgabe: keine Grußformel, Handy und Festnetz. Titel, Hinweise zur mobilen Nutzung und Vertraulichkeit können Sie bei Bedarf aktivieren.</p>
+<h2>Automatisches Einfügen</h2><p>Neue E-Mails erhalten standardmäßig eine Signatur. Für Antworten und Weiterleitungen gibt es jeweils eine eigene Checkbox.</p>
+<h2>Interne E-Mails</h2><p>„Signatur bei internen Emails nicht einfügen“ unterdrückt die Signatur bei Antworten und Weiterleitungen mit ausschließlich internen Empfängern. Intern bedeutet: gleiche E-Mail-Domain wie Ihr Konto. Mit „Auch bei neuen Mails nicht einfügen“ gilt das zusätzlich für neue Nachrichten. Sobald externe Empfänger dabei sind, gelten wieder die normalen Einstellungen zum automatischen Einfügen.</p>
+<h2>ASE-generierte Mails</h2><p>„Bei ASE generierten Mails keine Signatur einfügen“ unterdrückt oder entfernt auf dem PC die Signatur, wenn der Betreff mit „Ihre Objektinformation - “ oder „Durchführungsbestätigung - “ beginnt. Die Prüfung erfolgt auch vor dem Senden. Auf Mobilgeräten gilt diese Regel nicht.</p>
+<h2>Im Auftrag von</h2><p>Beim Wechsel der Von-Adresse wird das Profil des gewählten Absenders verwendet, sofern es geladen werden kann. Bei Personen erscheint die Kennzeichnung „im Auftrag von“. Konten mit nur einem Vornamen erhalten ihre eigene Signatur ohne diese Kennzeichnung. In Outlook Classic kann die Aktualisierung etwas dauern.</p>
+<h2>Besprechungen</h2><p>Aktivieren Sie „Automatisches Einfügen bei Besprechungen“, um die Signatur bei neu erstellten Besprechungen als Organisator einzufügen. Bereits vorhandene Termine werden dadurch nicht nachträglich geändert.</p>
+<h2>Gespeicherte Signaturdaten</h2><p>Wenn aktuelle Profildaten nicht geladen werden können, kann das Add-In passende gespeicherte Daten bis zu 14 Tage lang verwenden. Ein Hinweis zeigt die Verwendung dieser Daten an. Ohne Internet kann Outlook den Start des Add-Ins einschränken.</p>
+<section id="help-vip" hidden><h2>Benutzerdefinierte Signaturen (VIP)</h2><p>Über das Plus können Sie bis zu drei eigene Signaturen anlegen. Das Kontextmenü bietet Einstellungen, die Auswahl als Standard sowie bei eigenen Signaturen Bearbeiten und Löschen. Jede Signatur hat eigene Einstellungen; automatisches Einfügen verwendet die als Standard gewählte Signatur.</p><p><a class="inline-link" href="placeholders.html">Profilplatzhalter anzeigen</a></p></section>
+<h2>Feedback und Hilfe anfordern</h2><p>Über „Feedback“ können Sie Fehler, Wünsche, Feedback oder eine Hilfeanfrage senden. Wählen Sie eine Kategorie und beschreiben Sie Ihr Anliegen. Die Nachricht wird mit Ihrem Konto ohne Signatur versendet. Bei fehlendem Zugriff kontaktieren Sie bitte die EDV.</p><p class="info-version" data-release-version></p></main>
+  </section>
+  <section id="news-view" class="route-view">
+    <header>
+      <div class="logo-frame" aria-hidden="true"><img class="logo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAABKVBMVEUAAADgAADfAAD/AADiAADhAADhAADiAADhAADYAADhAADiAADgAADhAADkAADhAADgAADhAADhAAD/AADiAADhAADgAADlAADhAADhAADgAADhAADgAADhAAD/AADhAADhAADkAADbAADhAADhAADdAADhAADiAADhAADhAADhAADhAADmAADgAADgAADgAADiAADhAADhAADhAADgAADhAADgAADhAADhAADjAADhAADhAADiAADhAADgAADgAADhAADjAADhAADfAADiAADiAADhAADhAADhAADiAADhAADhAADiAADhAADhAADgAADgAADhAADiAADhAADhAADcAADhAADfAADhAADhAADgAAD/AADjAADiAADiAADjAADjAADhAAD///+ZudeEAAAAYXRSTlMAGUAEI/CwlDMN8Zxs9hPTc0PcAq3iSh3740m1hX8B2v4mB+j8HniMXKq77grIZDHQnzv3UqGmd8El/foa3lO3fgmXOINHhvMiUMM8LNaBa8D4aVTyFnAIuZpLAzZGPi0SEn2rxQAAAAFiS0dEYiu5HTwAAAAJcEhZcwAAAdEAAAHRAQyRTPMAAAAHdElNRQflDA8OIxS5I1PQAAABCUlEQVQ4y2NgoDNgZGLGK8/CmsiGVwF7YmIiBx55Ti6gAm48CniA8om8fLgV8IMUJArglBcEyycKCeNSIAKUFQViMRzy4hKJiZJSQAXSOBTIAOVk5eQTExUUscorKScmqqgyqAGVqWNVoAGU4dLU1AJS2jrYFOgmIoAeFnl9JPlEAywKDJEVJBphyPMZA4VNOEDAFMgyw1BgDhS1gDAtrRITrW3Q5IVtgQrsoBx7INuBgRzg6CSOzHV2cUVT4Jbo7uYBU+zplZho5Y0i72MN8qCvoZ+/uXpAINi3QSgKgkMS0YB8KKoV4tzWyNKiYeEYzmQMi4AaIxQZFY3dK9HiMbFx8QlkBQO5AADiCU4jdj6PHwAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAyMS0xMi0xNVQxNDozNToyMCswMDowMJfACAgAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMjEtMTItMTVUMTQ6MzU6MjArMDA6MDDmnbC0AAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAFd6VFh0UmF3IHByb2ZpbGUgdHlwZSBpcHRjAAB4nOPyDAhxVigoyk/LzEnlUgADIwsuYwsTIxNLkxQDEyBEgDTDZAMjs1Qgy9jUyMTMxBzEB8uASKBKLgDqFxF08kI1lQAAAABJRU5ErkJggg==" alt=""></div>
+      <h1>Neuigkeiten</h1>
+      <a class="nav-link" href="taskpane.html" aria-label="Zurück zur Signatur" title="Zurück">&#8592;</a>
+    </header>
+    <main class="info-content"><p>Die neuesten Änderungen stehen oben. Frühere Einträge beruhen auf der verfügbaren Projekthistorie.</p><div id="release-history" aria-live="polite">Neuigkeiten werden geladen …</div><p class="info-version" data-release-version></p></main>
   </section>
 </body>
 </html>
