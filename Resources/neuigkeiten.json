@@ -1,6 +1,13 @@
 {
-  "version": "0.8.51",
+  "version": "0.8.52",
   "releases": [
+    {
+      "version": "0.8.52",
+      "changes": [
+        "Versionsanzeige auf Neuigkeiten und Feedback begrenzt; beide verwenden dieselbe Versionsquelle.",
+        "Manifest-Version von der laufenden Add-In-Version getrennt. Reine Code- und Inhaltsupdates benötigen künftig keine Manifeständerung."
+      ]
+    },
     {
       "version": "0.8.51",
       "changes": [

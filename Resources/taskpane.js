@@ -2835,14 +2835,19 @@ Office.onReady((info) => {
 
 })();
 
-// Release maintenance: add every new release to neuigkeiten.json, newest first.
+// Release maintenance: neuigkeiten.json owns the displayed version and release notes.
+// Keep manifest version and entry URLs stable for hosted code/content-only updates.
+// Change/redeploy the manifest only when its actual configuration changes.
 (function informationRoute() {
   const view = new URLSearchParams(window.location.search).get("view");
-  if (view !== "help" && view !== "news") return;
-  Office.onReady(() => {
-    const vipHelp = document.getElementById("help-vip");
-    vipHelp.hidden = !(SignaturePreferences.getAccessAuthorized() && SignaturePreferences.getVipAuthorized());
-  });
+  if (!["help", "news", "feedback"].includes(view)) return;
+  if (view === "help") {
+    Office.onReady(() => {
+      const vipHelp = document.getElementById("help-vip");
+      vipHelp.hidden = !(SignaturePreferences.getAccessAuthorized() && SignaturePreferences.getVipAuthorized());
+    });
+    return;
+  }
   fetch("neuigkeiten.json", { cache: "no-store" })
     .then((response) => {
       if (!response.ok) throw new Error("Neuigkeiten konnten nicht geladen werden.");
