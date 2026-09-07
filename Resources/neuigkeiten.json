@@ -1,6 +1,12 @@
 {
-  "version": "0.8.52",
+  "version": "0.8.53",
   "releases": [
+    {
+      "version": "0.8.53",
+      "changes": [
+        "Hilfetexte auf die persönliche Du-Ansprache umgestellt."
+      ]
+    },
     {
       "version": "0.8.52",
       "changes": [
