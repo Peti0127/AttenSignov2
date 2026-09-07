@@ -115,7 +115,7 @@ function readableError(error) {
   const LEGACY_PHONE_PREFIX = "attensam.signature.phone-mode";
   const DEFAULT_SETTINGS = Object.freeze({
     Nummer: "Alles",
-    MfG: "MfG1",
+    MfG: "MfG0",
     CustomGreeting: "",
     GreetingLines: 1,
     CityOverride: "Standard",
@@ -624,7 +624,7 @@ let editingCustomSignatureId = null;
 let deleteConfirmationArmed = false;
 let signatureSettings = {
   Nummer: "Alles",
-  MfG: "MfG1",
+  MfG: "MfG0",
   CustomGreeting: "",
   GreetingLines: 1,
   CityOverride: "Standard",
