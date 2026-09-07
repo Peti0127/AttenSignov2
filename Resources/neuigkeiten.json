@@ -6,7 +6,8 @@
       "changes": [
         "Hilfe mit Fragezeichen-Symbol im Kopfbereich hinzugefügt.",
         "Neuigkeiten mit Versionshistorie links neben Feedback hinzugefügt.",
-        "Statusanzeige unter die Schaltflächen verschoben."
+        "Statusanzeige unter die Schaltflächen verschoben.",
+        "Neuigkeiten-Schaltfläche fett formatiert und links ausgerichtet; Feedback bleibt rechts (Anpassung ohne Versionswechsel)."
       ]
     },
     {
