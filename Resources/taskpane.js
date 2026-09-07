@@ -126,6 +126,7 @@ function readableError(error) {
     AutoInsertMeetings: false,
     SkipInternalOnly: false,
     SkipInternalOnNewMail: false,
+    SkipAseEmails: false,
     InsertTitleBefore: false,
     InsertTitleAfter: false,
     MobileUsage: false,
@@ -389,6 +390,7 @@ function readableError(error) {
       AutoInsertMeetings: value.AutoInsertMeetings === true,
       SkipInternalOnly: value.SkipInternalOnly === true || value.InternalRecipientsOnly === true,
       SkipInternalOnNewMail: value.SkipInternalOnNewMail === true,
+      SkipAseEmails: value.SkipAseEmails === true,
       InsertTitleBefore: value.InsertTitleBefore === true,
       InsertTitleAfter: value.InsertTitleAfter === true,
       MobileUsage: value.MobileUsage === true,
@@ -428,6 +430,7 @@ function readableError(error) {
       AutoInsertMeetings: record.AutoInsertMeetings,
       SkipInternalOnly: record.SkipInternalOnly,
       SkipInternalOnNewMail: record.SkipInternalOnNewMail,
+      SkipAseEmails: record.SkipAseEmails,
       InsertTitleBefore: record.InsertTitleBefore,
       InsertTitleAfter: record.InsertTitleAfter,
       MobileUsage: record.MobileUsage,
@@ -465,6 +468,7 @@ function readableError(error) {
       AutoInsertMeetings: DEFAULT_SETTINGS.AutoInsertMeetings,
       SkipInternalOnly: DEFAULT_SETTINGS.SkipInternalOnly,
       SkipInternalOnNewMail: DEFAULT_SETTINGS.SkipInternalOnNewMail,
+      SkipAseEmails: DEFAULT_SETTINGS.SkipAseEmails,
       InsertTitleBefore: DEFAULT_SETTINGS.InsertTitleBefore,
       InsertTitleAfter: DEFAULT_SETTINGS.InsertTitleAfter,
       MobileUsage: DEFAULT_SETTINGS.MobileUsage,
@@ -486,6 +490,7 @@ function readableError(error) {
       || typeof settings?.AutoInsertMeetings !== "boolean"
       || typeof settings?.SkipInternalOnly !== "boolean"
       || typeof settings?.SkipInternalOnNewMail !== "boolean"
+      || typeof settings?.SkipAseEmails !== "boolean"
       || typeof settings?.InsertTitleBefore !== "boolean"
       || typeof settings?.InsertTitleAfter !== "boolean"
       || typeof settings?.MobileUsage !== "boolean"
@@ -507,6 +512,7 @@ function readableError(error) {
       AutoInsertMeetings: settings.AutoInsertMeetings,
       SkipInternalOnly: settings.SkipInternalOnly,
       SkipInternalOnNewMail: settings.SkipInternalOnNewMail,
+      SkipAseEmails: settings.SkipAseEmails,
       InsertTitleBefore: settings.InsertTitleBefore,
       InsertTitleAfter: settings.InsertTitleAfter,
       MobileUsage: settings.MobileUsage,
@@ -1575,7 +1581,8 @@ async function saveAccessDeniedState() {
   });
 }
 
-async function subjectExcludesSignature() {
+async function subjectExcludesSignature(settings) {
+  if (settings?.SkipAseEmails !== true) return false;
   if (Office.context?.platform !== Office.PlatformType?.PC) return false;
   const subject = Office.context.mailbox.item?.subject;
   if (typeof subject?.getAsync !== "function") return false;
@@ -1596,13 +1603,16 @@ async function insertSignature(customId = "standard") {
     setStatus("Bitte eine neue Nachricht öffnen.");
     return;
   }
-  if (await subjectExcludesSignature()) {
+  const selectedSettings = vipAuthorized && customId !== "standard"
+    ? customSignatures.items.find((entry) => entry.id === customId)?.settings || signatureSettings
+    : signatureSettings;
+  if (await subjectExcludesSignature(selectedSettings)) {
     if (typeof body.setSignatureAsync === "function") {
       await new Promise((resolve) => {
         body.setSignatureAsync("", { coercionType: Office.CoercionType.Html }, () => resolve());
       });
     }
-    setStatus("Für diese Objektinformation wird keine Signatur eingefügt.");
+    setStatus("Für diese ASE-generierte Mail wird keine Signatur eingefügt.");
     return;
   }
   if (usingCachedProfile) {
@@ -2012,6 +2022,7 @@ const autoInsertMeetingsCheckbox = document.getElementById("auto-insert-meetings
 const skipInternalOnlyCheckbox = document.getElementById("skip-internal-only");
 const skipInternalNewMailField = document.getElementById("skip-internal-new-mail-field");
 const skipInternalNewMailCheckbox = document.getElementById("skip-internal-new-mail");
+const skipAseEmailsCheckbox = document.getElementById("skip-ase-emails");
 const settingsStatus = document.getElementById("settings-status");
 const settingsHeading = document.getElementById("settings-heading");
 const settingsMain = document.getElementById("settings-main");
@@ -2080,6 +2091,7 @@ function setControlsDisabled(disabled) {
   autoInsertMeetingsCheckbox.disabled = disabled;
   skipInternalOnlyCheckbox.disabled = disabled;
   skipInternalNewMailCheckbox.disabled = disabled || !skipInternalOnlyCheckbox.checked;
+  skipAseEmailsCheckbox.disabled = disabled;
 }
 
 function settingsEmailDomain(value) {
@@ -2138,6 +2150,7 @@ function getSettingsComposeType() {
 }
 
 function settingsSubjectExcludesSignature() {
+  if (currentSettings.SkipAseEmails !== true) return Promise.resolve(false);
   if (Office.context?.platform !== Office.PlatformType?.PC) return Promise.resolve(false);
   const subject = Office.context.mailbox.item?.subject;
   if (typeof subject?.getAsync !== "function") return Promise.resolve(false);
@@ -2338,6 +2351,7 @@ async function initializeSettings() {
     autoInsertMeetingsCheckbox.checked = currentSettings.AutoInsertMeetings;
     skipInternalOnlyCheckbox.checked = currentSettings.SkipInternalOnly;
     skipInternalNewMailCheckbox.checked = currentSettings.SkipInternalOnNewMail;
+    skipAseEmailsCheckbox.checked = currentSettings.SkipAseEmails;
     updateInternalInsertionVisibility();
     setControlsDisabled(false);
     setSettingsStatus("Einstellungen geladen.");
@@ -2362,6 +2376,7 @@ async function saveSettings() {
       AutoInsertMeetings: autoInsertMeetingsCheckbox.checked,
       SkipInternalOnly: skipInternalOnlyCheckbox.checked,
       SkipInternalOnNewMail: skipInternalNewMailCheckbox.checked,
+      SkipAseEmails: skipAseEmailsCheckbox.checked,
       InsertTitleBefore: insertTitleBeforeCheckbox.checked,
       InsertTitleAfter: insertTitleAfterCheckbox.checked,
       MobileUsage: mobileUsageCheckbox.checked,
@@ -2411,6 +2426,7 @@ skipInternalOnlyCheckbox.addEventListener("change", () => {
   saveSettings();
 });
 skipInternalNewMailCheckbox.addEventListener("change", saveSettings);
+skipAseEmailsCheckbox.addEventListener("change", saveSettings);
 
 Office.onReady((info) => {
   if (info.host === Office.HostType.Outlook) initializeSettings();
@@ -2453,6 +2469,7 @@ const autoInsertMeetingsCheckbox = document.getElementById("auto-insert-meetings
 const skipInternalOnlyCheckbox = document.getElementById("skip-internal-only");
 const skipInternalNewMailField = document.getElementById("skip-internal-new-mail-field");
 const skipInternalNewMailCheckbox = document.getElementById("skip-internal-new-mail");
+const skipAseEmailsCheckbox = document.getElementById("skip-ase-emails");
 const settingsStatus = document.getElementById("settings-status");
 const closeButton = document.getElementById("close-button");
 const settingsHeading = document.getElementById("settings-heading");
@@ -2492,6 +2509,7 @@ function setControlsDisabled(disabled) {
   autoInsertMeetingsCheckbox.disabled = disabled;
   skipInternalOnlyCheckbox.disabled = disabled;
   skipInternalNewMailCheckbox.disabled = disabled || !skipInternalOnlyCheckbox.checked;
+  skipAseEmailsCheckbox.disabled = disabled;
 }
 
 function updateMobileUsageVisibility() {
@@ -2567,6 +2585,7 @@ function showSettings(settings, department, titleAttributes) {
   autoInsertMeetingsCheckbox.checked = settings.AutoInsertMeetings;
   skipInternalOnlyCheckbox.checked = settings.SkipInternalOnly;
   skipInternalNewMailCheckbox.checked = settings.SkipInternalOnNewMail;
+  skipAseEmailsCheckbox.checked = settings.SkipAseEmails;
   updateInternalInsertionVisibility();
 }
 
@@ -2761,6 +2780,7 @@ async function saveSettings() {
       AutoInsertMeetings: autoInsertMeetingsCheckbox.checked,
       SkipInternalOnly: skipInternalOnlyCheckbox.checked,
       SkipInternalOnNewMail: skipInternalNewMailCheckbox.checked,
+      SkipAseEmails: skipAseEmailsCheckbox.checked,
       InsertTitleBefore: insertTitleBeforeCheckbox.checked,
       InsertTitleAfter: insertTitleAfterCheckbox.checked,
       MobileUsage: mobileUsageCheckbox.checked,
@@ -2802,6 +2822,7 @@ skipInternalOnlyCheckbox.addEventListener("change", () => {
   saveSettings();
 });
 skipInternalNewMailCheckbox.addEventListener("change", saveSettings);
+skipAseEmailsCheckbox.addEventListener("change", saveSettings);
 closeButton.addEventListener("click", () => {
   if (Office.context.ui?.closeContainer) Office.context.ui.closeContainer();
   else window.history.back();
