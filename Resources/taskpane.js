@@ -131,6 +131,7 @@ function readableError(error) {
     InsertTitleAfter: false,
     MobileUsage: false,
     MobileUsageText: "",
+    InternalSignatureText: "",
     Confidentiality: false,
   });
   const ALLOWED_NUMBERS = new Set(["Alles", "Handy", "Festnetz", "Office", "EDVHotline"]);
@@ -316,6 +317,10 @@ function readableError(error) {
     return String(value || "").replace(/\s+/g, " ").trim().slice(0, 200);
   }
 
+  function normalizeInternalSignatureText(value) {
+    return String(value || "").replace(/\r\n?/g, "\n").trim().slice(0, 500);
+  }
+
   function normalizeMobileUsageText(value) {
     return String(value || "").replace(/\s+/g, " ").trim().slice(0, 300);
   }
@@ -395,6 +400,7 @@ function readableError(error) {
       InsertTitleAfter: value.InsertTitleAfter === true,
       MobileUsage: value.MobileUsage === true,
       MobileUsageText: normalizeMobileUsageText(value?.MobileUsageText),
+      InternalSignatureText: normalizeInternalSignatureText(value?.InternalSignatureText),
       Confidentiality: value.Confidentiality === true,
       updatedAt: Number.isFinite(Date.parse(value.updatedAt)) ? value.updatedAt : "",
     };
@@ -435,6 +441,7 @@ function readableError(error) {
       InsertTitleAfter: record.InsertTitleAfter,
       MobileUsage: record.MobileUsage,
       MobileUsageText: record.MobileUsageText,
+      InternalSignatureText: record.InternalSignatureText,
       Confidentiality: record.Confidentiality,
     };
   }
@@ -473,6 +480,7 @@ function readableError(error) {
       InsertTitleAfter: DEFAULT_SETTINGS.InsertTitleAfter,
       MobileUsage: DEFAULT_SETTINGS.MobileUsage,
       MobileUsageText: DEFAULT_SETTINGS.MobileUsageText,
+      InternalSignatureText: DEFAULT_SETTINGS.InternalSignatureText,
       Confidentiality: DEFAULT_SETTINGS.Confidentiality,
     };
   }
@@ -495,6 +503,7 @@ function readableError(error) {
       || typeof settings?.InsertTitleAfter !== "boolean"
       || typeof settings?.MobileUsage !== "boolean"
       || typeof settings?.MobileUsageText !== "string"
+      || typeof settings?.InternalSignatureText !== "string"
       || typeof settings?.Confidentiality !== "boolean"
     ) {
       throw new Error("Ungültige Einstellung.");
@@ -517,6 +526,7 @@ function readableError(error) {
       InsertTitleAfter: settings.InsertTitleAfter,
       MobileUsage: settings.MobileUsage,
       MobileUsageText: normalizeMobileUsageText(settings.MobileUsageText),
+      InternalSignatureText: normalizeInternalSignatureText(settings.InternalSignatureText),
       Confidentiality: settings.Confidentiality,
       updatedAt: new Date().toISOString(),
     };
@@ -638,6 +648,7 @@ let signatureSettings = {
   InsertTitleAfter: false,
   MobileUsage: false,
   MobileUsageText: "",
+  InternalSignatureText: "",
   Confidentiality: false,
 };
 
@@ -2020,6 +2031,8 @@ const autoInsertRepliesCheckbox = document.getElementById("auto-insert-replies")
 const autoInsertForwardsCheckbox = document.getElementById("auto-insert-forwards");
 const autoInsertMeetingsCheckbox = document.getElementById("auto-insert-meetings");
 const skipInternalOnlyCheckbox = document.getElementById("skip-internal-only");
+const internalSignatureField = document.getElementById("internal-signature-field");
+const internalSignatureInput = document.getElementById("internal-signature-text");
 const skipInternalNewMailField = document.getElementById("skip-internal-new-mail-field");
 const skipInternalNewMailCheckbox = document.getElementById("skip-internal-new-mail");
 const skipAseEmailsCheckbox = document.getElementById("skip-ase-emails");
@@ -2037,6 +2050,8 @@ function setSettingsStatus(message) {
 
 function updateInternalInsertionVisibility() {
   skipInternalNewMailField.hidden = !skipInternalOnlyCheckbox.checked;
+  internalSignatureField.hidden = !skipInternalOnlyCheckbox.checked;
+  internalSignatureInput.disabled = skipInternalOnlyCheckbox.disabled || !skipInternalOnlyCheckbox.checked;
   skipInternalNewMailCheckbox.disabled = skipInternalOnlyCheckbox.disabled
     || !skipInternalOnlyCheckbox.checked;
 }
@@ -2090,6 +2105,7 @@ function setControlsDisabled(disabled) {
   autoInsertForwardsCheckbox.disabled = disabled;
   autoInsertMeetingsCheckbox.disabled = disabled;
   skipInternalOnlyCheckbox.disabled = disabled;
+  internalSignatureInput.disabled = disabled || !skipInternalOnlyCheckbox.checked;
   skipInternalNewMailCheckbox.disabled = disabled || !skipInternalOnlyCheckbox.checked;
   skipAseEmailsCheckbox.disabled = disabled;
 }
@@ -2244,7 +2260,7 @@ async function updateInsertedSignature() {
     && (settingsComposeType !== "newMail" || currentSettings.SkipInternalOnNewMail === true)
     && await settingsHasOnlyInternalRecipients(renderData);
   const subjectSuppressionApplies = await settingsSubjectExcludesSignature();
-  if (!composeModeAllowsInsertion || internalSuppressionApplies || subjectSuppressionApplies) {
+  if (!composeModeAllowsInsertion || subjectSuppressionApplies || (internalSuppressionApplies && !currentSettings.InternalSignatureText?.trim())) {
     if (typeof body.setSignatureAsync === "function") {
       await setCurrentSignature(body, "");
       return true;
@@ -2259,6 +2275,19 @@ async function updateInsertedSignature() {
       return true;
     }
     return false;
+  }
+  if (internalSuppressionApplies) {
+    const html = AttensamSignatureRuntime.renderInternalSignature(currentSettings.InternalSignatureText, SETTINGS_SIGNATURE_ID);
+    if (typeof body.setSignatureAsync === "function") {
+      await setCurrentSignature(body, html);
+      return true;
+    }
+    if (typeof body.getAsync !== "function" || typeof body.setAsync !== "function") return false;
+    const bodyHtml = await getBodyHtml(body);
+    const replacement = replaceMarkedSignature(bodyHtml, html);
+    if (replacement === null) return false;
+    await setBodyHtml(body, replacement);
+    return true;
   }
   const delegation = await new Promise((resolve) => {
     AttensamSignatureRuntime.resolveDelegation(renderData, resolve);
@@ -2344,6 +2373,7 @@ async function initializeSettings() {
     insertTitleAfterCheckbox.checked = currentSettings.InsertTitleAfter;
     mobileUsageCheckbox.checked = currentSettings.MobileUsage;
     mobileUsageTextInput.value = currentSettings.MobileUsageText;
+    internalSignatureInput.value = currentSettings.InternalSignatureText;
     updateMobileUsageVisibility();
     confidentialityCheckbox.checked = currentSettings.Confidentiality;
     autoInsertRepliesCheckbox.checked = currentSettings.AutoInsertReplies;
@@ -2381,6 +2411,7 @@ async function saveSettings() {
       InsertTitleAfter: insertTitleAfterCheckbox.checked,
       MobileUsage: mobileUsageCheckbox.checked,
       MobileUsageText: mobileUsageTextInput.value,
+      InternalSignatureText: internalSignatureInput.value,
       Confidentiality: confidentialityCheckbox.checked,
     });
     try {
@@ -2417,6 +2448,7 @@ mobileUsageCheckbox.addEventListener("change", () => {
   saveSettings();
 });
 mobileUsageTextInput.addEventListener("change", saveSettings);
+internalSignatureInput.addEventListener("change", saveSettings);
 confidentialityCheckbox.addEventListener("change", saveSettings);
 autoInsertRepliesCheckbox.addEventListener("change", saveSettings);
 autoInsertForwardsCheckbox.addEventListener("change", saveSettings);
@@ -2467,6 +2499,8 @@ const autoInsertRepliesCheckbox = document.getElementById("auto-insert-replies")
 const autoInsertForwardsCheckbox = document.getElementById("auto-insert-forwards");
 const autoInsertMeetingsCheckbox = document.getElementById("auto-insert-meetings");
 const skipInternalOnlyCheckbox = document.getElementById("skip-internal-only");
+const internalSignatureField = document.getElementById("internal-signature-field");
+const internalSignatureInput = document.getElementById("internal-signature-text");
 const skipInternalNewMailField = document.getElementById("skip-internal-new-mail-field");
 const skipInternalNewMailCheckbox = document.getElementById("skip-internal-new-mail");
 const skipAseEmailsCheckbox = document.getElementById("skip-ase-emails");
@@ -2489,6 +2523,8 @@ function setSettingsStatus(message) {
 
 function updateInternalInsertionVisibility() {
   skipInternalNewMailField.hidden = !skipInternalOnlyCheckbox.checked;
+  internalSignatureField.hidden = !skipInternalOnlyCheckbox.checked;
+  internalSignatureInput.disabled = skipInternalOnlyCheckbox.disabled || !skipInternalOnlyCheckbox.checked;
   skipInternalNewMailCheckbox.disabled = skipInternalOnlyCheckbox.disabled
     || !skipInternalOnlyCheckbox.checked;
 }
@@ -2508,6 +2544,7 @@ function setControlsDisabled(disabled) {
   autoInsertForwardsCheckbox.disabled = disabled;
   autoInsertMeetingsCheckbox.disabled = disabled;
   skipInternalOnlyCheckbox.disabled = disabled;
+  internalSignatureInput.disabled = disabled || !skipInternalOnlyCheckbox.checked;
   skipInternalNewMailCheckbox.disabled = disabled || !skipInternalOnlyCheckbox.checked;
   skipAseEmailsCheckbox.disabled = disabled;
 }
@@ -2578,6 +2615,7 @@ function showSettings(settings, department, titleAttributes) {
   insertTitleAfterCheckbox.checked = settings.InsertTitleAfter;
   mobileUsageCheckbox.checked = settings.MobileUsage;
   mobileUsageTextInput.value = settings.MobileUsageText;
+  internalSignatureInput.value = settings.InternalSignatureText;
   updateMobileUsageVisibility();
   confidentialityCheckbox.checked = settings.Confidentiality;
   autoInsertRepliesCheckbox.checked = settings.AutoInsertReplies;
@@ -2785,6 +2823,7 @@ async function saveSettings() {
       InsertTitleAfter: insertTitleAfterCheckbox.checked,
       MobileUsage: mobileUsageCheckbox.checked,
       MobileUsageText: mobileUsageTextInput.value,
+      InternalSignatureText: internalSignatureInput.value,
       Confidentiality: confidentialityCheckbox.checked,
     });
     setSettingsStatus("Einstellungen gespeichert.");
@@ -2813,6 +2852,7 @@ mobileUsageCheckbox.addEventListener("change", () => {
   saveSettings();
 });
 mobileUsageTextInput.addEventListener("change", saveSettings);
+internalSignatureInput.addEventListener("change", saveSettings);
 confidentialityCheckbox.addEventListener("change", saveSettings);
 autoInsertRepliesCheckbox.addEventListener("change", saveSettings);
 autoInsertForwardsCheckbox.addEventListener("change", saveSettings);
