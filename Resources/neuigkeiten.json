@@ -1,6 +1,18 @@
 {
-  "version": "0.8.58",
+  "version": "0.8.60",
   "releases": [
+    {
+      "version": "0.8.60",
+      "changes": [
+        "NEU: Betreffregel für „Journaleintrag “ ergänzt"
+      ]
+    },
+    {
+      "version": "0.8.59",
+      "changes": [
+        "FIX: Interne Signatur nutzt in New Outlook wieder den normalen Abstand"
+      ]
+    },
     {
       "version": "0.8.58",
       "changes": [

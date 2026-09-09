@@ -12,8 +12,8 @@
   </script>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@5.18.0/lib/msal-browser.min.js"></script>
-  <script defer src="autorun-classic.js?rev=14"></script>
-  <script defer src="taskpane.js?rev=13"></script>
+  <script defer src="autorun-classic.js?rev=16"></script>
+  <script defer src="taskpane.js?rev=15"></script>
   <style>
     :root { color-scheme:light; --red:#e10000; --ink:#090909; --muted:#666; --line:#d2d2d2; --paper:#f7f7f7; --surface:#fff; --control-bg:#fff; --control-ink:#090909; --control-border:#aaa; --hover:#f1f1f1; --footer-bg:rgba(255,255,255,.98); --button-bg:#090909; --button-ink:#fff; }
     :root[data-client-theme="dark"] { color-scheme:dark; --ink:#f2f2f2; --muted:#b8b8b8; --line:#4a4a4a; --paper:#111; --surface:#222; --control-bg:#2b2b2b; --control-ink:#f5f5f5; --control-border:#656565; --hover:#333; --footer-bg:rgba(28,28,28,.98); --button-bg:#ededed; --button-ink:#111; }
@@ -260,7 +260,7 @@
 <h2>Grußformel und Telefonnummern</h2><p>Wähle eine Grußformel und die anzuzeigenden Telefonnummern. Vorgabe: keine Grußformel, Handy und Festnetz. Titel, Hinweise zur mobilen Nutzung und Vertraulichkeit kannst du bei Bedarf aktivieren.</p>
 <h2>Automatisches Einfügen</h2><p>Neue E-Mails erhalten standardmäßig eine Signatur. Für Antworten und Weiterleitungen gibt es jeweils eine eigene Checkbox.</p>
 <h2>Interne E-Mails</h2><p>„Signatur bei internen Emails nicht einfügen“ unterdrückt die Signatur bei Antworten und Weiterleitungen mit ausschließlich internen Empfängern. Intern bedeutet: gleiche E-Mail-Domain wie dein Konto. Mit „Auch bei neuen Mails nicht einfügen“ gilt das zusätzlich für neue Nachrichten. Im Textfeld „Signatur für interne E-Mails“ kannst du eine kurze eigene Signatur wie „LG Peter“ hinterlegen. Zeilenumbrüche werden übernommen. Lässt du das Feld leer, wird keine Signatur eingefügt. Sobald externe Empfänger dabei sind, gelten wieder die normalen Einstellungen zum automatischen Einfügen und die vollständige Signatur wird verwendet.</p>
-<h2>ASE-generierte Mails</h2><p>„Bei ASE generierten Mails keine Signatur einfügen“ unterdrückt oder entfernt auf dem PC die Signatur, wenn der Betreff mit „Ihre Objektinformation - “ oder „Durchführungsbestätigung - “ beginnt. Die Prüfung erfolgt auch vor dem Senden. Auf Mobilgeräten gilt diese Regel nicht.</p>
+<h2>ASE-generierte Mails</h2><p>„Bei ASE generierten Mails keine Signatur einfügen“ unterdrückt oder entfernt auf dem PC die Signatur, wenn der Betreff mit „Ihre Objektinformation - “, „Durchführungsbestätigung - “ oder „Journaleintrag “ beginnt. Die Prüfung erfolgt auch vor dem Senden. Auf Mobilgeräten gilt diese Regel nicht.</p>
 <h2>Im Auftrag von</h2><p>Beim Wechsel der Von-Adresse wird das Profil des gewählten Absenders verwendet, sofern es geladen werden kann. Bei Personen erscheint die Kennzeichnung „im Auftrag von“. Konten mit nur einem Vornamen erhalten ihre eigene Signatur ohne diese Kennzeichnung. In Outlook Classic kann die Aktualisierung etwas dauern.</p>
 <h2>Besprechungen</h2><p>Aktiviere „Automatisches Einfügen bei Besprechungen“, um die Signatur bei neu erstellten Besprechungen als Organisator einzufügen. Bereits vorhandene Termine werden dadurch nicht nachträglich geändert.</p>
 <h2>Gespeicherte Signaturdaten</h2><p>Wenn aktuelle Profildaten nicht geladen werden können, kann das Add-In passende gespeicherte Daten bis zu 14 Tage lang verwenden. Ein Hinweis zeigt die Verwendung dieser Daten an. Ohne Internet kann Outlook den Start des Add-Ins einschränken.</p>

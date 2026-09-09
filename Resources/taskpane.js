@@ -613,7 +613,7 @@ const DELEGATED_PROFILE_LOCAL_CACHE_KEY = "attensam.signature.delegated-profiles
 const REQUIRED_ROLE = "ATS.Signature";
 const VIP_ROLE = "ATS.Signature.VIP";
 const CITY_CHANGE_ROLE = "CityChange";
-const EXCLUDED_SUBJECT_PREFIXES = ["Ihre Objektinformation - ", "Durchführungsbestätigung - "];
+const EXCLUDED_SUBJECT_PREFIXES = ["Ihre Objektinformation - ", "Durchführungsbestätigung - ", "Journaleintrag "];
 const MAX_CUSTOM_SIGNATURES = 3;
 const SIGNATURE_MARKER_ID = "attensam-signature-root";
 const SIGNATURE_MARKER_TEXT = "Attensam-Signatur";
@@ -2174,7 +2174,7 @@ function settingsSubjectExcludesSignature() {
     subject.getAsync((result) => {
       resolve(
         result.status === Office.AsyncResultStatus.Succeeded
-        && ["Ihre Objektinformation - ", "Durchführungsbestätigung - "].some((prefix) => String(result.value || "").startsWith(prefix)),
+        && ["Ihre Objektinformation - ", "Durchführungsbestätigung - ", "Journaleintrag "].some((prefix) => String(result.value || "").startsWith(prefix)),
       );
     });
   });
@@ -2280,7 +2280,6 @@ async function updateInsertedSignature() {
     const html = AttensamSignatureRuntime.renderInternalSignature(currentSettings.InternalSignatureText, SETTINGS_SIGNATURE_ID);
     if (typeof body.setSignatureAsync === "function") {
       await setCurrentSignature(body, html);
-      await new Promise((resolve) => AttensamSignatureRuntime.cleanInternalSignatureSpacing(body, resolve));
       return true;
     }
     if (typeof body.getAsync !== "function" || typeof body.setAsync !== "function") return false;
