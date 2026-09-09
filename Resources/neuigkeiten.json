@@ -1,6 +1,12 @@
 {
-  "version": "0.8.57",
+  "version": "0.8.58",
   "releases": [
+    {
+      "version": "0.8.58",
+      "changes": [
+        "FIX: Zusätzliche Leerzeilen unter internen Signaturen in New Outlook entfernt"
+      ]
+    },
     {
       "version": "0.8.57",
       "changes": [

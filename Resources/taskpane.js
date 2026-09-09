@@ -2280,6 +2280,7 @@ async function updateInsertedSignature() {
     const html = AttensamSignatureRuntime.renderInternalSignature(currentSettings.InternalSignatureText, SETTINGS_SIGNATURE_ID);
     if (typeof body.setSignatureAsync === "function") {
       await setCurrentSignature(body, html);
+      await new Promise((resolve) => AttensamSignatureRuntime.cleanInternalSignatureSpacing(body, resolve));
       return true;
     }
     if (typeof body.getAsync !== "function" || typeof body.setAsync !== "function") return false;
