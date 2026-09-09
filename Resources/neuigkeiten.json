@@ -1,6 +1,18 @@
 {
-  "version": "0.8.54",
+  "version": "0.8.56",
   "releases": [
+    {
+      "version": "0.8.56",
+      "changes": [
+        "FIX: Interne Signatur wird weiß statt grau angezeigt"
+      ]
+    },
+    {
+      "version": "0.8.55",
+      "changes": [
+        "FIX: Interne Signatur verwendet Aptos 12 mit einer Leerzeile darunter"
+      ]
+    },
     {
       "version": "0.8.54",
       "changes": [
