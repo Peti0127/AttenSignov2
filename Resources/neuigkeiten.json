@@ -1,6 +1,12 @@
 {
-  "version": "0.8.60",
+  "version": "0.8.61",
   "releases": [
+    {
+      "version": "0.8.61",
+      "changes": [
+        "FIX: Interne Signatur verwendet schwarze Schrift"
+      ]
+    },
     {
       "version": "0.8.60",
       "changes": [
