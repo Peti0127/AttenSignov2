@@ -1,6 +1,12 @@
 {
-  "version": "0.8.56",
+  "version": "0.8.57",
   "releases": [
+    {
+      "version": "0.8.57",
+      "changes": [
+        "FIX: Interne Signatur ohne Tabelle und feste Textfarbe"
+      ]
+    },
     {
       "version": "0.8.56",
       "changes": [
