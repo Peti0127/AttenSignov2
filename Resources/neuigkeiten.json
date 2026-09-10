@@ -4,7 +4,7 @@
     {
       "version": "0.8.62",
       "changes": [
-        "NEU: Eigene Vor- und Nachnamen mit NameChange-Rolle wählbar"
+        "NEU: Eigene Vor- und Nachnamen für berechtigte User wählbar"
       ]
     },
     {
