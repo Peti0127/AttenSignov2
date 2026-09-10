@@ -104,6 +104,7 @@ function readableError(error) {
   const REQUIRED_ROLE = "ATS.Signature";
   const VIP_ROLE = "ATS.Signature.VIP";
   const CITY_CHANGE_ROLE = "CityChange";
+  const NAME_CHANGE_ROLE = "rol.ats00.ATS.Signature.NameChange";
   const MAX_CUSTOM_SIGNATURES = 3;
   const PROFILE_CACHE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
   const CACHE_PREFIX = "attensam.signature.settings.v2";
@@ -112,11 +113,14 @@ function readableError(error) {
   const ACCESS_CACHE_PREFIX = "attensam.signature.access-role.v1";
   const VIP_CACHE_PREFIX = "attensam.signature.vip-role.v1";
   const CITY_CHANGE_CACHE_PREFIX = "attensam.signature.city-change-role.v1";
+  const NAME_CHANGE_CACHE_PREFIX = "attensam.signature.name-change-role.v1";
   const LEGACY_PHONE_PREFIX = "attensam.signature.phone-mode";
   const DEFAULT_SETTINGS = Object.freeze({
     Nummer: "Alles",
     MfG: "MfG0",
     CustomGreeting: "",
+    CustomFirstName: "",
+    CustomLastName: "",
     GreetingLines: 1,
     CityOverride: "Standard",
     AutoInsert: true,
@@ -215,6 +219,9 @@ function readableError(error) {
   function cityChangeStorageKey() {
     return `${CITY_CHANGE_CACHE_PREFIX}:${currentUserKey()}`;
   }
+  function nameChangeStorageKey() {
+    return `${NAME_CHANGE_CACHE_PREFIX}:${currentUserKey()}`;
+  }
 
   function setVipAuthorized(value) {
     localStorage.setItem(vipStorageKey(), JSON.stringify({
@@ -257,6 +264,28 @@ function readableError(error) {
 
   function getCityChangeAuthorized() {
     return getCityChangeAuthorizationState() === true;
+  }
+
+  function setNameChangeAuthorized(value) {
+    localStorage.setItem(nameChangeStorageKey(), JSON.stringify({
+      authorized: value === true,
+      role: NAME_CHANGE_ROLE,
+      updatedAt: new Date().toISOString(),
+    }));
+  }
+
+  function getNameChangeAuthorizationState() {
+    try {
+      const value = JSON.parse(localStorage.getItem(nameChangeStorageKey()) || "null");
+      return typeof value?.authorized === "boolean" ? value.authorized : null;
+    } catch {
+      localStorage.removeItem(nameChangeStorageKey());
+      return null;
+    }
+  }
+
+  function getNameChangeAuthorized() {
+    return getNameChangeAuthorizationState() === true;
   }
 
   function normalizeCustomSignatures(value) {
@@ -311,6 +340,10 @@ function readableError(error) {
     });
     localStorage.setItem(customSignaturesStorageKey(), JSON.stringify(record));
     return record;
+  }
+
+  function normalizeCustomName(value) {
+    return String(value || "").replace(/\s+/g, " ").trim().slice(0, 100);
   }
 
   function normalizeCustomGreeting(value) {
@@ -382,6 +415,8 @@ function readableError(error) {
       Nummer: ALLOWED_NUMBERS.has(value?.Nummer) ? value.Nummer : DEFAULT_SETTINGS.Nummer,
       MfG: ALLOWED_GREETINGS.has(value?.MfG) ? value.MfG : DEFAULT_SETTINGS.MfG,
       CustomGreeting: normalizeCustomGreeting(value?.CustomGreeting),
+      CustomFirstName: normalizeCustomName(value?.CustomFirstName),
+      CustomLastName: normalizeCustomName(value?.CustomLastName),
       GreetingLines: ALLOWED_GREETING_LINES.has(Number(value?.GreetingLines))
         ? Number(value.GreetingLines)
         : DEFAULT_SETTINGS.GreetingLines,
@@ -427,6 +462,8 @@ function readableError(error) {
       Nummer: record.Nummer,
       MfG: record.MfG,
       CustomGreeting: record.CustomGreeting,
+      CustomFirstName: record.CustomFirstName,
+      CustomLastName: record.CustomLastName,
       GreetingLines: record.GreetingLines,
       CityOverride: record.CityOverride,
       AutoInsert: record.AutoInsert,
@@ -466,6 +503,8 @@ function readableError(error) {
       Nummer: LEGACY_NUMBER_MAP[legacy] || DEFAULT_SETTINGS.Nummer,
       MfG: DEFAULT_SETTINGS.MfG,
       CustomGreeting: DEFAULT_SETTINGS.CustomGreeting,
+      CustomFirstName: DEFAULT_SETTINGS.CustomFirstName,
+      CustomLastName: DEFAULT_SETTINGS.CustomLastName,
       GreetingLines: DEFAULT_SETTINGS.GreetingLines,
       CityOverride: DEFAULT_SETTINGS.CityOverride,
       AutoInsert: DEFAULT_SETTINGS.AutoInsert,
@@ -490,6 +529,8 @@ function readableError(error) {
       !ALLOWED_NUMBERS.has(settings?.Nummer)
       || !ALLOWED_GREETINGS.has(settings?.MfG)
       || typeof settings?.CustomGreeting !== "string"
+      || typeof settings?.CustomFirstName !== "string"
+      || typeof settings?.CustomLastName !== "string"
       || !ALLOWED_GREETING_LINES.has(Number(settings?.GreetingLines))
       || !ALLOWED_CITY_OVERRIDES.has(settings?.CityOverride)
       || typeof settings?.AutoInsert !== "boolean"
@@ -512,6 +553,8 @@ function readableError(error) {
       Nummer: settings.Nummer,
       MfG: settings.MfG,
       CustomGreeting: normalizeCustomGreeting(settings.CustomGreeting),
+      CustomFirstName: normalizeCustomName(settings.CustomFirstName),
+      CustomLastName: normalizeCustomName(settings.CustomLastName),
       GreetingLines: Number(settings.GreetingLines),
       CityOverride: settings.CityOverride,
       AutoInsert: true,
@@ -599,6 +642,9 @@ function readableError(error) {
     getCityChangeAuthorized,
     getCityChangeAuthorizationState,
     setCityChangeAuthorized,
+    getNameChangeAuthorized,
+    getNameChangeAuthorizationState,
+    setNameChangeAuthorized,
   });
 })(window);
 
@@ -634,6 +680,7 @@ let userRoles = new Set();
 let accessAuthorized = false;
 let vipAuthorized = false;
 let cityChangeAuthorized = false;
+let nameChangeAuthorized = false;
 let customSignatures = { requiredRole: VIP_ROLE, defaultId: "standard", items: [] };
 let contextSignatureId = "standard";
 let editingCustomSignatureId = null;
@@ -642,6 +689,8 @@ let signatureSettings = {
   Nummer: "Alles",
   MfG: "MfG0",
   CustomGreeting: "",
+  CustomFirstName: "",
+  CustomLastName: "",
   GreetingLines: 1,
   CityOverride: "Standard",
   InsertTitleBefore: false,
@@ -679,6 +728,7 @@ if (initialCachedVipState !== null) {
 }
 const initialCachedCityChangeState = SignaturePreferences.getCityChangeAuthorizationState();
 cityChangeAuthorized = initialCachedCityChangeState === true;
+nameChangeAuthorized = SignaturePreferences.getNameChangeAuthorized();
 
 function setStatus(message) {
   statusElement.textContent = message;
@@ -720,9 +770,11 @@ function rememberAuthenticationRoles(result) {
   accessAuthorized = userRoles.has(REQUIRED_ROLE);
   vipAuthorized = userRoles.has(VIP_ROLE);
   cityChangeAuthorized = userRoles.has(CITY_CHANGE_ROLE) || userRoles.has("ATS.Signature.CityChange");
+  nameChangeAuthorized = userRoles.has("rol.ats00.ATS.Signature.NameChange");
   SignaturePreferences.setAccessAuthorized(accessAuthorized);
   SignaturePreferences.setVipAuthorized(vipAuthorized);
   SignaturePreferences.setCityChangeAuthorized(cityChangeAuthorized);
+  SignaturePreferences.setNameChangeAuthorized(nameChangeAuthorized);
   applyAccessView();
 }
 
@@ -1060,7 +1112,11 @@ function scaleSignaturePreview() {
 function buildSignature(templateHtml = signatureTemplate, settings = signatureSettings, signatureId = "standard") {
   const sendAs = isFirstNameOnlyProfile(currentDelegation);
   const sendOnBehalf = Boolean(currentDelegation) && !sendAs;
-  const selectedProfile = currentDelegation || profile;
+  const ownProfile = nameChangeAuthorized ? { ...profile,
+    firstName: String(settings.CustomFirstName || "").trim() || profile.firstName,
+    lastName: String(settings.CustomLastName || "").trim() || profile.lastName,
+  } : profile;
+  const selectedProfile = currentDelegation || ownProfile;
   const baseSignatureProfile = sendAs && !String(selectedProfile.firstName || "").trim()
     ? { ...selectedProfile, firstName: String(selectedProfile.displayName || "").trim() }
     : selectedProfile;
@@ -1086,7 +1142,7 @@ function buildSignature(templateHtml = signatureTemplate, settings = signatureSe
     && settings.InsertTitleAfter && String(signatureProfile.customAttribute11 || "").trim()
     ? ` ${String(signatureProfile.customAttribute11).trim()}`
     : "";
-  const senderName = personalName(profile);
+  const senderName = personalName(ownProfile);
   const fromName = delegatedName(currentDelegation, settings);
   const delegatedLastNameHtml = sendOnBehalf
     ? `<span style="font-weight: normal;">(im Auftrag von </span><span style="font-weight: bold;">${escapeHtml(fromName)}</span><span style="font-weight: normal;">)</span>`
@@ -1266,6 +1322,7 @@ async function saveAutoRenderData() {
     settings: { ...signatureSettings },
     accessAuthorized,
     cityChangeAuthorized,
+    nameChangeAuthorized,
     settingsUpdatedAt: cachedAt,
     graphAuth: {
       clientId: CONFIG.clientId,
@@ -2010,6 +2067,9 @@ const SETTINGS_SIGNATURE_ID = String(new URLSearchParams(window.location.search)
 const phoneModeSelect = document.getElementById("phone-mode");
 const cityChangeField = document.getElementById("city-change-field");
 const cityChangeSelect = document.getElementById("city-change");
+const nameChangeFields = document.getElementById("name-change-fields");
+const customFirstNameInput = document.getElementById("custom-first-name");
+const customLastNameInput = document.getElementById("custom-last-name");
 const edvHotlineOption = document.getElementById("edv-hotline-option");
 const combinedPhoneWarning = document.getElementById("combined-phone-warning");
 const mobilePhoneWarning = document.getElementById("mobile-phone-warning");
@@ -2043,6 +2103,7 @@ const settingsAccessDenied = document.getElementById("settings-access-denied");
 let currentSettings;
 let settingsProfile = null;
 let cityChangeAuthorized = false;
+let nameChangeAuthorized = false;
 
 function setSettingsStatus(message) {
   settingsStatus.textContent = message;
@@ -2093,6 +2154,8 @@ function updateGreetingVisibility() {
 function setControlsDisabled(disabled) {
   phoneModeSelect.disabled = disabled;
   cityChangeSelect.disabled = disabled || !cityChangeAuthorized;
+  customFirstNameInput.disabled = disabled || !nameChangeAuthorized;
+  customLastNameInput.disabled = disabled || !nameChangeAuthorized;
   greetingModeSelect.disabled = disabled;
   customGreetingInput.disabled = disabled || greetingModeSelect.value !== "MfGCustom";
   greetingLinesSelect.disabled = disabled || greetingModeSelect.value === "MfG0";
@@ -2248,7 +2311,7 @@ async function updateInsertedSignature() {
   if (!body) return false;
   const cachedRenderData = SignaturePreferences.getValidRenderData();
   const renderData = cachedRenderData
-    ? { ...cachedRenderData, cityChangeAuthorized: SignaturePreferences.getCityChangeAuthorized() }
+    ? { ...cachedRenderData, cityChangeAuthorized: SignaturePreferences.getCityChangeAuthorized(), nameChangeAuthorized: SignaturePreferences.getNameChangeAuthorized() }
     : null;
   if (!renderData) return false;
   const settingsComposeType = await getSettingsComposeType();
@@ -2351,8 +2414,12 @@ async function initializeSettings() {
       : `Einstellungen: ${selectedItem.title}`;
     currentSettings = await SignaturePreferences.getSettingsForSignature(SETTINGS_SIGNATURE_ID);
     cityChangeAuthorized = SignaturePreferences.getCityChangeAuthorized();
+    nameChangeAuthorized = SignaturePreferences.getNameChangeAuthorized();
     cityChangeField.hidden = !cityChangeAuthorized;
+    nameChangeFields.hidden = !nameChangeAuthorized;
     cityChangeSelect.value = currentSettings.CityOverride;
+    customFirstNameInput.value = currentSettings.CustomFirstName;
+    customLastNameInput.value = currentSettings.CustomLastName;
     settingsProfile = SignaturePreferences.getValidRenderData()?.profile || null;
     const department = SignaturePreferences.getDepartment();
     const titleAttributes = SignaturePreferences.getTitleAttributes();
@@ -2398,6 +2465,8 @@ async function saveSettings() {
       Nummer: phoneModeSelect.value,
       MfG: greetingModeSelect.value,
       CustomGreeting: customGreetingInput.value,
+      CustomFirstName: nameChangeAuthorized ? customFirstNameInput.value : currentSettings.CustomFirstName,
+      CustomLastName: nameChangeAuthorized ? customLastNameInput.value : currentSettings.CustomLastName,
       GreetingLines: Number(greetingLinesSelect.value),
       CityOverride: cityChangeAuthorized ? cityChangeSelect.value : currentSettings.CityOverride,
       AutoInsert: true,
@@ -2435,6 +2504,8 @@ phoneModeSelect.addEventListener("change", () => {
   saveSettings();
 });
 cityChangeSelect.addEventListener("change", saveSettings);
+customFirstNameInput.addEventListener("change", saveSettings);
+customLastNameInput.addEventListener("change", saveSettings);
 greetingModeSelect.addEventListener("change", () => {
   updateGreetingVisibility();
   saveSettings();
@@ -2478,6 +2549,9 @@ const MOBILE_SETTINGS_SIGNATURE_ID = String(new URLSearchParams(window.location.
 const phoneModeSelect = document.getElementById("phone-mode");
 const cityChangeField = document.getElementById("city-change-field");
 const cityChangeSelect = document.getElementById("city-change");
+const nameChangeFields = document.getElementById("name-change-fields");
+const customFirstNameInput = document.getElementById("custom-first-name");
+const customLastNameInput = document.getElementById("custom-last-name");
 const edvHotlineOption = document.getElementById("edv-hotline-option");
 const combinedPhoneWarning = document.getElementById("combined-phone-warning");
 const mobilePhoneWarning = document.getElementById("mobile-phone-warning");
@@ -2516,6 +2590,7 @@ let signatureTemplate = "";
 let msalInstance;
 let settingsProfile = null;
 let cityChangeAuthorized = SignaturePreferences.getCityChangeAuthorized();
+let nameChangeAuthorized = SignaturePreferences.getNameChangeAuthorized();
 
 function setSettingsStatus(message) {
   settingsStatus.textContent = message;
@@ -2532,6 +2607,8 @@ function updateInternalInsertionVisibility() {
 function setControlsDisabled(disabled) {
   phoneModeSelect.disabled = disabled;
   cityChangeSelect.disabled = disabled || !cityChangeAuthorized;
+  customFirstNameInput.disabled = disabled || !nameChangeAuthorized;
+  customLastNameInput.disabled = disabled || !nameChangeAuthorized;
   greetingModeSelect.disabled = disabled;
   customGreetingInput.disabled = disabled || greetingModeSelect.value !== "MfGCustom";
   greetingLinesSelect.disabled = disabled || greetingModeSelect.value === "MfG0";
@@ -2599,8 +2676,12 @@ function showSettings(settings, department, titleAttributes) {
   }
   const canUseEdvHotline = updateDepartmentOption(department);
   cityChangeAuthorized = SignaturePreferences.getCityChangeAuthorized();
+  nameChangeAuthorized = SignaturePreferences.getNameChangeAuthorized();
   cityChangeField.hidden = !cityChangeAuthorized;
+    nameChangeFields.hidden = !nameChangeAuthorized;
   cityChangeSelect.value = settings.CityOverride;
+    customFirstNameInput.value = settings.CustomFirstName;
+    customLastNameInput.value = settings.CustomLastName;
   phoneModeSelect.value = settings.Nummer === "EDVHotline" && !canUseEdvHotline
     ? "Alles"
     : settings.Nummer;
@@ -2673,8 +2754,10 @@ function rememberMobileCityChangeRole(result) {
     ...(Array.isArray(tokenClaims?.roles) ? tokenClaims.roles : []),
   ].map((role) => String(role).trim());
   cityChangeAuthorized = roles.includes("CityChange") || roles.includes("ATS.Signature.CityChange");
+  nameChangeAuthorized = roles.includes("rol.ats00.ATS.Signature.NameChange");
   SignaturePreferences.setAccessAuthorized(roles.includes("ATS.Signature"));
   SignaturePreferences.setCityChangeAuthorized(cityChangeAuthorized);
+  SignaturePreferences.setNameChangeAuthorized(nameChangeAuthorized);
 }
 
 async function loadProfile() {
@@ -2721,6 +2804,7 @@ async function saveAutomaticRenderData() {
     settings: { ...standardSettings },
     accessAuthorized: SignaturePreferences.getAccessAuthorized(),
     cityChangeAuthorized,
+    nameChangeAuthorized,
     settingsUpdatedAt: now,
     graphAuth: {
       clientId: CONFIG.clientId,
@@ -2810,6 +2894,8 @@ async function saveSettings() {
       Nummer: phoneModeSelect.value,
       MfG: greetingModeSelect.value,
       CustomGreeting: customGreetingInput.value,
+      CustomFirstName: nameChangeAuthorized ? customFirstNameInput.value : currentSettings.CustomFirstName,
+      CustomLastName: nameChangeAuthorized ? customLastNameInput.value : currentSettings.CustomLastName,
       GreetingLines: Number(greetingLinesSelect.value),
       CityOverride: cityChangeAuthorized ? cityChangeSelect.value : currentSettings.CityOverride,
       AutoInsert: true,
@@ -2839,6 +2925,8 @@ phoneModeSelect.addEventListener("change", () => {
   saveSettings();
 });
 cityChangeSelect.addEventListener("change", saveSettings);
+customFirstNameInput.addEventListener("change", saveSettings);
+customLastNameInput.addEventListener("change", saveSettings);
 greetingModeSelect.addEventListener("change", () => {
   updateGreetingVisibility();
   saveSettings();

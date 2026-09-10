@@ -1,6 +1,12 @@
 {
-  "version": "0.8.61",
+  "version": "0.8.62",
   "releases": [
+    {
+      "version": "0.8.62",
+      "changes": [
+        "NEU: Eigene Vor- und Nachnamen mit NameChange-Rolle wählbar"
+      ]
+    },
     {
       "version": "0.8.61",
       "changes": [
@@ -11,24 +17,6 @@
       "version": "0.8.60",
       "changes": [
         "NEU: Betreffregel für „Journaleintrag “ ergänzt"
-      ]
-    },
-    {
-      "version": "0.8.59",
-      "changes": [
-        "FIX: Interne Signatur nutzt in New Outlook wieder den normalen Abstand"
-      ]
-    },
-    {
-      "version": "0.8.58",
-      "changes": [
-        "FIX: Zusätzliche Leerzeilen unter internen Signaturen in New Outlook entfernt"
-      ]
-    },
-    {
-      "version": "0.8.57",
-      "changes": [
-        "FIX: Interne Signatur ohne Tabelle und feste Textfarbe"
       ]
     },
     {
@@ -47,19 +35,6 @@
       "version": "0.8.54",
       "changes": [
         "NEU: eigene Signatur für interne Mails ist jetzt wählbar"
-      ]
-    },
-    {
-      "version": "0.8.53",
-      "changes": [
-        "NEU: Hilfe spricht dich jetzt mit „du“ an"
-      ]
-    },
-    {
-      "version": "0.8.52",
-      "changes": [
-        "NEU: Version nur noch in Neuigkeiten und Feedback sichtbar",
-        "NEU: Code-Updates ohne Manifest-Update möglich"
       ]
     },
     {
@@ -84,25 +59,6 @@
       ]
     },
     {
-      "version": "0.8.48",
-      "changes": [
-        "NEU: Neue Vorgaben: keine Grußformel, beide Nummern, Checkboxen aus"
-      ]
-    },
-    {
-      "version": "0.8.47",
-      "changes": [
-        "NEU: Einstellungen per Rechtsklick auch ohne VIP verfügbar",
-        "NEU: Speicherhinweis aus den Einstellungen entfernt"
-      ]
-    },
-    {
-      "version": "0.8.46",
-      "changes": [
-        "NEU: Telefonnummern bei „im Auftrag von“ angepasst"
-      ]
-    },
-    {
       "version": "0.8.45",
       "changes": [
         "FIX: Automatische Signatur bei Besprechungen repariert"
@@ -113,13 +69,11 @@
       "changes": [
         "NEU: Automatische Signatur für Antworten und Weiterleitungen getrennt wählbar",
         "NEU: Signatur für interne Mails ausschaltbar",
-        "NEU: Zugriff auf berechtigte Benutzer beschränkt",
         "NEU: Stadtwahl mit CityChange-Rolle verfügbar",
-        "NEU: Betreffregel für „Ihre Objektinformation - “ ergänzt",
+        "ÄNDERUNG: Betreffregel für „Ihre Objektinformation - “ ergänzt",
         "FIX: Absenderwechsel in Outlook Classic verbessert",
         "NEU: Feedbackformular hinzugefügt",
-        "NEU: Automatische Signatur bei Besprechungen verfügbar",
-        "NEU: Bei Updates müssen weniger Dateien hochgeladen werden"
+        "NEU: Automatische Signatur bei Besprechungen verfügbar"
       ]
     },
     {
@@ -147,18 +101,6 @@
       ]
     },
     {
-      "version": "0.8.14",
-      "changes": [
-        "NEU: Übersicht der Profilplatzhalter hinzugefügt"
-      ]
-    },
-    {
-      "version": "0.8.13",
-      "changes": [
-        "FIX: Technischen Text in der Entwurfsvorschau umbenannt"
-      ]
-    },
-    {
       "version": "0.8.12",
       "changes": [
         "FIX: Outlooks eigene mobile Signatur wird deaktiviert"
@@ -171,40 +113,28 @@
       ]
     },
     {
-      "version": "0.8.10",
-      "changes": [
-        "NEU: Statusmeldungen vereinfacht"
-      ]
-    },
-    {
       "version": "0.8.9",
       "changes": [
-        "NEU: Add-In-Beschreibung und Buttontexte angepasst"
+        "ÄNDERUNG: Add-In-Beschreibung und Buttontexte angepasst"
       ]
     },
     {
       "version": "0.8.8",
       "changes": [
-        "NEU: Startseite vereinfacht"
+        "ÄNDERUNG: Startseite vereinfacht"
       ]
     },
     {
       "version": "0.8.7",
       "changes": [
         "NEU: Helles Design und Symbolbuttons eingeführt",
-        "FIX: Logo direkt eingebettet"
+        "ÄNDERUNG: Attensam Logo direkt eingebettet"
       ]
     },
     {
       "version": "0.8.5",
       "changes": [
         "FIX: Falsche Ansicht beim Start wird nicht mehr kurz angezeigt"
-      ]
-    },
-    {
-      "version": "0.8.4",
-      "changes": [
-        "NEU: Einstellungen an die VIP-Rolle angepasst"
       ]
     },
     {
