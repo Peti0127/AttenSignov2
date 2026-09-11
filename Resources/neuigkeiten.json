@@ -1,6 +1,12 @@
 {
-  "version": "0.8.62",
+  "version": "0.8.63",
   "releases": [
+    {
+      "version": "0.8.63",
+      "changes": [
+        "FIX: Felder für eigene Namen werden für berechtigte User zuverlässiger angezeigt"
+      ]
+    },
     {
       "version": "0.8.62",
       "changes": [

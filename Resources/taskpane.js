@@ -101,10 +101,10 @@ function readableError(error) {
   const RENDER_DATA_KEY = "attensam.signature.render-data.v1";
   const CUSTOM_SIGNATURES_KEY = "attensam.signature.custom-signatures.v1";
   const CUSTOM_SIGNATURES_CACHE_PREFIX = "attensam.signature.custom-signatures.v1";
-  const REQUIRED_ROLE = "ATS.Signature";
-  const VIP_ROLE = "ATS.Signature.VIP";
+  const REQUIRED_ROLE = "Access";
+  const VIP_ROLE = "VIP";
   const CITY_CHANGE_ROLE = "CityChange";
-  const NAME_CHANGE_ROLE = "rol.ats00.ATS.Signature.NameChange";
+  const NAME_CHANGE_ROLE = "NameChange";
   const MAX_CUSTOM_SIGNATURES = 3;
   const PROFILE_CACHE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
   const CACHE_PREFIX = "attensam.signature.settings.v2";
@@ -648,6 +648,36 @@ function readableError(error) {
   });
 })(window);
 
+function currentAuthenticationRoles(result) {
+  let claims = result?.idTokenClaims;
+  if (!claims && result?.idToken) {
+    try {
+      const encoded = result.idToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+      claims = JSON.parse(atob(encoded.padEnd(Math.ceil(encoded.length / 4) * 4, "=")));
+    } catch { claims = {}; }
+  }
+  if (!claims) claims = result?.account?.idTokenClaims || {};
+  return new Set((Array.isArray(claims.roles) ? claims.roles : []).map((role) => String(role).trim()).filter(Boolean));
+}
+
+async function refreshSettingsRoles() {
+  if (!hasConfiguredEntraApp() || !Office.context.requirements?.isSetSupported("NestedAppAuth", "1.1")) return;
+  const authority = ATTENSAM_CONFIG.tenantId.startsWith("https://") ? ATTENSAM_CONFIG.tenantId : `https://login.microsoftonline.com/${ATTENSAM_CONFIG.tenantId}`;
+  const client = await msal.createNestablePublicClientApplication({ auth: { clientId: ATTENSAM_CONFIG.clientId, authority }, cache: { cacheLocation: "localStorage" } });
+  const result = await client.acquireTokenSilent({ scopes: ["User.Read"], forceRefresh: true });
+  const roles = currentAuthenticationRoles(result);
+  SignaturePreferences.setAccessAuthorized(roles.has("Access"));
+  SignaturePreferences.setVipAuthorized(roles.has("VIP"));
+  SignaturePreferences.setNameChangeAuthorized(roles.has("NameChange"));
+  SignaturePreferences.setCityChangeAuthorized(roles.has("CityChange") || roles.has("ATS.Signature.CityChange"));
+  const roaming = Office.context.roamingSettings;
+  const cached = roaming?.get("attensam.signature.render-data.v1");
+  if (cached) {
+    roaming.set("attensam.signature.render-data.v1", { ...cached, accessAuthorized: roles.has("Access"), nameChangeAuthorized: roles.has("NameChange"), cityChangeAuthorized: SignaturePreferences.getCityChangeAuthorized() });
+    await new Promise((resolve) => roaming.saveAsync(() => resolve()));
+  }
+}
+
 (function compactRoute(){
   const activeView = new URLSearchParams(window.location.search).get("view");
   if (["settings", "feedback", "help", "news"].includes(activeView)) return;
@@ -656,8 +686,8 @@ function readableError(error) {
 const CONFIG = ATTENSAM_CONFIG;
 const AUTO_RENDER_DATA_KEY = "attensam.signature.render-data.v1";
 const DELEGATED_PROFILE_LOCAL_CACHE_KEY = "attensam.signature.delegated-profiles.v1";
-const REQUIRED_ROLE = "ATS.Signature";
-const VIP_ROLE = "ATS.Signature.VIP";
+const REQUIRED_ROLE = "Access";
+const VIP_ROLE = "VIP";
 const CITY_CHANGE_ROLE = "CityChange";
 const EXCLUDED_SUBJECT_PREFIXES = ["Ihre Objektinformation - ", "Durchführungsbestätigung - ", "Journaleintrag "];
 const MAX_CUSTOM_SIGNATURES = 3;
@@ -751,26 +781,11 @@ function escapeHtml(value) {
 }
 
 function rememberAuthenticationRoles(result) {
-  let tokenClaims = {};
-  try {
-    const encoded = String(result?.idToken || "").split(".")[1];
-    if (encoded) {
-      const normalized = encoded.replace(/-/g, "+").replace(/_/g, "/");
-      tokenClaims = JSON.parse(atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=")));
-    }
-  } catch {
-    tokenClaims = {};
-  }
-  const roles = [
-    ...(Array.isArray(result?.idTokenClaims?.roles) ? result.idTokenClaims.roles : []),
-    ...(Array.isArray(result?.account?.idTokenClaims?.roles) ? result.account.idTokenClaims.roles : []),
-    ...(Array.isArray(tokenClaims?.roles) ? tokenClaims.roles : []),
-  ];
-  userRoles = new Set(roles.map((role) => String(role).trim()).filter(Boolean));
+  userRoles = currentAuthenticationRoles(result);
   accessAuthorized = userRoles.has(REQUIRED_ROLE);
   vipAuthorized = userRoles.has(VIP_ROLE);
   cityChangeAuthorized = userRoles.has(CITY_CHANGE_ROLE) || userRoles.has("ATS.Signature.CityChange");
-  nameChangeAuthorized = userRoles.has("rol.ats00.ATS.Signature.NameChange");
+  nameChangeAuthorized = userRoles.has("NameChange");
   SignaturePreferences.setAccessAuthorized(accessAuthorized);
   SignaturePreferences.setVipAuthorized(vipAuthorized);
   SignaturePreferences.setCityChangeAuthorized(cityChangeAuthorized);
@@ -1408,7 +1423,7 @@ async function acquireGraphToken(scopes = ["User.Read"]) {
       cache: { cacheLocation: "localStorage" },
     });
   }
-  const request = { scopes };
+  const request = { scopes, forceRefresh: true };
   try {
     const result = await msalInstance.acquireTokenSilent(request);
     rememberAuthenticationRoles(result);
@@ -1887,7 +1902,7 @@ Office.onReady((info) => {
   if (new URLSearchParams(window.location.search).get("view") !== "feedback") return;
 /* global Office, msal, SignaturePreferences */
 
-const REQUIRED_ROLE = "ATS.Signature";
+const REQUIRED_ROLE = "Access";
 const form = document.getElementById("feedback-form");
 const feedbackMain = document.getElementById("feedback-main");
 const feedbackAccessDenied = document.getElementById("feedback-access-denied");
@@ -1909,23 +1924,7 @@ function setFeedbackControlsDisabled(disabled) {
   sendButton.disabled = disabled;
 }
 
-function authenticationRoles(result) {
-  let tokenClaims = {};
-  try {
-    const encoded = String(result?.idToken || "").split(".")[1];
-    if (encoded) {
-      const normalized = encoded.replace(/-/g, "+").replace(/_/g, "/");
-      tokenClaims = JSON.parse(atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=")));
-    }
-  } catch {
-    tokenClaims = {};
-  }
-  return new Set([
-    ...(Array.isArray(result?.idTokenClaims?.roles) ? result.idTokenClaims.roles : []),
-    ...(Array.isArray(result?.account?.idTokenClaims?.roles) ? result.account.idTokenClaims.roles : []),
-    ...(Array.isArray(tokenClaims?.roles) ? tokenClaims.roles : []),
-  ].map((role) => String(role).trim()).filter(Boolean));
-}
+function authenticationRoles(result) { return currentAuthenticationRoles(result); }
 
 async function acquireFeedbackToken() {
   if (!hasConfiguredEntraApp()) {
@@ -1943,7 +1942,7 @@ async function acquireFeedbackToken() {
       cache: { cacheLocation: "localStorage" },
     });
   }
-  const request = { scopes: ["User.Read", "Mail.Send"] };
+  const request = { scopes: ["User.Read", "Mail.Send"], forceRefresh: true };
   try {
     return await feedbackMsalInstance.acquireTokenSilent(request);
   } catch (error) {
@@ -2393,6 +2392,7 @@ async function updateInsertedSignature() {
 
 async function initializeSettings() {
   try {
+    try { await refreshSettingsRoles(); } catch (error) { console.warn("Aktuelle Berechtigungen konnten nicht geladen werden; gespeicherte Berechtigungen werden verwendet.", error); }
     const accessAuthorized = SignaturePreferences.getAccessAuthorized();
     settingsMain.hidden = !accessAuthorized;
     settingsAccessDenied.hidden = accessAuthorized;
@@ -2724,7 +2724,7 @@ async function acquireGraphToken() {
       cache: { cacheLocation: "localStorage" },
     });
   }
-  const request = { scopes: ["User.Read"] };
+  const request = { scopes: ["User.Read"], forceRefresh: true };
   try {
     const result = await msalInstance.acquireTokenSilent(request);
     rememberMobileCityChangeRole(result);
@@ -2738,24 +2738,11 @@ async function acquireGraphToken() {
 }
 
 function rememberMobileCityChangeRole(result) {
-  let tokenClaims = {};
-  try {
-    const encoded = String(result?.idToken || "").split(".")[1];
-    if (encoded) {
-      const normalized = encoded.replace(/-/g, "+").replace(/_/g, "/");
-      tokenClaims = JSON.parse(atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=")));
-    }
-  } catch {
-    tokenClaims = {};
-  }
-  const roles = [
-    ...(Array.isArray(result?.idTokenClaims?.roles) ? result.idTokenClaims.roles : []),
-    ...(Array.isArray(result?.account?.idTokenClaims?.roles) ? result.account.idTokenClaims.roles : []),
-    ...(Array.isArray(tokenClaims?.roles) ? tokenClaims.roles : []),
-  ].map((role) => String(role).trim());
+  const roles = [...currentAuthenticationRoles(result)];
+  SignaturePreferences.setVipAuthorized(roles.includes("VIP"));
   cityChangeAuthorized = roles.includes("CityChange") || roles.includes("ATS.Signature.CityChange");
-  nameChangeAuthorized = roles.includes("rol.ats00.ATS.Signature.NameChange");
-  SignaturePreferences.setAccessAuthorized(roles.includes("ATS.Signature"));
+  nameChangeAuthorized = roles.includes("NameChange");
+  SignaturePreferences.setAccessAuthorized(roles.includes("Access"));
   SignaturePreferences.setCityChangeAuthorized(cityChangeAuthorized);
   SignaturePreferences.setNameChangeAuthorized(nameChangeAuthorized);
 }
