@@ -131,8 +131,6 @@ function readableError(error) {
     SkipInternalOnly: false,
     SkipInternalOnNewMail: false,
     SkipAseEmails: false,
-    InsertTitleBefore: false,
-    InsertTitleAfter: false,
     MobileUsage: false,
     MobileUsageText: "",
     InternalSignatureText: "",
@@ -420,9 +418,7 @@ function readableError(error) {
       GreetingLines: ALLOWED_GREETING_LINES.has(Number(value?.GreetingLines))
         ? Number(value.GreetingLines)
         : DEFAULT_SETTINGS.GreetingLines,
-      CityOverride: ALLOWED_CITY_OVERRIDES.has(value?.CityOverride)
-        ? value.CityOverride
-        : DEFAULT_SETTINGS.CityOverride,
+      CityOverride: "Standard",
       AutoInsert: true,
       AutoInsertMode: autoInsertReplies && autoInsertForwards ? "AllMail" : "NewMail",
       AutoInsertReplies: autoInsertReplies,
@@ -431,8 +427,6 @@ function readableError(error) {
       SkipInternalOnly: value.SkipInternalOnly === true || value.InternalRecipientsOnly === true,
       SkipInternalOnNewMail: value.SkipInternalOnNewMail === true,
       SkipAseEmails: value.SkipAseEmails === true,
-      InsertTitleBefore: value.InsertTitleBefore === true,
-      InsertTitleAfter: value.InsertTitleAfter === true,
       MobileUsage: value.MobileUsage === true,
       MobileUsageText: normalizeMobileUsageText(value?.MobileUsageText),
       InternalSignatureText: normalizeInternalSignatureText(value?.InternalSignatureText),
@@ -474,8 +468,6 @@ function readableError(error) {
       SkipInternalOnly: record.SkipInternalOnly,
       SkipInternalOnNewMail: record.SkipInternalOnNewMail,
       SkipAseEmails: record.SkipAseEmails,
-      InsertTitleBefore: record.InsertTitleBefore,
-      InsertTitleAfter: record.InsertTitleAfter,
       MobileUsage: record.MobileUsage,
       MobileUsageText: record.MobileUsageText,
       InternalSignatureText: record.InternalSignatureText,
@@ -515,8 +507,6 @@ function readableError(error) {
       SkipInternalOnly: DEFAULT_SETTINGS.SkipInternalOnly,
       SkipInternalOnNewMail: DEFAULT_SETTINGS.SkipInternalOnNewMail,
       SkipAseEmails: DEFAULT_SETTINGS.SkipAseEmails,
-      InsertTitleBefore: DEFAULT_SETTINGS.InsertTitleBefore,
-      InsertTitleAfter: DEFAULT_SETTINGS.InsertTitleAfter,
       MobileUsage: DEFAULT_SETTINGS.MobileUsage,
       MobileUsageText: DEFAULT_SETTINGS.MobileUsageText,
       InternalSignatureText: DEFAULT_SETTINGS.InternalSignatureText,
@@ -540,8 +530,6 @@ function readableError(error) {
       || typeof settings?.SkipInternalOnly !== "boolean"
       || typeof settings?.SkipInternalOnNewMail !== "boolean"
       || typeof settings?.SkipAseEmails !== "boolean"
-      || typeof settings?.InsertTitleBefore !== "boolean"
-      || typeof settings?.InsertTitleAfter !== "boolean"
       || typeof settings?.MobileUsage !== "boolean"
       || typeof settings?.MobileUsageText !== "string"
       || typeof settings?.InternalSignatureText !== "string"
@@ -565,8 +553,6 @@ function readableError(error) {
       SkipInternalOnly: settings.SkipInternalOnly,
       SkipInternalOnNewMail: settings.SkipInternalOnNewMail,
       SkipAseEmails: settings.SkipAseEmails,
-      InsertTitleBefore: settings.InsertTitleBefore,
-      InsertTitleAfter: settings.InsertTitleAfter,
       MobileUsage: settings.MobileUsage,
       MobileUsageText: normalizeMobileUsageText(settings.MobileUsageText),
       InternalSignatureText: normalizeInternalSignatureText(settings.InternalSignatureText),
@@ -647,6 +633,15 @@ function readableError(error) {
     setNameChangeAuthorized,
   });
 })(window);
+
+const CITY_SIGNATURE_CITIES = Object.freeze({
+  "city-neusiedl": "Neusiedl am See",
+  "city-oberwart": "Oberwart",
+  "city-wr-neustadt": "Wr. Neustadt",
+});
+function cityForSignature(id) {
+  return Object.hasOwn(CITY_SIGNATURE_CITIES, id) ? CITY_SIGNATURE_CITIES[id] : "";
+}
 
 function currentAuthenticationRoles(result) {
   let decodedClaims = null;
@@ -739,8 +734,6 @@ let signatureSettings = {
   CustomLastName: "",
   GreetingLines: 1,
   CityOverride: "Standard",
-  InsertTitleBefore: false,
-  InsertTitleAfter: false,
   MobileUsage: false,
   MobileUsageText: "",
   InternalSignatureText: "",
@@ -751,6 +744,8 @@ const statusElement = document.getElementById("status");
 const signatureMain = document.getElementById("signature-main");
 const taskpaneAccessDenied = document.getElementById("taskpane-access-denied");
 const previewElement = document.getElementById("signature-preview");
+const citySignaturesElement = document.getElementById("city-signatures");
+const standardSignatureTitle = document.getElementById("standard-signature-title");
 const signatureButton = document.getElementById("signature-button");
 const profileWarningsElement = document.getElementById("profile-warnings");
 const mainSettingsLink = document.getElementById("main-settings-link");
@@ -1032,12 +1027,8 @@ function personalName(profileValue) {
 }
 
 function delegatedName(profileValue, settings = signatureSettings) {
-  const titleBefore = settings.InsertTitleBefore
-    ? String(profileValue?.customAttribute10 || "").trim()
-    : "";
-  const titleAfter = settings.InsertTitleAfter
-    ? String(profileValue?.customAttribute11 || "").trim()
-    : "";
+  const titleBefore = String(profileValue?.customAttribute10 || "").trim();
+  const titleAfter = String(profileValue?.customAttribute11 || "").trim();
   return [titleBefore, personalName(profileValue), titleAfter].filter(Boolean).join(" ");
 }
 
@@ -1134,7 +1125,7 @@ function scalePreview(container, content) {
 
 function scaleSignaturePreview() {
   scalePreview(signatureButton, previewElement);
-  customSignaturesElement.querySelectorAll(".preview").forEach((container) => {
+  document.querySelectorAll("#custom-signatures .preview, #city-signatures .preview").forEach((container) => {
     const content = container.querySelector(".signature-preview-content");
     if (content) scalePreview(container, content);
   });
@@ -1151,7 +1142,7 @@ function buildSignature(templateHtml = signatureTemplate, settings = signatureSe
   const baseSignatureProfile = sendAs && !String(selectedProfile.firstName || "").trim()
     ? { ...selectedProfile, firstName: String(selectedProfile.displayName || "").trim() }
     : selectedProfile;
-  const signatureProfile = applyCityOverride(baseSignatureProfile, settings);
+  const signatureProfile = applyCityOverride(baseSignatureProfile, { CityOverride: cityForSignature(signatureId) || "Standard" });
   const sendAsHasDirectNumber = Boolean(
     String(signatureProfile.phone || "").trim()
     || String(signatureProfile.mobile || "").trim(),
@@ -1166,11 +1157,11 @@ function buildSignature(templateHtml = signatureTemplate, settings = signatureSe
       }
     : sendOnBehalf ? { ...settings, Nummer: "OnBehalf" } : settings;
   const titleBefore = !sendOnBehalf
-    && settings.InsertTitleBefore && String(signatureProfile.customAttribute10 || "").trim()
+    && String(signatureProfile.customAttribute10 || "").trim()
     ? `${String(signatureProfile.customAttribute10).trim()} `
     : "";
   const titleAfter = !sendOnBehalf
-    && settings.InsertTitleAfter && String(signatureProfile.customAttribute11 || "").trim()
+    && String(signatureProfile.customAttribute11 || "").trim()
     ? ` ${String(signatureProfile.customAttribute11).trim()}`
     : "";
   const senderName = personalName(ownProfile);
@@ -1219,8 +1210,44 @@ function renderSignature() {
   signatureButton.setAttribute("aria-disabled", String(!ready));
   signatureButton.tabIndex = ready ? 0 : -1;
   signatureButton.classList.toggle("ready", ready);
+  renderCitySignatureCards(result.signatureProfile.city);
   renderCustomSignatureCards();
   return result.html;
+}
+
+function renderCitySignatureCards(standardCity) {
+  citySignaturesElement.replaceChildren();
+  standardSignatureTitle.hidden = !cityChangeAuthorized;
+  citySignaturesElement.hidden = !cityChangeAuthorized;
+  if (!accessAuthorized || !cityChangeAuthorized || !profileLoaded) return;
+  const normalizedCity = String(standardCity || "").trim().toLocaleLowerCase("de-AT")
+    .replace(/^wiener neustadt$/, "wr. neustadt");
+  for (const [id, city] of Object.entries(CITY_SIGNATURE_CITIES)) {
+    if (city.toLocaleLowerCase("de-AT") === normalizedCity) continue;
+    const card = document.createElement("article");
+    card.className = "custom-signature-card";
+    card.innerHTML = `<div class="custom-signature-title">${escapeHtml(city)}</div><div class="preview ready" role="button" tabindex="0" aria-label="${escapeHtml(city)} einfügen"><div class="signature-preview-content"></div></div>`;
+    const button = card.querySelector(".preview");
+    const content = card.querySelector(".signature-preview-content");
+    content.innerHTML = buildSignature(signatureTemplate, signatureSettings, id).previewHtml;
+    button.addEventListener("click", () => insertSignature(id));
+    button.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        insertSignature(id);
+      }
+    });
+    button.addEventListener("contextmenu", (event) => {
+      openSignatureMenu(event, "standard");
+      setDefaultButton.hidden = true;
+      openSignatureSettingsButton.focus();
+    });
+    content.querySelectorAll("img").forEach((image) => {
+      if (!image.complete) image.addEventListener("load", () => scalePreview(button, content), { once: true });
+    });
+    citySignaturesElement.append(card);
+    requestAnimationFrame(() => scalePreview(button, content));
+  }
 }
 
 function defaultBadge(id) {
@@ -1697,6 +1724,7 @@ async function subjectExcludesSignature(settings) {
 
 async function insertSignature(customId = "standard") {
   if (!accessAuthorized || !profileLoaded || signatureButton.getAttribute("aria-disabled") === "true") return;
+  if (cityForSignature(customId) && !cityChangeAuthorized) return;
   const body = Office.context.mailbox.item?.body;
   if (!body) {
     setStatus("Bitte eine neue Nachricht öffnen.");
@@ -1722,7 +1750,10 @@ async function insertSignature(customId = "standard") {
   const item = vipAuthorized && customId !== "standard"
     ? customSignatures.items.find((entry) => entry.id === customId)
     : null;
-  const html = item ? buildSignature(item.html, item.settings || signatureSettings, item.id).html : renderSignature();
+  renderSignature();
+  const html = cityForSignature(customId)
+    ? buildSignature(signatureTemplate, signatureSettings, customId).html
+    : item ? buildSignature(item.html, item.settings || signatureSettings, item.id).html : buildSignature().html;
   const callback = (result) => {
     if (result.status === Office.AsyncResultStatus.Succeeded) {
       setStatus("Signatur wurde eingefügt.");
@@ -2080,8 +2111,6 @@ const SETTINGS_SIGNATURE_MARKER_ID_PREFIX = "attensam-signature-marker-";
 const SETTINGS_SIGNATURE_ID = String(new URLSearchParams(window.location.search).get("signature") || "standard").replace(/[^a-zA-Z0-9_-]/g, "") || "standard";
 
 const phoneModeSelect = document.getElementById("phone-mode");
-const cityChangeField = document.getElementById("city-change-field");
-const cityChangeSelect = document.getElementById("city-change");
 const nameChangeFields = document.getElementById("name-change-fields");
 const customFirstNameInput = document.getElementById("custom-first-name");
 const customLastNameInput = document.getElementById("custom-last-name");
@@ -2094,10 +2123,6 @@ const customGreetingField = document.getElementById("custom-greeting-field");
 const customGreetingInput = document.getElementById("custom-greeting");
 const greetingLinesField = document.getElementById("greeting-lines-field");
 const greetingLinesSelect = document.getElementById("greeting-lines");
-const titleBeforeField = document.getElementById("title-before-field");
-const insertTitleBeforeCheckbox = document.getElementById("insert-title-before");
-const titleAfterField = document.getElementById("title-after-field");
-const insertTitleAfterCheckbox = document.getElementById("insert-title-after");
 const mobileUsageCheckbox = document.getElementById("mobile-usage");
 const mobileUsageTextField = document.getElementById("mobile-usage-text-field");
 const mobileUsageTextInput = document.getElementById("mobile-usage-text");
@@ -2168,14 +2193,11 @@ function updateGreetingVisibility() {
 
 function setControlsDisabled(disabled) {
   phoneModeSelect.disabled = disabled;
-  cityChangeSelect.disabled = disabled || !cityChangeAuthorized;
   customFirstNameInput.disabled = disabled || !nameChangeAuthorized;
   customLastNameInput.disabled = disabled || !nameChangeAuthorized;
   greetingModeSelect.disabled = disabled;
   customGreetingInput.disabled = disabled || greetingModeSelect.value !== "MfGCustom";
   greetingLinesSelect.disabled = disabled || greetingModeSelect.value === "MfG0";
-  insertTitleBeforeCheckbox.disabled = disabled;
-  insertTitleAfterCheckbox.disabled = disabled;
   mobileUsageCheckbox.disabled = disabled;
   mobileUsageTextInput.disabled = disabled || !mobileUsageCheckbox.checked;
   confidentialityCheckbox.disabled = disabled;
@@ -2380,12 +2402,18 @@ async function updateInsertedSignature() {
           ? { ...item, settings: { ...currentSettings } }
           : item),
       };
+  let renderSignatureId = SETTINGS_SIGNATURE_ID;
+  if (SETTINGS_SIGNATURE_ID === "standard" && renderData.cityChangeAuthorized && typeof body.getAsync === "function") {
+    const existingDocument = new DOMParser().parseFromString(await getBodyHtml(body), "text/html");
+    const existingId = readInsertedSignatureId(findMarkedSignature(existingDocument));
+    if (cityForSignature(existingId)) renderSignatureId = existingId;
+  }
   const html = AttensamSignatureRuntime.renderSignature(
     renderData,
     currentSettings,
     verifiedDelegation,
     renderCustomRecord,
-    SETTINGS_SIGNATURE_ID,
+    renderSignatureId,
   );
   if (typeof body.setSignatureAsync === "function") {
     await setCurrentSignature(body, html);
@@ -2397,7 +2425,7 @@ async function updateInsertedSignature() {
   const existingSignature = findMarkedSignature(bodyDocument);
   if (!existingSignature) return false;
   const insertedSignatureId = readInsertedSignatureId(existingSignature);
-  if (insertedSignatureId && insertedSignatureId !== SETTINGS_SIGNATURE_ID) return false;
+  if (insertedSignatureId && insertedSignatureId !== renderSignatureId) return false;
   const replacedBodyHtml = replaceMarkedSignature(bodyHtml, html);
   if (replacedBodyHtml !== null && body.setAsync) {
     await setBodyHtml(body, replacedBodyHtml);
@@ -2431,9 +2459,7 @@ async function initializeSettings() {
     currentSettings = await SignaturePreferences.getSettingsForSignature(SETTINGS_SIGNATURE_ID);
     cityChangeAuthorized = SignaturePreferences.getCityChangeAuthorized();
     nameChangeAuthorized = SignaturePreferences.getNameChangeAuthorized();
-    cityChangeField.hidden = !cityChangeAuthorized;
     nameChangeFields.hidden = !nameChangeAuthorized;
-    cityChangeSelect.value = currentSettings.CityOverride;
     customFirstNameInput.value = currentSettings.CustomFirstName;
     customLastNameInput.value = currentSettings.CustomLastName;
     settingsProfile = SignaturePreferences.getValidRenderData()?.profile || null;
@@ -2450,10 +2476,6 @@ async function initializeSettings() {
     customGreetingInput.value = currentSettings.CustomGreeting;
     greetingLinesSelect.value = String(currentSettings.GreetingLines);
     updateGreetingVisibility();
-    titleBeforeField.hidden = !titleAttributes.customAttribute10;
-    titleAfterField.hidden = !titleAttributes.customAttribute11;
-    insertTitleBeforeCheckbox.checked = currentSettings.InsertTitleBefore;
-    insertTitleAfterCheckbox.checked = currentSettings.InsertTitleAfter;
     mobileUsageCheckbox.checked = currentSettings.MobileUsage;
     mobileUsageTextInput.value = currentSettings.MobileUsageText;
     internalSignatureInput.value = currentSettings.InternalSignatureText;
@@ -2484,7 +2506,7 @@ async function saveSettings() {
       CustomFirstName: nameChangeAuthorized ? customFirstNameInput.value : currentSettings.CustomFirstName,
       CustomLastName: nameChangeAuthorized ? customLastNameInput.value : currentSettings.CustomLastName,
       GreetingLines: Number(greetingLinesSelect.value),
-      CityOverride: cityChangeAuthorized ? cityChangeSelect.value : currentSettings.CityOverride,
+      CityOverride: "Standard",
       AutoInsert: true,
       AutoInsertReplies: autoInsertRepliesCheckbox.checked,
       AutoInsertForwards: autoInsertForwardsCheckbox.checked,
@@ -2492,8 +2514,6 @@ async function saveSettings() {
       SkipInternalOnly: skipInternalOnlyCheckbox.checked,
       SkipInternalOnNewMail: skipInternalNewMailCheckbox.checked,
       SkipAseEmails: skipAseEmailsCheckbox.checked,
-      InsertTitleBefore: insertTitleBeforeCheckbox.checked,
-      InsertTitleAfter: insertTitleAfterCheckbox.checked,
       MobileUsage: mobileUsageCheckbox.checked,
       MobileUsageText: mobileUsageTextInput.value,
       InternalSignatureText: internalSignatureInput.value,
@@ -2519,7 +2539,6 @@ phoneModeSelect.addEventListener("change", () => {
   updatePhoneWarnings();
   saveSettings();
 });
-cityChangeSelect.addEventListener("change", saveSettings);
 customFirstNameInput.addEventListener("change", saveSettings);
 customLastNameInput.addEventListener("change", saveSettings);
 greetingModeSelect.addEventListener("change", () => {
@@ -2528,8 +2547,6 @@ greetingModeSelect.addEventListener("change", () => {
 });
 customGreetingInput.addEventListener("change", saveSettings);
 greetingLinesSelect.addEventListener("change", saveSettings);
-insertTitleBeforeCheckbox.addEventListener("change", saveSettings);
-insertTitleAfterCheckbox.addEventListener("change", saveSettings);
 mobileUsageCheckbox.addEventListener("change", () => {
   updateMobileUsageVisibility();
   saveSettings();
@@ -2563,8 +2580,6 @@ const AUTO_RENDER_DATA_KEY = "attensam.signature.render-data.v1";
 const MOBILE_SETTINGS_SIGNATURE_ID = String(new URLSearchParams(window.location.search).get("signature") || "standard").replace(/[^a-zA-Z0-9_-]/g, "") || "standard";
 
 const phoneModeSelect = document.getElementById("phone-mode");
-const cityChangeField = document.getElementById("city-change-field");
-const cityChangeSelect = document.getElementById("city-change");
 const nameChangeFields = document.getElementById("name-change-fields");
 const customFirstNameInput = document.getElementById("custom-first-name");
 const customLastNameInput = document.getElementById("custom-last-name");
@@ -2577,10 +2592,6 @@ const customGreetingField = document.getElementById("custom-greeting-field");
 const customGreetingInput = document.getElementById("custom-greeting");
 const greetingLinesField = document.getElementById("greeting-lines-field");
 const greetingLinesSelect = document.getElementById("greeting-lines");
-const titleBeforeField = document.getElementById("title-before-field");
-const insertTitleBeforeCheckbox = document.getElementById("insert-title-before");
-const titleAfterField = document.getElementById("title-after-field");
-const insertTitleAfterCheckbox = document.getElementById("insert-title-after");
 const mobileUsageCheckbox = document.getElementById("mobile-usage");
 const mobileUsageTextField = document.getElementById("mobile-usage-text-field");
 const mobileUsageTextInput = document.getElementById("mobile-usage-text");
@@ -2622,14 +2633,11 @@ function updateInternalInsertionVisibility() {
 
 function setControlsDisabled(disabled) {
   phoneModeSelect.disabled = disabled;
-  cityChangeSelect.disabled = disabled || !cityChangeAuthorized;
   customFirstNameInput.disabled = disabled || !nameChangeAuthorized;
   customLastNameInput.disabled = disabled || !nameChangeAuthorized;
   greetingModeSelect.disabled = disabled;
   customGreetingInput.disabled = disabled || greetingModeSelect.value !== "MfGCustom";
   greetingLinesSelect.disabled = disabled || greetingModeSelect.value === "MfG0";
-  insertTitleBeforeCheckbox.disabled = disabled;
-  insertTitleAfterCheckbox.disabled = disabled;
   mobileUsageCheckbox.disabled = disabled;
   mobileUsageTextInput.disabled = disabled || !mobileUsageCheckbox.checked;
   confidentialityCheckbox.disabled = disabled;
@@ -2693,9 +2701,7 @@ function showSettings(settings, department, titleAttributes) {
   const canUseEdvHotline = updateDepartmentOption(department);
   cityChangeAuthorized = SignaturePreferences.getCityChangeAuthorized();
   nameChangeAuthorized = SignaturePreferences.getNameChangeAuthorized();
-  cityChangeField.hidden = !cityChangeAuthorized;
     nameChangeFields.hidden = !nameChangeAuthorized;
-  cityChangeSelect.value = settings.CityOverride;
     customFirstNameInput.value = settings.CustomFirstName;
     customLastNameInput.value = settings.CustomLastName;
   phoneModeSelect.value = settings.Nummer === "EDVHotline" && !canUseEdvHotline
@@ -2706,10 +2712,6 @@ function showSettings(settings, department, titleAttributes) {
   customGreetingInput.value = settings.CustomGreeting;
   greetingLinesSelect.value = String(settings.GreetingLines);
   updateGreetingVisibility();
-  titleBeforeField.hidden = !titleAttributes.customAttribute10;
-  titleAfterField.hidden = !titleAttributes.customAttribute11;
-  insertTitleBeforeCheckbox.checked = settings.InsertTitleBefore;
-  insertTitleAfterCheckbox.checked = settings.InsertTitleAfter;
   mobileUsageCheckbox.checked = settings.MobileUsage;
   mobileUsageTextInput.value = settings.MobileUsageText;
   internalSignatureInput.value = settings.InternalSignatureText;
@@ -2900,7 +2902,7 @@ async function saveSettings() {
       CustomFirstName: nameChangeAuthorized ? customFirstNameInput.value : currentSettings.CustomFirstName,
       CustomLastName: nameChangeAuthorized ? customLastNameInput.value : currentSettings.CustomLastName,
       GreetingLines: Number(greetingLinesSelect.value),
-      CityOverride: cityChangeAuthorized ? cityChangeSelect.value : currentSettings.CityOverride,
+      CityOverride: "Standard",
       AutoInsert: true,
       AutoInsertReplies: autoInsertRepliesCheckbox.checked,
       AutoInsertForwards: autoInsertForwardsCheckbox.checked,
@@ -2908,8 +2910,6 @@ async function saveSettings() {
       SkipInternalOnly: skipInternalOnlyCheckbox.checked,
       SkipInternalOnNewMail: skipInternalNewMailCheckbox.checked,
       SkipAseEmails: skipAseEmailsCheckbox.checked,
-      InsertTitleBefore: insertTitleBeforeCheckbox.checked,
-      InsertTitleAfter: insertTitleAfterCheckbox.checked,
       MobileUsage: mobileUsageCheckbox.checked,
       MobileUsageText: mobileUsageTextInput.value,
       InternalSignatureText: internalSignatureInput.value,
@@ -2927,7 +2927,6 @@ phoneModeSelect.addEventListener("change", () => {
   updatePhoneWarnings();
   saveSettings();
 });
-cityChangeSelect.addEventListener("change", saveSettings);
 customFirstNameInput.addEventListener("change", saveSettings);
 customLastNameInput.addEventListener("change", saveSettings);
 greetingModeSelect.addEventListener("change", () => {
@@ -2936,8 +2935,6 @@ greetingModeSelect.addEventListener("change", () => {
 });
 customGreetingInput.addEventListener("change", saveSettings);
 greetingLinesSelect.addEventListener("change", saveSettings);
-insertTitleBeforeCheckbox.addEventListener("change", saveSettings);
-insertTitleAfterCheckbox.addEventListener("change", saveSettings);
 mobileUsageCheckbox.addEventListener("change", () => {
   updateMobileUsageVisibility();
   saveSettings();

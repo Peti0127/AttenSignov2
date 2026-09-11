@@ -12,8 +12,8 @@
   </script>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@5.18.0/lib/msal-browser.min.js"></script>
-  <script defer src="autorun-classic.js?rev=19"></script>
-  <script defer src="taskpane.js?rev=18"></script>
+  <script defer src="autorun-classic.js?rev=21"></script>
+  <script defer src="taskpane.js?rev=20"></script>
   <style>
     :root { color-scheme:light; --red:#e10000; --ink:#090909; --muted:#666; --line:#d2d2d2; --paper:#f7f7f7; --surface:#fff; --control-bg:#fff; --control-ink:#090909; --control-border:#aaa; --hover:#f1f1f1; --footer-bg:rgba(255,255,255,.98); --button-bg:#090909; --button-ink:#fff; }
     :root[data-client-theme="dark"] { color-scheme:dark; --ink:#f2f2f2; --muted:#b8b8b8; --line:#4a4a4a; --paper:#111; --surface:#222; --control-bg:#2b2b2b; --control-ink:#f5f5f5; --control-border:#656565; --hover:#333; --footer-bg:rgba(28,28,28,.98); --button-bg:#ededed; --button-ink:#111; }
@@ -113,9 +113,11 @@
     <main id="signature-main" hidden>
       <section>
         <button id="custom-add-button" class="add-signature" type="button" aria-label="Benutzerdefinierte Signatur hinzufügen" title="Benutzerdefinierte Signatur hinzufügen" hidden>+</button>
+        <div id="standard-signature-title" class="custom-signature-title" hidden>Standard Signatur</div>
         <div id="signature-button" class="preview" role="button" tabindex="-1" aria-disabled="true" aria-label="Signatur in Outlook einfügen">
           <div id="signature-preview" class="signature-preview-content">Vorlage wird geladen …</div>
         </div>
+        <div id="city-signatures" hidden></div>
         <div id="profile-warnings" class="validation-warnings" role="alert" hidden></div>
         <div id="custom-editor" class="custom-editor" hidden>
           <div class="field"><label for="custom-signature-title">Titel</label><input id="custom-signature-title" type="text" maxlength="80" autocomplete="off" placeholder="z. B. Messe-Signatur"></div>
@@ -194,21 +196,6 @@
         <div class="field"><label for="custom-first-name">Benutzerdefinierte Vorname</label><input id="custom-first-name" type="text" maxlength="100" autocomplete="off" disabled></div>
         <div class="field"><label for="custom-last-name">Benutzerdefinierte Nachname</label><input id="custom-last-name" type="text" maxlength="100" autocomplete="off" disabled></div>
       </div>
-      <div id="city-change-field" class="field" hidden>
-        <label for="city-change">Stadt ändern</label>
-        <select id="city-change" disabled>
-          <option value="Standard">Standard</option>
-          <option value="Neusiedl am See">Neusiedl am See</option>
-          <option value="Oberwart">Oberwart</option>
-          <option value="Wr. Neustadt">Wr. Neustadt</option>
-        </select>
-      </div>
-      <div id="title-before-field" class="field" hidden>
-        <label class="checkbox-row" for="insert-title-before"><input id="insert-title-before" type="checkbox" disabled><span>Titel vorg. einfügen</span></label>
-      </div>
-      <div id="title-after-field" class="field" hidden>
-        <label class="checkbox-row" for="insert-title-after"><input id="insert-title-after" type="checkbox" disabled><span>Titel nachg. einfügen</span></label>
-      </div>
       <div id="mobile-usage-field" class="field">
         <label class="checkbox-row" for="mobile-usage"><input id="mobile-usage" type="checkbox" disabled><span>Mobile Nutzung</span></label>
       </div>
@@ -261,7 +248,8 @@
     </header>
     <main class="info-content"><h2>Signatur einfügen</h2><p>Öffne das Add-In in einer E-Mail und warte, bis die Signaturdaten geladen sind. Klicke auf die Vorschau, um die Signatur einzufügen.</p>
 <h2>Einstellungen öffnen</h2><p>Klicke mit der rechten Maustaste auf die Signatur und wähle „Einstellungen“. Änderungen werden gespeichert und können die bereits eingefügte Signatur aktualisieren.</p>
-<h2>Grußformel und Telefonnummern</h2><p>Wähle eine Grußformel und die anzuzeigenden Telefonnummern. Vorgabe: keine Grußformel, Handy und Festnetz. Titel, Hinweise zur mobilen Nutzung und Vertraulichkeit kannst du bei Bedarf aktivieren.</p>
+<h2>Weitere Standorte</h2><p>Wenn du weitere Standorte verwenden darfst, siehst du unter „Standard Signatur“ zusätzliche Vorschauen mit den Städtenamen. Klicke auf eine Vorschau, um diese Adresse einzufügen. Die Einstellungen teilen sich alle Standortvorschauen mit der Standard-Signatur.</p>
+<h2>Grußformel und Telefonnummern</h2><p>Wähle eine Grußformel und die anzuzeigenden Telefonnummern. Vorgabe: keine Grußformel, Handy und Festnetz. Vorhandene Titel werden automatisch angezeigt. Hinweise zur mobilen Nutzung und Vertraulichkeit kannst du bei Bedarf aktivieren.</p>
 <h2>Eigener Name</h2><p>Mit der NameChange-Berechtigung kannst du in den Einstellungen einen eigenen Vor- und Nachnamen für deine Signatur angeben. Leere Felder verwenden die Profildaten. Dein Microsoft-365-Profil wird nicht geändert.</p>
 <h2>Automatisches Einfügen</h2><p>Neue E-Mails erhalten standardmäßig eine Signatur. Für Antworten und Weiterleitungen gibt es jeweils eine eigene Checkbox.</p>
 <h2>Interne E-Mails</h2><p>„Signatur bei internen Emails nicht einfügen“ unterdrückt die Signatur bei Antworten und Weiterleitungen mit ausschließlich internen Empfängern. Intern bedeutet: gleiche E-Mail-Domain wie dein Konto. Mit „Auch bei neuen Mails nicht einfügen“ gilt das zusätzlich für neue Nachrichten. Im Textfeld „Signatur für interne E-Mails“ kannst du eine kurze eigene Signatur wie „LG Peter“ hinterlegen. Zeilenumbrüche werden übernommen. Lässt du das Feld leer, wird keine Signatur eingefügt. Sobald externe Empfänger dabei sind, gelten wieder die normalen Einstellungen zum automatischen Einfügen und die vollständige Signatur wird verwendet.</p>

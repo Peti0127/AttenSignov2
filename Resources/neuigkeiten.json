@@ -1,6 +1,18 @@
 {
-  "version": "0.8.64",
+  "version": "0.8.66",
   "releases": [
+    {
+      "version": "0.8.66",
+      "changes": [
+        "ÄNDERUNG: Alternative Standorte sind jetzt als eigene Signaturvorschau auswählbar"
+      ]
+    },
+    {
+      "version": "0.8.65",
+      "changes": [
+        "ÄNDERUNG: Vorhandene Titel werden immer angezeigt"
+      ]
+    },
     {
       "version": "0.8.64",
       "changes": [
