@@ -649,15 +649,31 @@ function readableError(error) {
 })(window);
 
 function currentAuthenticationRoles(result) {
-  let claims = result?.idTokenClaims;
-  if (!claims && result?.idToken) {
+  let decodedClaims = null;
+  if (result?.idToken) {
     try {
       const encoded = result.idToken.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-      claims = JSON.parse(atob(encoded.padEnd(Math.ceil(encoded.length / 4) * 4, "=")));
-    } catch { claims = {}; }
+      decodedClaims = JSON.parse(atob(encoded.padEnd(Math.ceil(encoded.length / 4) * 4, "=")));
+    } catch { /* Fall back to MSAL's parsed ID-token claims. */ }
   }
-  if (!claims) claims = result?.account?.idTokenClaims || {};
-  return new Set((Array.isArray(claims.roles) ? claims.roles : []).map((role) => String(role).trim()).filter(Boolean));
+  const meaningfulClaims = (value) => value && typeof value === "object"
+    && (Array.isArray(value.roles) || Boolean(value.sub || value.oid || value.aud || value.iss));
+  // Never merge old account roles into a current ID token: missing roles in a
+  // complete current token must remain a denial, including role revocations.
+  const claims = meaningfulClaims(decodedClaims) ? decodedClaims
+    : meaningfulClaims(result?.idTokenClaims) ? result.idTokenClaims
+    : result?.account?.idTokenClaims || {};
+  const roles = new Set((Array.isArray(claims.roles) ? claims.roles : []).map((role) => String(role).trim()).filter(Boolean));
+  // Recognize the previous values during Entra role-value propagation.
+  const previousValues = {
+    "ATS.Signature": "Access",
+    "ATS.Signature.VIP": "VIP",
+    "rol.ats00.ATS.Signature.NameChange": "NameChange",
+  };
+  for (const [previous, current] of Object.entries(previousValues)) {
+    if (roles.has(previous)) roles.add(current);
+  }
+  return roles;
 }
 
 async function refreshSettingsRoles() {

@@ -1,6 +1,12 @@
 {
-  "version": "0.8.63",
+  "version": "0.8.64",
   "releases": [
+    {
+      "version": "0.8.64",
+      "changes": [
+        "FIX: Zugriff für berechtigte User nach der Umstellung wiederhergestellt"
+      ]
+    },
     {
       "version": "0.8.63",
       "changes": [
