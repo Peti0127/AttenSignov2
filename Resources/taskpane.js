@@ -1132,6 +1132,12 @@ function scaleSignaturePreview() {
 }
 
 function buildSignature(templateHtml = signatureTemplate, settings = signatureSettings, signatureId = "standard") {
+  const preset = AttensamSignatureRuntime.presetSignature(signatureTemplate, currentDelegation?.email || currentDelegationAddress || profile.email);
+  if (preset) {
+    const html = AttensamSignatureRuntime.presetMarkup(preset);
+    return { html, previewHtml: html, signatureProfile: profile, renderSettings: settings, isPreset: true };
+  }
+  templateHtml = AttensamSignatureRuntime.standardTemplate(templateHtml);
   const sendAs = isFirstNameOnlyProfile(currentDelegation);
   const sendOnBehalf = Boolean(currentDelegation) && !sendAs;
   const ownProfile = nameChangeAuthorized ? { ...profile,
@@ -1197,7 +1203,8 @@ function buildSignature(templateHtml = signatureTemplate, settings = signatureSe
 function renderSignature() {
   const result = buildSignature();
   previewElement.innerHTML = result.previewHtml;
-  showProfileWarnings(
+  if (result.isPreset) document.getElementById("profile-warnings").hidden = true;
+  else showProfileWarnings(
     result.signatureProfile,
     result.renderSettings.Nummer,
     result.ignoreMissingTitle,
@@ -1211,6 +1218,7 @@ function renderSignature() {
   signatureButton.tabIndex = ready ? 0 : -1;
   signatureButton.classList.toggle("ready", ready);
   renderCitySignatureCards(result.signatureProfile.city);
+  if (result.isPreset) citySignaturesElement.hidden = true;
   renderCustomSignatureCards();
   return result.html;
 }
@@ -1582,6 +1590,16 @@ async function loadDelegatedUser(fromDetails) {
 async function refreshDelegationForCurrentFrom() {
   const fromDetails = await getCurrentFrom();
   const fromEmail = normalizeEmail(fromDetails?.emailAddress);
+  if (AttensamSignatureRuntime.presetSignature(signatureTemplate, fromEmail)) {
+    currentDelegation = { id: "preset:" + fromEmail, email: fromEmail, firstName: "Preset" };
+    currentDelegationAddress = fromEmail;
+    return;
+  }
+  if (usingCachedProfile) {
+    currentDelegation = null;
+    currentDelegationAddress = "";
+    return;
+  }
   const ownEmails = new Set([
     normalizeEmail(profile.email),
     normalizeEmail(Office.context.mailbox.userProfile.emailAddress),
@@ -1742,11 +1760,7 @@ async function insertSignature(customId = "standard") {
     setStatus("Für diese ASE-generierte Mail wird keine Signatur eingefügt.");
     return;
   }
-  if (usingCachedProfile) {
-    currentDelegation = null;
-    currentDelegationAddress = "";
-  }
-  else await refreshDelegationForCurrentFrom();
+  await refreshDelegationForCurrentFrom();
   const item = vipAuthorized && customId !== "standard"
     ? customSignatures.items.find((entry) => entry.id === customId)
     : null;
