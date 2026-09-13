@@ -1,12 +1,6 @@
 {
-  "version": "0.8.71",
+  "version": "0.8.70",
   "releases": [
-    {
-      "version": "0.8.71",
-      "changes": [
-        "FIX: Signaturvorschauen aktualisieren sich beim Wechsel der Absenderadresse"
-      ]
-    },
     {
       "version": "0.8.70",
       "changes": [

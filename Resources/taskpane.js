@@ -1648,11 +1648,8 @@ async function loadDelegatedUser(fromDetails) {
   }
 }
 
-let delegationRefreshSequence = 0;
 async function refreshDelegationForCurrentFrom() {
-  const refreshSequence = ++delegationRefreshSequence;
   const fromDetails = await getCurrentFrom();
-  if (refreshSequence !== delegationRefreshSequence) return;
   const fromEmail = normalizeEmail(fromDetails?.emailAddress);
   if (AttensamSignatureRuntime.presetSignature(signatureTemplate, fromEmail)) {
     currentDelegation = { id: "preset:" + fromEmail, email: fromEmail, firstName: "Preset" };
@@ -1673,9 +1670,7 @@ async function refreshDelegationForCurrentFrom() {
     currentDelegationAddress = "";
     return;
   }
-  const loadedDelegation = await loadDelegatedUser(fromDetails);
-  if (refreshSequence !== delegationRefreshSequence) return;
-  currentDelegation = loadedDelegation;
+  currentDelegation = await loadDelegatedUser(fromDetails);
   if (
     !String(currentDelegation.firstName || "").trim()
     &&
@@ -2025,51 +2020,9 @@ deleteCustomButton.addEventListener("click", async () => {
 document.addEventListener("click", (event) => {
   if (!contextMenu.hidden && !contextMenu.contains(event.target)) closeSignatureMenu();
 });
-let fromPreviewTimer = null;
-let fromPreviewCheckRunning = false;
-let lastPreviewFromAddress = "";
-let fromPreviewWatcherStopped = false;
-async function checkFromPreview() {
-  if (fromPreviewWatcherStopped || fromPreviewCheckRunning || document.hidden || !accessAuthorized || !profileLoaded) return;
-  fromPreviewCheckRunning = true;
-  try {
-    const fromDetails = await getCurrentFrom();
-    const address = normalizeEmail(fromDetails?.emailAddress);
-    if (!address || address === lastPreviewFromAddress) return;
-    closeSignatureMenu();
-    setStatus("Signaturvorschau wird aktualisiert …");
-    await refreshDelegationForCurrentFrom();
-    const confirmed = await getCurrentFrom();
-    if (fromPreviewWatcherStopped || normalizeEmail(confirmed?.emailAddress) !== address) return;
-    showProfile();
-    lastPreviewFromAddress = address;
-    setStatus(usingCachedProfile
-      ? `Gespeicherte Signaturdaten vom ${cachedProfileDate(getValidCachedRenderData() || {})} werden verwendet.`
-      : "Signaturvorschau aktualisiert.");
-  } catch (error) {
-    console.warn("Signaturvorschau konnte nach dem Absenderwechsel nicht aktualisiert werden.", error);
-  } finally {
-    fromPreviewCheckRunning = false;
-  }
-}
-function startFromPreviewWatcher() {
-  if (fromPreviewTimer !== null) return;
-  lastPreviewFromAddress = normalizeEmail(currentDelegationAddress || profile.email);
-  fromPreviewWatcherStopped = false;
-  fromPreviewTimer = window.setInterval(checkFromPreview, 750);
-  checkFromPreview();
-}
-window.addEventListener("pagehide", () => {
-  fromPreviewWatcherStopped = true;
-  delegationRefreshSequence += 1;
-  window.clearInterval(fromPreviewTimer);
-  fromPreviewTimer = null;
-});
-window.addEventListener("pageshow", () => { if (profileLoaded) startFromPreviewWatcher(); });
-document.addEventListener("visibilitychange", () => { if (!document.hidden) checkFromPreview(); });
 window.addEventListener("resize", scaleSignaturePreview);
 Office.onReady((info) => {
-  if (info.host === Office.HostType.Outlook) initialize().then(startFromPreviewWatcher);
+  if (info.host === Office.HostType.Outlook) initialize();
   else setStatus("Diese Seite muss als Outlook-Add-In geöffnet werden.");
 });
 
