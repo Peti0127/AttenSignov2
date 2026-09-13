@@ -1,6 +1,12 @@
 {
-  "version": "0.8.68",
+  "version": "0.8.69",
   "releases": [
+    {
+      "version": "0.8.69",
+      "changes": [
+        "NEU: Eigene Signatur oder Auftragssignatur je Absender als Standard wählen"
+      ]
+    },
     {
       "version": "0.8.68",
       "changes": [

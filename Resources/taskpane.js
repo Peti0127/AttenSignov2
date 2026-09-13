@@ -634,6 +634,24 @@ function readableError(error) {
   });
 })(window);
 
+const SENDER_DEFAULTS_KEY = "attensam.signature.sender-defaults.v1";
+function senderDefaultMode(address) {
+  const record = Office.context.roamingSettings?.get(SENDER_DEFAULTS_KEY);
+  return record?.choices?.[String(address || "").trim().toLowerCase()] === "own" ? "own" : "delegated";
+}
+async function saveSenderDefault(address, mode) {
+  const roaming = Office.context.roamingSettings;
+  const key = String(address || "").trim().toLowerCase();
+  if (!key || !["own", "delegated"].includes(mode)) throw new Error("Ungültige Absenderauswahl.");
+  const previous = roaming.get(SENDER_DEFAULTS_KEY);
+  const choices = { ...previous?.choices, [key]: mode };
+  roaming.set(SENDER_DEFAULTS_KEY, { choices });
+  await new Promise((resolve, reject) => roaming.saveAsync(result => {
+    if (result.status === Office.AsyncResultStatus.Succeeded) resolve();
+    else { if (previous) roaming.set(SENDER_DEFAULTS_KEY, previous); else roaming.remove(SENDER_DEFAULTS_KEY); reject(new Error("Auswahl konnte nicht gespeichert werden.")); }
+  }));
+}
+
 const CITY_SIGNATURE_CITIES = Object.freeze({
   "city-neusiedl": "Neusiedl am See",
   "city-oberwart": "Oberwart",
@@ -744,6 +762,7 @@ const statusElement = document.getElementById("status");
 const signatureMain = document.getElementById("signature-main");
 const taskpaneAccessDenied = document.getElementById("taskpane-access-denied");
 const previewElement = document.getElementById("signature-preview");
+const ownSignatureElement = document.getElementById("own-signature");
 const citySignaturesElement = document.getElementById("city-signatures");
 const standardSignatureTitle = document.getElementById("standard-signature-title");
 const signatureButton = document.getElementById("signature-button");
@@ -1125,26 +1144,26 @@ function scalePreview(container, content) {
 
 function scaleSignaturePreview() {
   scalePreview(signatureButton, previewElement);
-  document.querySelectorAll("#custom-signatures .preview, #city-signatures .preview").forEach((container) => {
+  document.querySelectorAll("#custom-signatures .preview, #city-signatures .preview, #own-signature .preview").forEach((container) => {
     const content = container.querySelector(".signature-preview-content");
     if (content) scalePreview(container, content);
   });
 }
 
-function buildSignature(templateHtml = signatureTemplate, settings = signatureSettings, signatureId = "standard") {
-  const preset = AttensamSignatureRuntime.presetSignature(signatureTemplate, currentDelegation?.email || currentDelegationAddress || profile.email);
+function buildSignature(templateHtml = signatureTemplate, settings = signatureSettings, signatureId = "standard", delegation = currentDelegation) {
+  const preset = AttensamSignatureRuntime.presetSignature(signatureTemplate, delegation?.email || profile.email);
   if (preset) {
     const html = AttensamSignatureRuntime.presetMarkup(preset);
     return { html, previewHtml: html, signatureProfile: profile, renderSettings: settings, isPreset: true };
   }
   templateHtml = AttensamSignatureRuntime.standardTemplate(templateHtml);
-  const sendAs = isFirstNameOnlyProfile(currentDelegation);
-  const sendOnBehalf = Boolean(currentDelegation) && !sendAs;
+  const sendAs = isFirstNameOnlyProfile(delegation);
+  const sendOnBehalf = Boolean(delegation) && !sendAs;
   const ownProfile = nameChangeAuthorized ? { ...profile,
     firstName: String(settings.CustomFirstName || "").trim() || profile.firstName,
     lastName: String(settings.CustomLastName || "").trim() || profile.lastName,
   } : profile;
-  const selectedProfile = currentDelegation || ownProfile;
+  const selectedProfile = delegation || ownProfile;
   const baseSignatureProfile = sendAs && !String(selectedProfile.firstName || "").trim()
     ? { ...selectedProfile, firstName: String(selectedProfile.displayName || "").trim() }
     : selectedProfile;
@@ -1171,7 +1190,7 @@ function buildSignature(templateHtml = signatureTemplate, settings = signatureSe
     ? ` ${String(signatureProfile.customAttribute11).trim()}`
     : "";
   const senderName = personalName(ownProfile);
-  const fromName = delegatedName(currentDelegation, settings);
+  const fromName = delegatedName(delegation, settings);
   const delegatedLastNameHtml = sendOnBehalf
     ? `<span style="font-weight: normal;">(im Auftrag von </span><span style="font-weight: bold;">${escapeHtml(fromName)}</span><span style="font-weight: normal;">)</span>`
     : "";
@@ -1219,8 +1238,38 @@ function renderSignature() {
   signatureButton.classList.toggle("ready", ready);
   renderCitySignatureCards(result.signatureProfile.city);
   if (result.isPreset) citySignaturesElement.hidden = true;
+  renderOwnSignatureCard();
   renderCustomSignatureCards();
   return result.html;
+}
+
+function hasOnBehalfChoice() {
+  return Boolean(currentDelegation?.email) && !isFirstNameOnlyProfile(currentDelegation)
+    && !AttensamSignatureRuntime.presetSignature(signatureTemplate, currentDelegation.email);
+}
+function renderOwnSignatureCard() {
+  ownSignatureElement.replaceChildren();
+  ownSignatureElement.hidden = !hasOnBehalfChoice();
+  if (!hasOnBehalfChoice()) {
+    standardSignatureTitle.textContent = "Standard Signatur";
+    return;
+  }
+  const ownDefault = senderDefaultMode(currentDelegation.email) === "own";
+  standardSignatureTitle.hidden = false;
+  standardSignatureTitle.innerHTML = 'Im Auftrag von' + (!ownDefault ? '<span class="default-badge">Standard</span>' : '');
+  ownSignatureElement.innerHTML = '<div class="custom-signature-title">Eigene Signatur' + (ownDefault ? '<span class="default-badge">Standard</span>' : '') + '</div><div class="preview ready" role="button" tabindex="0" aria-label="Eigene Signatur einfügen"><div class="signature-preview-content"></div></div>';
+  const button = ownSignatureElement.querySelector(".preview");
+  const content = ownSignatureElement.querySelector(".signature-preview-content");
+  content.innerHTML = buildSignature(signatureTemplate, signatureSettings, "own-standard", null).previewHtml;
+  button.addEventListener("click", () => insertSignature("own-standard"));
+  button.addEventListener("keydown", event => {
+    if (event.key === "Enter" || event.key === " ") { event.preventDefault(); insertSignature("own-standard"); }
+  });
+  button.addEventListener("contextmenu", event => openSignatureMenu(event, "own-standard"));
+  content.querySelectorAll("img").forEach(image => {
+    if (!image.complete) image.addEventListener("load", () => scalePreview(button, content), { once: true });
+  });
+  requestAnimationFrame(() => scalePreview(button, content));
 }
 
 function renderCitySignatureCards(standardCity) {
@@ -1291,7 +1340,7 @@ function renderCustomSignatureCards() {
 }
 
 function openSignatureMenu(event, id) {
-  if (!accessAuthorized || (!vipAuthorized && id !== "standard")) return;
+  if (!accessAuthorized || (!vipAuthorized && id !== "standard" && !(id === "own-standard" && hasOnBehalfChoice()))) return;
   event.preventDefault();
   contextSignatureId = id;
   deleteConfirmationArmed = false;
@@ -1300,6 +1349,11 @@ function openSignatureMenu(event, id) {
   deleteCustomButton.hidden = !vipAuthorized || id === "standard";
   setDefaultButton.hidden = !vipAuthorized;
   setDefaultButton.disabled = customSignatures.defaultId === id;
+  if (hasOnBehalfChoice() && ["standard", "own-standard"].includes(id)) {
+    editCustomButton.hidden = deleteCustomButton.hidden = true;
+    setDefaultButton.hidden = false;
+    setDefaultButton.disabled = senderDefaultMode(currentDelegation.email) === (id === "own-standard" ? "own" : "delegated");
+  }
   contextMenu.hidden = false;
   const width = 195;
   contextMenu.style.left = `${Math.min(event.clientX, window.innerWidth - width - 8)}px`;
@@ -1765,7 +1819,9 @@ async function insertSignature(customId = "standard") {
     ? customSignatures.items.find((entry) => entry.id === customId)
     : null;
   renderSignature();
-  const html = cityForSignature(customId)
+  const html = customId === "own-standard" && hasOnBehalfChoice()
+    ? buildSignature(signatureTemplate, signatureSettings, "own-standard", null).html
+    : cityForSignature(customId)
     ? buildSignature(signatureTemplate, signatureSettings, customId).html
     : item ? buildSignature(item.html, item.settings || signatureSettings, item.id).html : buildSignature().html;
   const callback = (result) => {
@@ -1905,6 +1961,12 @@ customSaveButton.addEventListener("click", async () => {
 });
 setDefaultButton.addEventListener("click", async () => {
   try {
+    if (hasOnBehalfChoice() && ["standard", "own-standard"].includes(contextSignatureId)) {
+      await saveSenderDefault(currentDelegation.email, contextSignatureId === "own-standard" ? "own" : "delegated");
+      renderSignature();
+      setStatus("Standard-Signatur für diese Absenderadresse gespeichert.");
+      return;
+    }
     customSignatures = await SignaturePreferences.saveCustomSignatures({ ...customSignatures, defaultId: contextSignatureId });
     renderCustomSignatureCards();
     setStatus(contextSignatureId === "standard" ? "Standard-Signatur wurde als Standard festgelegt." : "Benutzerdefinierte Signatur wurde als Standard festgelegt.");
@@ -1915,7 +1977,7 @@ setDefaultButton.addEventListener("click", async () => {
   }
 });
 openSignatureSettingsButton.addEventListener("click", () => {
-  const signatureId = contextSignatureId || "standard";
+  const signatureId = contextSignatureId === "own-standard" ? "standard" : contextSignatureId || "standard";
   if (!accessAuthorized || (!vipAuthorized && signatureId !== "standard")) return;
   window.location.href = `taskpane.html?view=settings&signature=${encodeURIComponent(signatureId)}`;
 });
@@ -2420,7 +2482,7 @@ async function updateInsertedSignature() {
   if (SETTINGS_SIGNATURE_ID === "standard" && renderData.cityChangeAuthorized && typeof body.getAsync === "function") {
     const existingDocument = new DOMParser().parseFromString(await getBodyHtml(body), "text/html");
     const existingId = readInsertedSignatureId(findMarkedSignature(existingDocument));
-    if (cityForSignature(existingId)) renderSignatureId = existingId;
+    if (cityForSignature(existingId) || existingId === "own-standard") renderSignatureId = existingId;
   }
   const html = AttensamSignatureRuntime.renderSignature(
     renderData,
