@@ -1216,7 +1216,7 @@ function buildSignature(templateHtml = signatureTemplate, settings = signatureSe
   const marker = `<span id="attensam-signature-marker-${safeSignatureId}" data-attensam-signature-id="${safeSignatureId}" style="display:none!important;mso-hide:all;max-height:0;overflow:hidden;font-size:0;line-height:0;color:transparent;">${SIGNATURE_MARKER_TEXT}</span>`;
   const previewHtml = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2" data-attensam-signature-id="${safeSignatureId}">${marker}${signatureContent}</div>`;
   const html = `<div id="${SIGNATURE_MARKER_ID}" data-attensam-signature="v2" data-attensam-signature-id="${safeSignatureId}">${marker}${insertedProfileWarningsHtml(signatureProfile, renderSettings.Nummer, sendAs)}${signatureContent}</div>`;
-  return { html, previewHtml, signatureProfile, renderSettings, ignoreMissingTitle: sendAs, sendOnBehalf };
+  return { html: AttensamSignatureRuntime.placeSignatureMarker(html), previewHtml: AttensamSignatureRuntime.placeSignatureMarker(previewHtml), signatureProfile, renderSettings, ignoreMissingTitle: sendAs, sendOnBehalf };
 }
 
 function renderSignature() {
@@ -2399,13 +2399,24 @@ function setBodyHtml(body, html) {
 }
 
 function findMarkedSignature(document) {
-  const hiddenMarker = Array.from(document.querySelectorAll("span"))
-    .find((element) => element.textContent?.includes(SETTINGS_SIGNATURE_MARKER_TEXT));
-  return document.getElementById(SETTINGS_SIGNATURE_MARKER_ID)
+  const root = document.getElementById(SETTINGS_SIGNATURE_MARKER_ID)
     || document.querySelector('[data-attensam-signature="v1"]')
-    || document.querySelector('[data-attensam-signature="v2"]')
-    || document.querySelector(`[id^="${SETTINGS_SIGNATURE_MARKER_ID_PREFIX}"]`)?.parentElement
-    || hiddenMarker?.parentElement;
+    || document.querySelector('[data-attensam-signature="v2"]');
+  if (root) return root;
+  const marker = document.querySelector(`[id^="${SETTINGS_SIGNATURE_MARKER_ID_PREFIX}"]`)
+    || Array.from(document.querySelectorAll("span"))
+      .find(element => element.textContent?.trim() === SETTINGS_SIGNATURE_MARKER_TEXT);
+  if (!marker) return null;
+  const parent = marker.parentElement;
+  // Old signatures placed the marker directly in the wrapper.
+  if (parent?.tagName === "DIV" && parent !== document.body) return parent;
+  // New signatures keep it inside an existing paragraph. Only recover a
+  // dedicated wrapper; never replace the whole message or just its first line.
+  const paragraph = marker.closest("p");
+  const wrapper = paragraph?.parentElement;
+  if (wrapper?.tagName === "DIV" && wrapper !== document.body
+      && wrapper.firstElementChild === paragraph) return wrapper;
+  return null;
 }
 
 function replaceMarkedSignature(bodyHtml, signatureHtml) {

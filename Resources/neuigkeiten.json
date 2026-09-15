@@ -1,6 +1,12 @@
 {
-  "version": "0.8.70",
+  "version": "0.8.72",
   "releases": [
+    {
+      "version": "0.8.72",
+      "changes": [
+        "FIX: Unsichtbare Zusatzzeile vor der Signatur entfernt"
+      ]
+    },
     {
       "version": "0.8.70",
       "changes": [
