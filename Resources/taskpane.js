@@ -939,7 +939,7 @@ function greetingHtml(settings = signatureSettings) {
   }
   if (!greeting) return "";
   const configuredLines = Number(settings.GreetingLines);
-  const blankLines = configuredLines === 3 ? 3 : configuredLines === 2 ? 1 : 0;
+  const blankLines = [1, 2, 3].includes(configuredLines) ? configuredLines : 1;
   return `<p style="margin: 0; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);">${escapeHtml(greeting)}${"<br>".repeat(blankLines + 1)}</p>`;
 }
 
