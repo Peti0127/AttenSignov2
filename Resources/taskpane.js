@@ -121,6 +121,7 @@ function readableError(error) {
     CustomGreeting: "",
     CustomFirstName: "",
     CustomLastName: "",
+    GreetingLeadingLines: 1,
     GreetingLines: 1,
     CityOverride: "Standard",
     AutoInsert: true,
@@ -415,6 +416,9 @@ function readableError(error) {
       CustomGreeting: normalizeCustomGreeting(value?.CustomGreeting),
       CustomFirstName: normalizeCustomName(value?.CustomFirstName),
       CustomLastName: normalizeCustomName(value?.CustomLastName),
+      GreetingLeadingLines: ALLOWED_GREETING_LINES.has(Number(value?.GreetingLeadingLines))
+        ? Number(value.GreetingLeadingLines)
+        : DEFAULT_SETTINGS.GreetingLeadingLines,
       GreetingLines: ALLOWED_GREETING_LINES.has(Number(value?.GreetingLines))
         ? Number(value.GreetingLines)
         : DEFAULT_SETTINGS.GreetingLines,
@@ -458,6 +462,7 @@ function readableError(error) {
       CustomGreeting: record.CustomGreeting,
       CustomFirstName: record.CustomFirstName,
       CustomLastName: record.CustomLastName,
+      GreetingLeadingLines: record.GreetingLeadingLines,
       GreetingLines: record.GreetingLines,
       CityOverride: record.CityOverride,
       AutoInsert: record.AutoInsert,
@@ -497,6 +502,7 @@ function readableError(error) {
       CustomGreeting: DEFAULT_SETTINGS.CustomGreeting,
       CustomFirstName: DEFAULT_SETTINGS.CustomFirstName,
       CustomLastName: DEFAULT_SETTINGS.CustomLastName,
+      GreetingLeadingLines: DEFAULT_SETTINGS.GreetingLeadingLines,
       GreetingLines: DEFAULT_SETTINGS.GreetingLines,
       CityOverride: DEFAULT_SETTINGS.CityOverride,
       AutoInsert: DEFAULT_SETTINGS.AutoInsert,
@@ -521,6 +527,7 @@ function readableError(error) {
       || typeof settings?.CustomGreeting !== "string"
       || typeof settings?.CustomFirstName !== "string"
       || typeof settings?.CustomLastName !== "string"
+      || !ALLOWED_GREETING_LINES.has(Number(settings?.GreetingLeadingLines))
       || !ALLOWED_GREETING_LINES.has(Number(settings?.GreetingLines))
       || !ALLOWED_CITY_OVERRIDES.has(settings?.CityOverride)
       || typeof settings?.AutoInsert !== "boolean"
@@ -543,6 +550,7 @@ function readableError(error) {
       CustomGreeting: normalizeCustomGreeting(settings.CustomGreeting),
       CustomFirstName: normalizeCustomName(settings.CustomFirstName),
       CustomLastName: normalizeCustomName(settings.CustomLastName),
+      GreetingLeadingLines: Number(settings.GreetingLeadingLines),
       GreetingLines: Number(settings.GreetingLines),
       CityOverride: settings.CityOverride,
       AutoInsert: true,
@@ -750,6 +758,7 @@ let signatureSettings = {
   CustomGreeting: "",
   CustomFirstName: "",
   CustomLastName: "",
+  GreetingLeadingLines: 1,
   GreetingLines: 1,
   CityOverride: "Standard",
   MobileUsage: false,
@@ -938,9 +947,11 @@ function greetingHtml(settings = signatureSettings) {
     greeting = String(settings.CustomGreeting || "").trim();
   }
   if (!greeting) return "";
+  const configuredLeadingLines = Number(settings.GreetingLeadingLines);
+  const leadingLines = [1, 2, 3].includes(configuredLeadingLines) ? configuredLeadingLines : 1;
   const configuredLines = Number(settings.GreetingLines);
   const blankLines = [1, 2, 3].includes(configuredLines) ? configuredLines : 1;
-  return `<p style="margin: 0; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);">${escapeHtml(greeting)}${"<br>".repeat(blankLines + 1)}</p>`;
+  return `<p style="margin: 0; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);">${"<br>".repeat(leadingLines)}${escapeHtml(greeting)}${"<br>".repeat(blankLines + 1)}</p>`;
 }
 
 function isOutlookMobile() {
@@ -2204,7 +2215,9 @@ const landlinePhoneWarning = document.getElementById("landline-phone-warning");
 const greetingModeSelect = document.getElementById("greeting-mode");
 const customGreetingField = document.getElementById("custom-greeting-field");
 const customGreetingInput = document.getElementById("custom-greeting");
+const greetingLeadingLinesField = document.getElementById("greeting-leading-lines-field");
 const greetingLinesField = document.getElementById("greeting-lines-field");
+const greetingLeadingLinesSelect = document.getElementById("greeting-leading-lines");
 const greetingLinesSelect = document.getElementById("greeting-lines");
 const mobileUsageCheckbox = document.getElementById("mobile-usage");
 const mobileUsageTextField = document.getElementById("mobile-usage-text-field");
@@ -2269,8 +2282,10 @@ function updateGreetingVisibility() {
   const isCustom = greetingModeSelect.value === "MfGCustom";
   const hasGreeting = greetingModeSelect.value !== "MfG0";
   customGreetingField.hidden = !isCustom;
+  greetingLeadingLinesField.hidden = !hasGreeting;
   greetingLinesField.hidden = !hasGreeting;
   customGreetingInput.disabled = greetingModeSelect.disabled || !isCustom;
+  greetingLeadingLinesSelect.disabled = greetingModeSelect.disabled || !hasGreeting;
   greetingLinesSelect.disabled = greetingModeSelect.disabled || !hasGreeting;
 }
 
@@ -2280,6 +2295,7 @@ function setControlsDisabled(disabled) {
   customLastNameInput.disabled = disabled || !nameChangeAuthorized;
   greetingModeSelect.disabled = disabled;
   customGreetingInput.disabled = disabled || greetingModeSelect.value !== "MfGCustom";
+  greetingLeadingLinesSelect.disabled = disabled || greetingModeSelect.value === "MfG0";
   greetingLinesSelect.disabled = disabled || greetingModeSelect.value === "MfG0";
   mobileUsageCheckbox.disabled = disabled;
   mobileUsageTextInput.disabled = disabled || !mobileUsageCheckbox.checked;
@@ -2568,6 +2584,7 @@ async function initializeSettings() {
     updatePhoneWarnings();
     greetingModeSelect.value = currentSettings.MfG;
     customGreetingInput.value = currentSettings.CustomGreeting;
+    greetingLeadingLinesSelect.value = String(currentSettings.GreetingLeadingLines);
     greetingLinesSelect.value = String(currentSettings.GreetingLines);
     updateGreetingVisibility();
     mobileUsageCheckbox.checked = currentSettings.MobileUsage;
@@ -2599,6 +2616,7 @@ async function saveSettings() {
       CustomGreeting: customGreetingInput.value,
       CustomFirstName: nameChangeAuthorized ? customFirstNameInput.value : currentSettings.CustomFirstName,
       CustomLastName: nameChangeAuthorized ? customLastNameInput.value : currentSettings.CustomLastName,
+      GreetingLeadingLines: Number(greetingLeadingLinesSelect.value),
       GreetingLines: Number(greetingLinesSelect.value),
       CityOverride: "Standard",
       AutoInsert: true,
@@ -2640,6 +2658,7 @@ greetingModeSelect.addEventListener("change", () => {
   saveSettings();
 });
 customGreetingInput.addEventListener("change", saveSettings);
+greetingLeadingLinesSelect.addEventListener("change", saveSettings);
 greetingLinesSelect.addEventListener("change", saveSettings);
 mobileUsageCheckbox.addEventListener("change", () => {
   updateMobileUsageVisibility();
@@ -2684,7 +2703,9 @@ const landlinePhoneWarning = document.getElementById("landline-phone-warning");
 const greetingModeSelect = document.getElementById("greeting-mode");
 const customGreetingField = document.getElementById("custom-greeting-field");
 const customGreetingInput = document.getElementById("custom-greeting");
+const greetingLeadingLinesField = document.getElementById("greeting-leading-lines-field");
 const greetingLinesField = document.getElementById("greeting-lines-field");
+const greetingLeadingLinesSelect = document.getElementById("greeting-leading-lines");
 const greetingLinesSelect = document.getElementById("greeting-lines");
 const mobileUsageCheckbox = document.getElementById("mobile-usage");
 const mobileUsageTextField = document.getElementById("mobile-usage-text-field");
@@ -2731,6 +2752,7 @@ function setControlsDisabled(disabled) {
   customLastNameInput.disabled = disabled || !nameChangeAuthorized;
   greetingModeSelect.disabled = disabled;
   customGreetingInput.disabled = disabled || greetingModeSelect.value !== "MfGCustom";
+  greetingLeadingLinesSelect.disabled = disabled || greetingModeSelect.value === "MfG0";
   greetingLinesSelect.disabled = disabled || greetingModeSelect.value === "MfG0";
   mobileUsageCheckbox.disabled = disabled;
   mobileUsageTextInput.disabled = disabled || !mobileUsageCheckbox.checked;
@@ -2773,8 +2795,10 @@ function updateGreetingVisibility() {
   const isCustom = greetingModeSelect.value === "MfGCustom";
   const hasGreeting = greetingModeSelect.value !== "MfG0";
   customGreetingField.hidden = !isCustom;
+  greetingLeadingLinesField.hidden = !hasGreeting;
   greetingLinesField.hidden = !hasGreeting;
   customGreetingInput.disabled = greetingModeSelect.disabled || !isCustom;
+  greetingLeadingLinesSelect.disabled = greetingModeSelect.disabled || !hasGreeting;
   greetingLinesSelect.disabled = greetingModeSelect.disabled || !hasGreeting;
 }
 
@@ -2804,6 +2828,7 @@ function showSettings(settings, department, titleAttributes) {
   updatePhoneWarnings();
   greetingModeSelect.value = settings.MfG;
   customGreetingInput.value = settings.CustomGreeting;
+  greetingLeadingLinesSelect.value = String(settings.GreetingLeadingLines);
   greetingLinesSelect.value = String(settings.GreetingLines);
   updateGreetingVisibility();
   mobileUsageCheckbox.checked = settings.MobileUsage;
@@ -2995,6 +3020,7 @@ async function saveSettings() {
       CustomGreeting: customGreetingInput.value,
       CustomFirstName: nameChangeAuthorized ? customFirstNameInput.value : currentSettings.CustomFirstName,
       CustomLastName: nameChangeAuthorized ? customLastNameInput.value : currentSettings.CustomLastName,
+      GreetingLeadingLines: Number(greetingLeadingLinesSelect.value),
       GreetingLines: Number(greetingLinesSelect.value),
       CityOverride: "Standard",
       AutoInsert: true,
@@ -3028,6 +3054,7 @@ greetingModeSelect.addEventListener("change", () => {
   saveSettings();
 });
 customGreetingInput.addEventListener("change", saveSettings);
+greetingLeadingLinesSelect.addEventListener("change", saveSettings);
 greetingLinesSelect.addEventListener("change", saveSettings);
 mobileUsageCheckbox.addEventListener("change", () => {
   updateMobileUsageVisibility();
