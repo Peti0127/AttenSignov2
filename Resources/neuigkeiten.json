@@ -1,6 +1,18 @@
 {
-  "version": "0.8.72",
+  "version": "0.8.74",
   "releases": [
+    {
+      "version": "0.8.74",
+      "changes": [
+        "ÄNDERUNG: Unsichtbare Signaturkennung steht direkt vor dem Namen"
+      ]
+    },
+    {
+      "version": "0.8.73",
+      "changes": [
+        "ÄNDERUNG: Hilfe ist jetzt auf einer eigenen Seite verfügbar"
+      ]
+    },
     {
       "version": "0.8.72",
       "changes": [

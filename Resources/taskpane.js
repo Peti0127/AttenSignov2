@@ -708,7 +708,7 @@ async function refreshSettingsRoles() {
 }
 
 (function compactRoute(){
-  const activeView = new URLSearchParams(window.location.search).get("view");
+  const activeView = document.documentElement.dataset.view === "help" ? "help" : new URLSearchParams(window.location.search).get("view");
   if (["settings", "feedback", "help", "news"].includes(activeView)) return;
 /* global Office, msal, SignaturePreferences */
 
@@ -3061,12 +3061,12 @@ Office.onReady((info) => {
 // Keep manifest version and entry URLs stable for hosted code/content-only updates.
 // Change/redeploy the manifest only when its actual configuration changes.
 (function informationRoute() {
-  const view = new URLSearchParams(window.location.search).get("view");
+  const view = document.documentElement.dataset.view === "help" ? "help" : new URLSearchParams(window.location.search).get("view");
   if (!["help", "news", "feedback"].includes(view)) return;
   if (view === "help") {
     Office.onReady(() => {
       const vipHelp = document.getElementById("help-vip");
-      vipHelp.hidden = !(SignaturePreferences.getAccessAuthorized() && SignaturePreferences.getVipAuthorized());
+      if (vipHelp) vipHelp.hidden = !(SignaturePreferences.getAccessAuthorized() && SignaturePreferences.getVipAuthorized());
     });
     return;
   }
