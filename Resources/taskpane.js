@@ -135,6 +135,7 @@ function readableError(error) {
     MobileUsage: false,
     MobileUsageText: "",
     InternalSignatureText: "",
+    ConfidentialityEnglish: false,
     Confidentiality: false,
   });
   const ALLOWED_NUMBERS = new Set(["Alles", "Handy", "Festnetz", "Office", "EDVHotline"]);
@@ -434,6 +435,7 @@ function readableError(error) {
       MobileUsage: value.MobileUsage === true,
       MobileUsageText: normalizeMobileUsageText(value?.MobileUsageText),
       InternalSignatureText: normalizeInternalSignatureText(value?.InternalSignatureText),
+      ConfidentialityEnglish: value.ConfidentialityEnglish === true,
       Confidentiality: value.Confidentiality === true,
       updatedAt: Number.isFinite(Date.parse(value.updatedAt)) ? value.updatedAt : "",
     };
@@ -476,6 +478,7 @@ function readableError(error) {
       MobileUsage: record.MobileUsage,
       MobileUsageText: record.MobileUsageText,
       InternalSignatureText: record.InternalSignatureText,
+      ConfidentialityEnglish: record.ConfidentialityEnglish,
       Confidentiality: record.Confidentiality,
     };
   }
@@ -516,6 +519,7 @@ function readableError(error) {
       MobileUsage: DEFAULT_SETTINGS.MobileUsage,
       MobileUsageText: DEFAULT_SETTINGS.MobileUsageText,
       InternalSignatureText: DEFAULT_SETTINGS.InternalSignatureText,
+      ConfidentialityEnglish: DEFAULT_SETTINGS.ConfidentialityEnglish,
       Confidentiality: DEFAULT_SETTINGS.Confidentiality,
     };
   }
@@ -540,6 +544,7 @@ function readableError(error) {
       || typeof settings?.MobileUsage !== "boolean"
       || typeof settings?.MobileUsageText !== "string"
       || typeof settings?.InternalSignatureText !== "string"
+      || typeof settings?.ConfidentialityEnglish !== "boolean"
       || typeof settings?.Confidentiality !== "boolean"
     ) {
       throw new Error("Ungültige Einstellung.");
@@ -564,6 +569,7 @@ function readableError(error) {
       MobileUsage: settings.MobileUsage,
       MobileUsageText: normalizeMobileUsageText(settings.MobileUsageText),
       InternalSignatureText: normalizeInternalSignatureText(settings.InternalSignatureText),
+      ConfidentialityEnglish: settings.ConfidentialityEnglish,
       Confidentiality: settings.Confidentiality,
       updatedAt: new Date().toISOString(),
     };
@@ -764,6 +770,7 @@ let signatureSettings = {
   MobileUsage: false,
   MobileUsageText: "",
   InternalSignatureText: "",
+  ConfidentialityEnglish: false,
   Confidentiality: false,
 };
 
@@ -968,7 +975,8 @@ function noticesHtml(settings = signatureSettings) {
     html += `<p style="margin: 12px 0 0; font-family: Aptos, Arial, sans-serif; font-size: 12pt; color: rgb(0, 0, 0);">${escapeHtml(mobileNotice)}</p>`;
   }
   if (settings.Confidentiality) {
-    html += '<p style="margin: 6px 0 0; font-family: Aptos, Arial, sans-serif; font-size: 9pt; color: rgb(0, 0, 0);">Diese E-Mail ist vertraulich.</p>';
+    html += "<p style=\"margin: 6px 0 0; font-family: Aptos, Arial, sans-serif; font-size: 8pt; color: rgb(0, 0, 0);\">Diese E-Mail ist vertraulich und ausschließlich für den (die) genannten Adressaten bestimmt. Wenn Sie nicht der vorgesehene Adressat sind, informieren Sie uns und bitte löschen Sie diese Nachricht. Jede Form der Speicherung, Veröffentlichung, Vervielfältigung, Weitergabe oder das Ergreifen von Handlungen auf der Grundlage dieser Nachricht des Inhaltes dieser E-Mail ist unzulässig.</p>";
+    if (settings.ConfidentialityEnglish) html += "<p style=\"margin: 6px 0 0; font-family: Aptos, Arial, sans-serif; font-size: 8pt; color: rgb(0, 0, 0);\">The e-mail is confidential and intended solely for the attention and use of the named addressee(s). If you are not the intended recipient, please inform us immediately and delete the message. Any form of recording, disclosure, reproduction, distribution or other usage of the content of this email or take any action in reliance on it is prohibited.</p>";
   }
   return html;
 }
@@ -1187,6 +1195,7 @@ function buildSignature(templateHtml = signatureTemplate, settings = signatureSe
     ? {
         ...settings,
         Nummer: sendAsHasDirectNumber ? "Available" : "Office",
+        ConfidentialityEnglish: false,
         Confidentiality: false,
         MobileUsage: false,
         MobileUsageText: "",
@@ -2223,6 +2232,8 @@ const mobileUsageCheckbox = document.getElementById("mobile-usage");
 const mobileUsageTextField = document.getElementById("mobile-usage-text-field");
 const mobileUsageTextInput = document.getElementById("mobile-usage-text");
 const confidentialityCheckbox = document.getElementById("confidentiality");
+const confidentialityEnglishField = document.getElementById("confidentiality-english-field");
+const confidentialityEnglishCheckbox = document.getElementById("confidentiality-english");
 const autoInsertRepliesCheckbox = document.getElementById("auto-insert-replies");
 const autoInsertForwardsCheckbox = document.getElementById("auto-insert-forwards");
 const autoInsertMeetingsCheckbox = document.getElementById("auto-insert-meetings");
@@ -2278,6 +2289,11 @@ function updatePhoneWarnings() {
     || (bothNeeded && mobileMissing);
 }
 
+function updateConfidentialityVisibility() {
+  confidentialityEnglishField.hidden = !confidentialityCheckbox.checked;
+  confidentialityEnglishCheckbox.disabled = confidentialityCheckbox.disabled || !confidentialityCheckbox.checked;
+}
+
 function updateGreetingVisibility() {
   const isCustom = greetingModeSelect.value === "MfGCustom";
   const hasGreeting = greetingModeSelect.value !== "MfG0";
@@ -2300,6 +2316,7 @@ function setControlsDisabled(disabled) {
   mobileUsageCheckbox.disabled = disabled;
   mobileUsageTextInput.disabled = disabled || !mobileUsageCheckbox.checked;
   confidentialityCheckbox.disabled = disabled;
+  updateConfidentialityVisibility();
   autoInsertRepliesCheckbox.disabled = disabled;
   autoInsertForwardsCheckbox.disabled = disabled;
   autoInsertMeetingsCheckbox.disabled = disabled;
@@ -2592,6 +2609,8 @@ async function initializeSettings() {
     internalSignatureInput.value = currentSettings.InternalSignatureText;
     updateMobileUsageVisibility();
     confidentialityCheckbox.checked = currentSettings.Confidentiality;
+    confidentialityEnglishCheckbox.checked = currentSettings.ConfidentialityEnglish;
+    updateConfidentialityVisibility();
     autoInsertRepliesCheckbox.checked = currentSettings.AutoInsertReplies;
     autoInsertForwardsCheckbox.checked = currentSettings.AutoInsertForwards;
     autoInsertMeetingsCheckbox.checked = currentSettings.AutoInsertMeetings;
@@ -2629,6 +2648,7 @@ async function saveSettings() {
       MobileUsage: mobileUsageCheckbox.checked,
       MobileUsageText: mobileUsageTextInput.value,
       InternalSignatureText: internalSignatureInput.value,
+      ConfidentialityEnglish: confidentialityEnglishCheckbox.checked,
       Confidentiality: confidentialityCheckbox.checked,
     });
     try {
@@ -2666,7 +2686,8 @@ mobileUsageCheckbox.addEventListener("change", () => {
 });
 mobileUsageTextInput.addEventListener("change", saveSettings);
 internalSignatureInput.addEventListener("change", saveSettings);
-confidentialityCheckbox.addEventListener("change", saveSettings);
+confidentialityCheckbox.addEventListener("change", () => { updateConfidentialityVisibility(); saveSettings(); });
+confidentialityEnglishCheckbox.addEventListener("change", saveSettings);
 autoInsertRepliesCheckbox.addEventListener("change", saveSettings);
 autoInsertForwardsCheckbox.addEventListener("change", saveSettings);
 autoInsertMeetingsCheckbox.addEventListener("change", saveSettings);
@@ -2711,6 +2732,8 @@ const mobileUsageCheckbox = document.getElementById("mobile-usage");
 const mobileUsageTextField = document.getElementById("mobile-usage-text-field");
 const mobileUsageTextInput = document.getElementById("mobile-usage-text");
 const confidentialityCheckbox = document.getElementById("confidentiality");
+const confidentialityEnglishField = document.getElementById("confidentiality-english-field");
+const confidentialityEnglishCheckbox = document.getElementById("confidentiality-english");
 const autoInsertRepliesCheckbox = document.getElementById("auto-insert-replies");
 const autoInsertForwardsCheckbox = document.getElementById("auto-insert-forwards");
 const autoInsertMeetingsCheckbox = document.getElementById("auto-insert-meetings");
@@ -2757,6 +2780,7 @@ function setControlsDisabled(disabled) {
   mobileUsageCheckbox.disabled = disabled;
   mobileUsageTextInput.disabled = disabled || !mobileUsageCheckbox.checked;
   confidentialityCheckbox.disabled = disabled;
+  updateConfidentialityVisibility();
   autoInsertRepliesCheckbox.disabled = disabled;
   autoInsertForwardsCheckbox.disabled = disabled;
   autoInsertMeetingsCheckbox.disabled = disabled;
@@ -2789,6 +2813,11 @@ function updatePhoneWarnings() {
   landlinePhoneWarning.hidden = !phoneMissing
     || (mode !== "Festnetz" && mode !== "Alles")
     || (bothNeeded && mobileMissing);
+}
+
+function updateConfidentialityVisibility() {
+  confidentialityEnglishField.hidden = !confidentialityCheckbox.checked;
+  confidentialityEnglishCheckbox.disabled = confidentialityCheckbox.disabled || !confidentialityCheckbox.checked;
 }
 
 function updateGreetingVisibility() {
@@ -2836,6 +2865,8 @@ function showSettings(settings, department, titleAttributes) {
   internalSignatureInput.value = settings.InternalSignatureText;
   updateMobileUsageVisibility();
   confidentialityCheckbox.checked = settings.Confidentiality;
+    confidentialityEnglishCheckbox.checked = settings.ConfidentialityEnglish;
+    updateConfidentialityVisibility();
   autoInsertRepliesCheckbox.checked = settings.AutoInsertReplies;
   autoInsertForwardsCheckbox.checked = settings.AutoInsertForwards;
   autoInsertMeetingsCheckbox.checked = settings.AutoInsertMeetings;
@@ -3033,6 +3064,7 @@ async function saveSettings() {
       MobileUsage: mobileUsageCheckbox.checked,
       MobileUsageText: mobileUsageTextInput.value,
       InternalSignatureText: internalSignatureInput.value,
+      ConfidentialityEnglish: confidentialityEnglishCheckbox.checked,
       Confidentiality: confidentialityCheckbox.checked,
     });
     setSettingsStatus("Einstellungen gespeichert.");
@@ -3062,7 +3094,8 @@ mobileUsageCheckbox.addEventListener("change", () => {
 });
 mobileUsageTextInput.addEventListener("change", saveSettings);
 internalSignatureInput.addEventListener("change", saveSettings);
-confidentialityCheckbox.addEventListener("change", saveSettings);
+confidentialityCheckbox.addEventListener("change", () => { updateConfidentialityVisibility(); saveSettings(); });
+confidentialityEnglishCheckbox.addEventListener("change", saveSettings);
 autoInsertRepliesCheckbox.addEventListener("change", saveSettings);
 autoInsertForwardsCheckbox.addEventListener("change", saveSettings);
 autoInsertMeetingsCheckbox.addEventListener("change", saveSettings);

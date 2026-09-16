@@ -1,6 +1,12 @@
 {
-  "version": "0.8.75",
+  "version": "0.8.76",
   "releases": [
+    {
+      "version": "0.8.76",
+      "changes": [
+        "ÄNDERUNG: Vertraulichkeitshinweis erweitert und optional auch auf Englisch verfügbar"
+      ]
+    },
     {
       "version": "0.8.75",
       "changes": [
