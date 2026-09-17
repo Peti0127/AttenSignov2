@@ -664,6 +664,19 @@ function senderDefaultMode(address) {
   const record = senderDefaultsRecord();
   return record?.choices?.[String(address || "").trim().toLowerCase()] === "own" ? "own" : "delegated";
 }
+async function syncSenderSessionDefaults(record = senderDefaultsRecord()) {
+  const session = Office.context.mailbox?.item?.sessionData;
+  if (typeof session?.setAsync !== "function") return;
+  const mailbox = String(Office.context.mailbox.userProfile?.emailAddress || "").trim().toLowerCase();
+  await new Promise(resolve => {
+    try {
+      session.setAsync(SENDER_DEFAULTS_KEY, JSON.stringify({ mailbox, record }), result => {
+        if (result.status !== Office.AsyncResultStatus.Succeeded) console.warn("Absenderauswahl konnte nicht mit dem Ereignisruntime geteilt werden.", result.error);
+        resolve();
+      });
+    } catch (error) { console.warn("Absenderauswahl konnte nicht geteilt werden.", error); resolve(); }
+  });
+}
 async function saveSenderDefault(address, mode) {
   const roaming = Office.context.roamingSettings;
   const key = String(address || "").trim().toLowerCase();
@@ -677,6 +690,7 @@ async function saveSenderDefault(address, mode) {
     else { if (previous) roaming.set(SENDER_DEFAULTS_KEY, previous); else roaming.remove(SENDER_DEFAULTS_KEY); reject(new Error("Auswahl konnte nicht gespeichert werden.")); }
   }));
   senderDefaultsRecord();
+  await syncSenderSessionDefaults(record);
 }
 
 const CITY_SIGNATURE_CITIES = Object.freeze({
@@ -2005,16 +2019,19 @@ customSaveButton.addEventListener("click", async () => {
   }
 });
 setDefaultButton.addEventListener("click", async () => {
+  const selectedId = contextSignatureId;
   try {
-    if (hasOnBehalfChoice() && ["standard", "own-standard"].includes(contextSignatureId)) {
-      await saveSenderDefault(currentDelegationAddress || currentDelegation?.email, contextSignatureId === "own-standard" ? "own" : "delegated");
+    if (hasOnBehalfChoice() && ["standard", "own-standard"].includes(selectedId)) {
+      await saveSenderDefault(currentDelegationAddress || currentDelegation?.email, selectedId === "own-standard" ? "own" : "delegated");
       renderSignature();
       setStatus("Standard-Signatur für diese Absenderadresse gespeichert.");
+      await insertSignature(selectedId);
       return;
     }
-    customSignatures = await SignaturePreferences.saveCustomSignatures({ ...customSignatures, defaultId: contextSignatureId });
+    customSignatures = await SignaturePreferences.saveCustomSignatures({ ...customSignatures, defaultId: selectedId });
     renderCustomSignatureCards();
-    setStatus(contextSignatureId === "standard" ? "Standard-Signatur wurde als Standard festgelegt." : "Benutzerdefinierte Signatur wurde als Standard festgelegt.");
+    setStatus(selectedId === "standard" ? "Standard-Signatur wurde als Standard festgelegt." : "Benutzerdefinierte Signatur wurde als Standard festgelegt.");
+    await insertSignature(selectedId);
   } catch (error) {
     setStatus(error.message || "Standard konnte nicht gespeichert werden.");
   } finally {
@@ -2060,7 +2077,7 @@ document.addEventListener("click", (event) => {
 });
 window.addEventListener("resize", scaleSignaturePreview);
 Office.onReady((info) => {
-  if (info.host === Office.HostType.Outlook) initialize();
+  if (info.host === Office.HostType.Outlook) initialize().then(() => syncSenderSessionDefaults());
   else setStatus("Diese Seite muss als Outlook-Add-In geöffnet werden.");
 });
 
