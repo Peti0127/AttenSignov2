@@ -1,6 +1,12 @@
 {
-  "version": "0.8.78",
+  "version": "0.8.79",
   "releases": [
+    {
+      "version": "0.8.79",
+      "changes": [
+        "FIX: Gespeicherte Standardsignatur wird beim Absenderwechsel berücksichtigt"
+      ]
+    },
     {
       "version": "0.8.78",
       "changes": [

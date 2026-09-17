@@ -649,8 +649,19 @@ function readableError(error) {
 })(window);
 
 const SENDER_DEFAULTS_KEY = "attensam.signature.sender-defaults.v1";
+function senderDefaultsRecord() {
+  const key = "attensam.signature.sender-defaults.v1";
+  const mailbox = String(Office.context.mailbox?.userProfile?.emailAddress || "").trim().toLowerCase();
+  const roaming = Office.context.roamingSettings?.get(key) || {};
+  let local = null;
+  try { if (mailbox) local = JSON.parse(localStorage.getItem(key + ":" + mailbox) || "null"); } catch {}
+  const stamp = value => Date.parse(value?.updatedAt || "") || 0;
+  const latest = local && stamp(local) > stamp(roaming) ? local : roaming;
+  try { if (mailbox && latest.choices) localStorage.setItem(key + ":" + mailbox, JSON.stringify(latest)); } catch {}
+  return latest;
+}
 function senderDefaultMode(address) {
-  const record = Office.context.roamingSettings?.get(SENDER_DEFAULTS_KEY);
+  const record = senderDefaultsRecord();
   return record?.choices?.[String(address || "").trim().toLowerCase()] === "own" ? "own" : "delegated";
 }
 async function saveSenderDefault(address, mode) {
@@ -658,12 +669,14 @@ async function saveSenderDefault(address, mode) {
   const key = String(address || "").trim().toLowerCase();
   if (!key || !["own", "delegated"].includes(mode)) throw new Error("Ungültige Absenderauswahl.");
   const previous = roaming.get(SENDER_DEFAULTS_KEY);
-  const choices = { ...previous?.choices, [key]: mode };
-  roaming.set(SENDER_DEFAULTS_KEY, { choices });
+  const choices = { ...senderDefaultsRecord().choices, [key]: mode };
+  const record = { choices, updatedAt: new Date().toISOString() };
+  roaming.set(SENDER_DEFAULTS_KEY, record);
   await new Promise((resolve, reject) => roaming.saveAsync(result => {
     if (result.status === Office.AsyncResultStatus.Succeeded) resolve();
     else { if (previous) roaming.set(SENDER_DEFAULTS_KEY, previous); else roaming.remove(SENDER_DEFAULTS_KEY); reject(new Error("Auswahl konnte nicht gespeichert werden.")); }
   }));
+  senderDefaultsRecord();
 }
 
 const CITY_SIGNATURE_CITIES = Object.freeze({
