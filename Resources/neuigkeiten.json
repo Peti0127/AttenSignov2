@@ -1,6 +1,18 @@
 {
-  "version": "0.8.76",
+  "version": "0.8.78",
   "releases": [
+    {
+      "version": "0.8.78",
+      "changes": [
+        "FIX: Eigene Signatur ist für alle abweichenden Absenderadressen als Standard wählbar"
+      ]
+    },
+    {
+      "version": "0.8.77",
+      "changes": [
+        "FIX: Leerzeichen vor dem Namen verhindert das Zusammenziehen mit der unsichtbaren Kennung"
+      ]
+    },
     {
       "version": "0.8.76",
       "changes": [

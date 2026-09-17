@@ -1242,7 +1242,7 @@ function buildSignature(templateHtml = signatureTemplate, settings = signatureSe
 function renderSignature() {
   const result = buildSignature();
   previewElement.innerHTML = result.previewHtml;
-  renderOwnSignatureCard(result.sendOnBehalf === true);
+  renderOwnSignatureCard(hasOnBehalfChoice());
   if (result.isPreset) document.getElementById("profile-warnings").hidden = true;
   else showProfileWarnings(
     result.signatureProfile,
@@ -1265,8 +1265,9 @@ function renderSignature() {
 }
 
 function hasOnBehalfChoice() {
-  return Boolean(currentDelegation) && !isFirstNameOnlyProfile(currentDelegation)
-    && !AttensamSignatureRuntime.presetSignature(signatureTemplate, currentDelegation?.email || currentDelegationAddress || profile.email);
+  const address = normalizeEmail(currentDelegationAddress || currentDelegation?.email);
+  const ownAddresses = [profile.email, Office.context.mailbox.userProfile?.emailAddress].map(normalizeEmail);
+  return Boolean(address) && !ownAddresses.includes(address);
 }
 function renderOwnSignatureCard(showOwnSignature = hasOnBehalfChoice()) {
   if (!ownSignatureElement || !ownSignatureElement.isConnected) {
@@ -1281,9 +1282,13 @@ function renderOwnSignatureCard(showOwnSignature = hasOnBehalfChoice()) {
     standardSignatureTitle.textContent = "Standard Signatur";
     return;
   }
-  const ownDefault = senderDefaultMode(currentDelegation?.email || currentDelegationAddress) === "own";
+  const ownDefault = senderDefaultMode(currentDelegationAddress || currentDelegation?.email) === "own";
   standardSignatureTitle.hidden = false;
-  standardSignatureTitle.innerHTML = 'Im Auftrag von' + (!ownDefault ? '<span class="default-badge">Standard</span>' : '');
+  const fromAddress = currentDelegationAddress || currentDelegation?.email || "";
+  const isOnBehalf = currentDelegation && !isFirstNameOnlyProfile(currentDelegation)
+    && !AttensamSignatureRuntime.presetSignature(signatureTemplate, fromAddress);
+  standardSignatureTitle.innerHTML = escapeHtml(isOnBehalf ? "Im Auftrag von" : `Signatur: ${fromAddress}`)
+    + (!ownDefault ? '<span class="default-badge">Standard</span>' : '');
   ownSignatureElement.innerHTML = '<div class="custom-signature-title">Eigene Signatur' + (ownDefault ? '<span class="default-badge">Standard</span>' : '') + '</div><div class="preview ready" role="button" tabindex="0" aria-label="Eigene Signatur einfügen"><div class="signature-preview-content"></div></div>';
   const button = ownSignatureElement.querySelector(".preview");
   const content = ownSignatureElement.querySelector(".signature-preview-content");
@@ -1379,7 +1384,7 @@ function openSignatureMenu(event, id) {
   if (hasOnBehalfChoice() && ["standard", "own-standard"].includes(id)) {
     editCustomButton.hidden = deleteCustomButton.hidden = true;
     setDefaultButton.hidden = false;
-    setDefaultButton.disabled = senderDefaultMode(currentDelegation?.email || currentDelegationAddress) === (id === "own-standard" ? "own" : "delegated");
+    setDefaultButton.disabled = senderDefaultMode(currentDelegationAddress || currentDelegation?.email) === (id === "own-standard" ? "own" : "delegated");
   }
   contextMenu.hidden = false;
   const width = 195;
@@ -1678,7 +1683,7 @@ async function refreshDelegationForCurrentFrom() {
   }
   if (usingCachedProfile) {
     currentDelegation = null;
-    currentDelegationAddress = "";
+    currentDelegationAddress = fromEmail;
     return;
   }
   const ownEmails = new Set([
@@ -1698,7 +1703,7 @@ async function refreshDelegationForCurrentFrom() {
     && !String(currentDelegation.department || "").trim()
   ) {
     currentDelegation = null;
-    currentDelegationAddress = "";
+    currentDelegationAddress = fromEmail;
     return;
   }
   if (currentDelegation.id && profile.id && currentDelegation.id === profile.id) {
@@ -1989,7 +1994,7 @@ customSaveButton.addEventListener("click", async () => {
 setDefaultButton.addEventListener("click", async () => {
   try {
     if (hasOnBehalfChoice() && ["standard", "own-standard"].includes(contextSignatureId)) {
-      await saveSenderDefault(currentDelegation?.email || currentDelegationAddress, contextSignatureId === "own-standard" ? "own" : "delegated");
+      await saveSenderDefault(currentDelegationAddress || currentDelegation?.email, contextSignatureId === "own-standard" ? "own" : "delegated");
       renderSignature();
       setStatus("Standard-Signatur für diese Absenderadresse gespeichert.");
       return;
