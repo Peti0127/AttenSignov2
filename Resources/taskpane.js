@@ -1202,7 +1202,7 @@ function buildSignature(templateHtml = signatureTemplate, settings = signatureSe
     const html = AttensamSignatureRuntime.presetMarkup(preset);
     return { html, previewHtml: html, signatureProfile: profile, renderSettings: settings, isPreset: true };
   }
-  templateHtml = AttensamSignatureRuntime.standardTemplate(templateHtml);
+  templateHtml = AttensamSignatureRuntime.standardTemplate(templateHtml, signatureId === "standard" || signatureId === "own-standard" || signatureId.startsWith("city-"));
   const sendAs = isFirstNameOnlyProfile(delegation);
   const sendOnBehalf = Boolean(delegation) && !sendAs;
   const ownProfile = nameChangeAuthorized ? { ...profile,
@@ -2475,15 +2475,8 @@ function findMarkedSignature(document) {
     || Array.from(document.querySelectorAll("span"))
       .find(element => element.textContent?.trim() === SETTINGS_SIGNATURE_MARKER_TEXT);
   if (!marker) return null;
-  const parent = marker.parentElement;
-  // Old signatures placed the marker directly in the wrapper.
-  if (parent?.tagName === "DIV" && parent !== document.body) return parent;
-  // New signatures keep it inside an existing paragraph. Only recover a
-  // dedicated wrapper; never replace the whole message or just its first line.
-  const paragraph = marker.closest("p");
-  const wrapper = paragraph?.parentElement;
-  if (wrapper?.tagName === "DIV" && wrapper !== document.body
-      && wrapper.firstElementChild === paragraph) return wrapper;
+  // Inline markers identify presence, not the extent of a signature. If Outlook
+  // stripped the wrapper attributes, never guess a parent: it may contain mail text.
   return null;
 }
 
