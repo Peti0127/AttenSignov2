@@ -160,7 +160,7 @@ function readableError(error) {
 
   function getValidRenderData() {
     const cached = Office.context.roamingSettings?.get(RENDER_DATA_KEY);
-    if (!cached?.profile || typeof cached.template !== "string" || !cached.template.trim()) return null;
+    if (cached?.roleValuesVersion !== 2 || !cached?.profile || typeof cached.template !== "string" || !cached.template.trim()) return null;
     const cachedAt = Date.parse(cached.profileUpdatedAt || cached.updatedAt || "");
     if (!Number.isFinite(cachedAt) || Date.now() - cachedAt > PROFILE_CACHE_MAX_AGE_MS) return null;
     const mailboxEmail = currentUserKey();
@@ -197,6 +197,7 @@ function readableError(error) {
   function setAccessAuthorized(value) {
     localStorage.setItem(accessStorageKey(), JSON.stringify({
       authorized: value === true,
+      roleValuesVersion: 2,
       role: REQUIRED_ROLE,
       updatedAt: new Date().toISOString(),
     }));
@@ -205,7 +206,7 @@ function readableError(error) {
   function getAccessAuthorizationState() {
     try {
       const value = JSON.parse(localStorage.getItem(accessStorageKey()) || "null");
-      return typeof value?.authorized === "boolean" ? value.authorized : null;
+      return value?.roleValuesVersion === 2 && typeof value.authorized === "boolean" ? value.authorized : null;
     } catch {
       localStorage.removeItem(accessStorageKey());
       return null;
@@ -226,6 +227,7 @@ function readableError(error) {
   function setVipAuthorized(value) {
     localStorage.setItem(vipStorageKey(), JSON.stringify({
       authorized: value === true,
+      roleValuesVersion: 2,
       updatedAt: new Date().toISOString(),
     }));
   }
@@ -233,7 +235,7 @@ function readableError(error) {
   function getVipAuthorizationState() {
     try {
       const value = JSON.parse(localStorage.getItem(vipStorageKey()) || "null");
-      return typeof value?.authorized === "boolean" ? value.authorized : null;
+      return value?.roleValuesVersion === 2 && typeof value.authorized === "boolean" ? value.authorized : null;
     } catch {
       localStorage.removeItem(vipStorageKey());
       return null;
@@ -247,6 +249,7 @@ function readableError(error) {
   function setCityChangeAuthorized(value) {
     localStorage.setItem(cityChangeStorageKey(), JSON.stringify({
       authorized: value === true,
+      roleValuesVersion: 2,
       role: CITY_CHANGE_ROLE,
       updatedAt: new Date().toISOString(),
     }));
@@ -255,7 +258,7 @@ function readableError(error) {
   function getCityChangeAuthorizationState() {
     try {
       const value = JSON.parse(localStorage.getItem(cityChangeStorageKey()) || "null");
-      return typeof value?.authorized === "boolean" ? value.authorized : null;
+      return value?.roleValuesVersion === 2 && typeof value.authorized === "boolean" ? value.authorized : null;
     } catch {
       localStorage.removeItem(cityChangeStorageKey());
       return null;
@@ -269,6 +272,7 @@ function readableError(error) {
   function setNameChangeAuthorized(value) {
     localStorage.setItem(nameChangeStorageKey(), JSON.stringify({
       authorized: value === true,
+      roleValuesVersion: 2,
       role: NAME_CHANGE_ROLE,
       updatedAt: new Date().toISOString(),
     }));
@@ -277,7 +281,7 @@ function readableError(error) {
   function getNameChangeAuthorizationState() {
     try {
       const value = JSON.parse(localStorage.getItem(nameChangeStorageKey()) || "null");
-      return typeof value?.authorized === "boolean" ? value.authorized : null;
+      return value?.roleValuesVersion === 2 && typeof value.authorized === "boolean" ? value.authorized : null;
     } catch {
       localStorage.removeItem(nameChangeStorageKey());
       return null;
@@ -718,15 +722,6 @@ function currentAuthenticationRoles(result) {
     : meaningfulClaims(result?.idTokenClaims) ? result.idTokenClaims
     : result?.account?.idTokenClaims || {};
   const roles = new Set((Array.isArray(claims.roles) ? claims.roles : []).map((role) => String(role).trim()).filter(Boolean));
-  // Recognize the previous values during Entra role-value propagation.
-  const previousValues = {
-    "ATS.Signature": "Access",
-    "ATS.Signature.VIP": "VIP",
-    "rol.ats00.ATS.Signature.NameChange": "NameChange",
-  };
-  for (const [previous, current] of Object.entries(previousValues)) {
-    if (roles.has(previous)) roles.add(current);
-  }
   return roles;
 }
 
@@ -739,11 +734,11 @@ async function refreshSettingsRoles() {
   SignaturePreferences.setAccessAuthorized(roles.has("Access"));
   SignaturePreferences.setVipAuthorized(roles.has("VIP"));
   SignaturePreferences.setNameChangeAuthorized(roles.has("NameChange"));
-  SignaturePreferences.setCityChangeAuthorized(roles.has("CityChange") || roles.has("ATS.Signature.CityChange"));
+  SignaturePreferences.setCityChangeAuthorized(roles.has("CityChange"));
   const roaming = Office.context.roamingSettings;
   const cached = roaming?.get("attensam.signature.render-data.v1");
   if (cached) {
-    roaming.set("attensam.signature.render-data.v1", { ...cached, accessAuthorized: roles.has("Access"), nameChangeAuthorized: roles.has("NameChange"), cityChangeAuthorized: SignaturePreferences.getCityChangeAuthorized() });
+    roaming.set("attensam.signature.render-data.v1", { ...cached, roleValuesVersion: 2, vipAuthorized: roles.has("VIP"), accessAuthorized: roles.has("Access"), nameChangeAuthorized: roles.has("NameChange"), cityChangeAuthorized: SignaturePreferences.getCityChangeAuthorized() });
     await new Promise((resolve) => roaming.saveAsync(() => resolve()));
   }
 }
@@ -857,7 +852,7 @@ function rememberAuthenticationRoles(result) {
   userRoles = currentAuthenticationRoles(result);
   accessAuthorized = userRoles.has(REQUIRED_ROLE);
   vipAuthorized = userRoles.has(VIP_ROLE);
-  cityChangeAuthorized = userRoles.has(CITY_CHANGE_ROLE) || userRoles.has("ATS.Signature.CityChange");
+  cityChangeAuthorized = userRoles.has(CITY_CHANGE_ROLE);
   nameChangeAuthorized = userRoles.has("NameChange");
   SignaturePreferences.setAccessAuthorized(accessAuthorized);
   SignaturePreferences.setVipAuthorized(vipAuthorized);
@@ -1499,7 +1494,9 @@ async function saveAutoRenderData() {
     template: signatureTemplate,
     officeNumber: CONFIG.officeNumber,
     settings: { ...signatureSettings },
+    roleValuesVersion: 2,
     accessAuthorized,
+    vipAuthorized,
     cityChangeAuthorized,
     nameChangeAuthorized,
     settingsUpdatedAt: cachedAt,
@@ -1830,6 +1827,8 @@ async function saveAccessDeniedState() {
   const existing = roamingSettings.get(AUTO_RENDER_DATA_KEY) || {};
   roamingSettings.set(AUTO_RENDER_DATA_KEY, {
     ...existing,
+    roleValuesVersion: 2,
+    vipAuthorized: false,
     accessAuthorized: false,
     accessCheckedAt: new Date().toISOString(),
   });
@@ -2936,7 +2935,7 @@ async function acquireGraphToken() {
 function rememberMobileCityChangeRole(result) {
   const roles = [...currentAuthenticationRoles(result)];
   SignaturePreferences.setVipAuthorized(roles.includes("VIP"));
-  cityChangeAuthorized = roles.includes("CityChange") || roles.includes("ATS.Signature.CityChange");
+  cityChangeAuthorized = roles.includes("CityChange");
   nameChangeAuthorized = roles.includes("NameChange");
   SignaturePreferences.setAccessAuthorized(roles.includes("Access"));
   SignaturePreferences.setCityChangeAuthorized(cityChangeAuthorized);
@@ -2985,6 +2984,8 @@ async function saveAutomaticRenderData() {
     template: signatureTemplate,
     officeNumber: CONFIG.officeNumber,
     settings: { ...standardSettings },
+    roleValuesVersion: 2,
+    vipAuthorized: SignaturePreferences.getVipAuthorized(),
     accessAuthorized: SignaturePreferences.getAccessAuthorized(),
     cityChangeAuthorized,
     nameChangeAuthorized,
