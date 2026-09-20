@@ -1,18 +1,6 @@
 {
-  "version": "0.8.84",
+  "version": "0.8.85",
   "releases": [
-    {
-      "version": "0.8.84",
-      "changes": [
-        "NEU: Kleine Überraschung beim Vergrößern des Signaturfensters"
-      ]
-    },
-    {
-      "version": "0.8.83",
-      "changes": [
-        "ÄNDERUNG: Berechtigungen werden nur noch nach den aktuellen Zuweisungen geprüft"
-      ]
-    },
     {
       "version": "0.8.82",
       "changes": [
