@@ -1,6 +1,24 @@
 {
-  "version": "0.8.81",
+  "version": "0.8.84",
   "releases": [
+    {
+      "version": "0.8.84",
+      "changes": [
+        "NEU: Kleine Überraschung beim Vergrößern des Signaturfensters"
+      ]
+    },
+    {
+      "version": "0.8.83",
+      "changes": [
+        "ÄNDERUNG: Berechtigungen werden nur noch nach den aktuellen Zuweisungen geprüft"
+      ]
+    },
+    {
+      "version": "0.8.82",
+      "changes": [
+        "FIX: Verschieben von Empfängern zwischen An, Cc und Bcc fügt die Signatur nicht erneut ein"
+      ]
+    },
     {
       "version": "0.8.81",
       "changes": [
