@@ -346,6 +346,53 @@ function recipientSignatureRange(html){
  if(/<blockquote\b|\bid\s*=\s*["'](?:divRplyFwdMsg|appendonsend|replyForward|mail-editor-reference-message-container)["']|\bclass\s*=\s*["'][^"']*(?:gmail_quote|yahoo_quoted)/i.test(html.slice(0,range.start)))return null;
  return range;
 }
+// Recover only complete HTML blocks matching a known signature. Never infer
+// a replacement range solely from the marker's parent or Outlook's bookmark.
+function recoverRecipientSignatureRange(html,knownSignatures){
+ const expected=new Set(knownSignatures.filter(value=>value&&recipientSignatureText(value)).map(recipientSignatureContent));
+ const markers=[...html.matchAll(/Attensam-Signatur/g)];
+ if(markers.length!==1||!expected.size)return null;
+ const markerAt=markers[0].index;
+ if(/<blockquote\b|\bid\s*=\s*["'](?:divRplyFwdMsg|appendonsend|replyForward|mail-editor-reference-message-container)["']|\bclass\s*=\s*["'][^"']*(?:gmail_quote|yahoo_quoted)/i.test(html.slice(0,markerAt)))return null;
+ const root={tag:"#document",start:0,end:html.length,children:[]},stack=[root];
+ const voidTags=new Set(["area","base","br","col","embed","hr","img","input","link","meta","param","source","track","wbr"]);
+ const tokens=/<!--[\s\S]*?-->|<![^>]*>|<\/?[a-zA-Z][\w:-]*\b(?:"[^"]*"|'[^']*'|[^'">])*>/g;
+ let token,count=0;
+ while((token=tokens.exec(html))){
+  if(++count>10000)return null;
+  const tag=token[0];if(/^<!/.test(tag))continue;
+  const name=/^<\/?([\w:-]+)/.exec(tag)[1].toLowerCase();
+  if(/^<\//.test(tag)){
+   if(voidTags.has(name))continue;
+   if(stack.length===1||stack[stack.length-1].tag!==name)return null;
+   stack.pop().end=tokens.lastIndex;
+  }else{
+   const parent=stack[stack.length-1],node={tag:name,start:token.index,end:0,children:[],parent};parent.children.push(node);
+   if(voidTags.has(name)||/\/\s*>$/.test(tag))node.end=tokens.lastIndex;else stack.push(node);
+  }
+ }
+ if(stack.length!==1)return null;
+ // Whole paragraphs/tables/divs may have become siblings after Outlook removes
+ // the original wrapper. Keep their surrounding message text byte-for-byte.
+ const containers=[root];let result=null,checks=0;
+ while(containers.length){
+  const parent=containers.pop();containers.push(...parent.children.filter(node=>node.start<=markerAt&&node.end>markerAt));
+  if(!["#document","body","div","td","section"].includes(parent.tag))continue;
+  const children=parent.children,pivot=children.findIndex(node=>node.start<=markerAt&&node.end>markerAt);
+  if(pivot<0)continue;
+  for(let first=pivot;first>=0&&pivot-first<40;first--){
+   if(!["p","div","table"].includes(children[first].tag))continue;
+   for(let last=pivot;last<children.length&&last-pivot<40;last++){
+    if(++checks>3000)return null;
+    if(!["p","div","table"].includes(children[last].tag))continue;
+    const range={start:children[first].start,end:children[last].end};
+    const candidate=html.slice(range.start,range.end);
+    if(expected.has(recipientSignatureContent(candidate))&&(!result||range.end-range.start<result.end-result.start))result=range;
+   }
+  }
+ }
+ return result;
+}
 function handleRecipientsChanged(event){
  const revision=++recipientRevision;let ended=false;
  const finish=()=>{if(!ended){ended=true;completed(event)}};
@@ -375,13 +422,18 @@ function handleRecipientsChanged(event){
  if(!standard){finish();return}
  const desired=onlyInternal?(internal||EMPTY_RECIPIENT_SIGNATURE):standard;
  readBody(original=>{
- const range=recipientSignatureRange(original);if(!range){finish();return}
- const existing=original.slice(range.start,range.end),text=recipientSignatureText(existing),content=recipientSignatureContent(existing);
+ let range=recipientSignatureRange(original)||recoverRecipientSignatureRange(original,[standard,internal]);if(!range){finish();return}
+ let existing=original.slice(range.start,range.end),text=recipientSignatureText(existing),content=recipientSignatureContent(existing);
  if(content===recipientSignatureContent(desired)){finish();return}
  const empty=/\bdata-attensam-empty-signature=["']true["']/.test(existing)&&content===recipientSignatureContent(EMPTY_RECIPIENT_SIGNATURE);
  const known=text!==""&&(content===recipientSignatureContent(standard)||internal&&content===recipientSignatureContent(internal));
  // Do not replace a wrapper expanded to include user-authored text.
- if(!empty&&!known){finish();return}
+ if(!empty&&!known){
+ const recovered=recoverRecipientSignatureRange(original,[standard,internal]);
+ if(!recovered){finish();return}
+ range=recovered;existing=original.slice(range.start,range.end);
+ if(recipientSignatureContent(existing)===recipientSignatureContent(desired)){finish();return}
+ }
  getAllRecipientAddresses(latest=>{
  if(!current()||JSON.stringify(latest)!==JSON.stringify(addresses)){finish();return}
  readBody(fresh=>{if(fresh!==original){finish();return}

@@ -1,6 +1,12 @@
 {
-  "version": "0.8.85",
+  "version": "0.8.86",
   "releases": [
+    {
+      "version": "0.8.86",
+      "changes": [
+        "FIX: Interne Signatur wird beim Auswählen interner Empfänger wieder automatisch übernommen"
+      ]
+    },
     {
       "version": "0.8.82",
       "changes": [
