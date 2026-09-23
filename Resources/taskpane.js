@@ -664,6 +664,10 @@ function signatureInsertionDisabled() {
   const key = isMobileOutlookClient() ? MOBILE_INSERTION_KEY : isComputerOutlookClient() ? COMPUTER_INSERTION_KEY : null;
   return Boolean(key && Office.context.roamingSettings?.get(key) === true);
 }
+function updateAutomaticInsertionVisibility() {
+  const options = document.getElementById("automatic-insertion-options");
+  if (options) options.hidden = signatureInsertionDisabled();
+}
 async function saveInsertionPreference(checkbox, status) {
   const mobile = checkbox.id === "disable-mobile-insertion";
   if (!(mobile ? isMobileOutlookClient() : isComputerOutlookClient()) || !SignaturePreferences.getAccessAuthorized()) return;
@@ -673,6 +677,7 @@ async function saveInsertionPreference(checkbox, status) {
   const requested = checkbox.checked;
   checkbox.disabled = true;
   roaming.set(key, requested);
+  updateAutomaticInsertionVisibility();
   try {
     await new Promise((resolve, reject) => roaming.saveAsync(result => {
       if (result.status === Office.AsyncResultStatus.Succeeded) resolve();
@@ -683,7 +688,7 @@ async function saveInsertionPreference(checkbox, status) {
     if (previous === undefined) roaming.remove(key); else roaming.set(key, previous);
     checkbox.checked = previous === true;
     status.textContent = readableError(error);
-  } finally { checkbox.disabled = false; }
+  } finally { checkbox.disabled = false; updateAutomaticInsertionVisibility(); }
 }
 
 const SENDER_DEFAULTS_KEY = "attensam.signature.sender-defaults.v1";
@@ -2405,6 +2410,7 @@ function setControlsDisabled(disabled) {
   disableMobileInsertionCheckbox.disabled = disabled || !isMobileOutlookClient();
   document.getElementById("disable-computer-insertion-field").hidden = !isComputerOutlookClient();
   disableComputerInsertionCheckbox.disabled = disabled || !isComputerOutlookClient();
+  updateAutomaticInsertionVisibility();
   skipInternalOnlyCheckbox.disabled = disabled;
   internalSignatureInput.disabled = disabled || !skipInternalOnlyCheckbox.checked;
   skipInternalNewMailCheckbox.disabled = disabled || !skipInternalOnlyCheckbox.checked;
@@ -2874,6 +2880,7 @@ function setControlsDisabled(disabled) {
   disableMobileInsertionCheckbox.disabled = disabled || !isMobileOutlookClient();
   document.getElementById("disable-computer-insertion-field").hidden = !isComputerOutlookClient();
   disableComputerInsertionCheckbox.disabled = disabled || !isComputerOutlookClient();
+  updateAutomaticInsertionVisibility();
   skipInternalOnlyCheckbox.disabled = disabled;
   internalSignatureInput.disabled = disabled || !skipInternalOnlyCheckbox.checked;
   skipInternalNewMailCheckbox.disabled = disabled || !skipInternalOnlyCheckbox.checked;
