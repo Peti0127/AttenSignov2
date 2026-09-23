@@ -19,6 +19,70 @@ function hasConfiguredEntraApp() {
   );
 }
 
+// Diagnostics deliberately exclude request headers, tokens and message bodies.
+const SignatureDiagnostics = (() => {
+  const maxAge = 24 * 60 * 60 * 1000;
+  function clean(value) {
+    return String(value || "").replace(/Bearer\s+[^\s"<>]+/gi,"Bearer [entfernt]")
+      .replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)?/g,"[Token entfernt]")
+      .replace(/((?:access_token|refresh_token|id_token|authorization|client_secret)\s*[=:]\s*)[^\s&,;]+/gi,"$1[entfernt]")
+      .slice(0,1800);
+  }
+  function key() {
+    const account = String(Office.context?.mailbox?.userProfile?.emailAddress || "").trim().toLowerCase();
+    return account ? "attensam.signature.diagnostics.v1:" + account : null;
+  }
+  let memory = [];
+  let memoryKey = null;
+  function read() {
+    try { const storageKey=key(); if(storageKey!==memoryKey){memory=[];memoryKey=storageKey;} if(storageKey) memory=JSON.parse(localStorage.getItem(storageKey)||"[]"); } catch {}
+    if(!Array.isArray(memory)) memory=[];
+    return memory.filter(entry=>entry&&Date.now()-Date.parse(entry.time)<maxAge).slice(-40);
+  }
+  function save(entries) {
+    memory=entries;
+    try { const storageKey=key(); if(storageKey) localStorage.setItem(storageKey,JSON.stringify(entries)); } catch {}
+  }
+  function add(details) {
+    try {
+      const entry={time:new Date().toISOString(),client:clean(Office.context?.mailbox?.diagnostics?.hostName||Office.context?.platform||"Unbekannt")};
+      for(const field of ["source","status","code","message","requestId","serverDate","challenge"]) if(details[field]!==undefined) entry[field]=clean(details[field]);
+      save([...read(),entry].slice(-40));
+    } catch { /* Diagnostics must not affect authentication or mail operations. */ }
+  }
+  return {add,read,clear:()=>save([])};
+})();
+async function diagnosticAuth(client, method, request) {
+  try { return await client[method](request); }
+  catch(error) {
+    SignatureDiagnostics.add({source:"Anmeldung / "+method,code:error?.errorCode||error?.name,message:error?.message,requestId:error?.correlationId});
+    throw error;
+  }
+}
+async function diagnosticFetch(input, options) {
+  let url;
+  try { url=new URL(String(input),window.location.href); } catch { return fetch(input,options); }
+  if(url.origin!=="https://graph.microsoft.com") return fetch(input,options);
+  const source="Microsoft Graph "+url.pathname.replace(/\/users\/[^/]+/i,"/users/{Benutzer}");
+  let response;
+  try { response=await fetch(input,options); }
+  catch(error) { SignatureDiagnostics.add({source,code:"NetworkError",message:error?.message}); throw error; }
+  if(!response.ok) {
+    try {
+      let payload={};try { payload=await response.clone().json(); } catch {}
+      const error=payload?.error||{},inner=error.innerError||error.innererror||{};
+      const challenge=response.headers.get("www-authenticate")||"";
+      const authError=/\berror="([a-z_]+)"/i.exec(challenge)?.[1];
+      SignatureDiagnostics.add({source,status:response.status,code:error.code||authError||"HTTPError",
+        message:error.message||response.statusText||"Keine Fehlerbeschreibung verfügbar.",
+        requestId:response.headers.get("request-id")||inner["request-id"],
+        serverDate:response.headers.get("date")||inner.date,
+        challenge:challenge ? (authError||"Anmeldeanforderung vorhanden")+(/\bclaims=/i.test(challenge)?"; zusätzliche Anmeldung erforderlich":"") : "Nicht verfügbar"});
+    } catch {}
+  }
+  return response;
+}
+
 function readableError(error) {
   if (typeof error === "string" && error.trim()) return error.trim();
   if (typeof error?.message === "string" && error.message.trim()) return error.message.trim();
@@ -768,7 +832,7 @@ async function refreshSettingsRoles() {
   if (!hasConfiguredEntraApp() || !Office.context.requirements?.isSetSupported("NestedAppAuth", "1.1")) return;
   const authority = ATTENSAM_CONFIG.tenantId.startsWith("https://") ? ATTENSAM_CONFIG.tenantId : `https://login.microsoftonline.com/${ATTENSAM_CONFIG.tenantId}`;
   const client = await msal.createNestablePublicClientApplication({ auth: { clientId: ATTENSAM_CONFIG.clientId, authority }, cache: { cacheLocation: "localStorage" } });
-  const result = await client.acquireTokenSilent({ scopes: ["User.Read"], forceRefresh: true });
+  const result = await diagnosticAuth(client, "acquireTokenSilent", { scopes: ["User.Read"], forceRefresh: true });
   const roles = currentAuthenticationRoles(result);
   SignaturePreferences.setAccessAuthorized(roles.has("Access"));
   SignaturePreferences.setVipAuthorized(roles.has("VIP"));
@@ -784,7 +848,7 @@ async function refreshSettingsRoles() {
 
 (function compactRoute(){
   const activeView = document.documentElement.dataset.view === "help" ? "help" : new URLSearchParams(window.location.search).get("view");
-  if (["settings", "feedback", "help", "news"].includes(activeView)) return;
+  if (["settings", "feedback", "help", "news", "errors"].includes(activeView)) return;
 /* global Office, msal, SignaturePreferences */
 
 const CONFIG = ATTENSAM_CONFIG;
@@ -1633,12 +1697,12 @@ async function acquireGraphToken(scopes = ["User.Read"]) {
   }
   const request = { scopes, forceRefresh: true };
   try {
-    const result = await msalInstance.acquireTokenSilent(request);
+    const result = await diagnosticAuth(msalInstance, "acquireTokenSilent", request);
     rememberAuthenticationRoles(result);
     return result.accessToken;
   } catch (error) {
     if (!(error instanceof msal.InteractionRequiredAuthError)) throw error;
-    const result = await msalInstance.acquireTokenPopup(request);
+    const result = await diagnosticAuth(msalInstance, "acquireTokenPopup", request);
     rememberAuthenticationRoles(result);
     return result.accessToken;
   }
@@ -1683,7 +1747,7 @@ async function loadDelegatedUser(fromDetails) {
       "companyName", "city", "streetAddress", "postalCode", "jobTitle",
       "department", "mobilePhone", "businessPhones", "onPremisesExtensionAttributes",
     ].join(",");
-    let response = await fetch(
+    let response = await diagnosticFetch(
       `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(fromDetails.emailAddress)}?$select=${encodeURIComponent(select)}`,
       { headers: { Authorization: `Bearer ${token}` } },
     );
@@ -1694,7 +1758,7 @@ async function loadDelegatedUser(fromDetails) {
     if (!user) {
       const address = String(fromDetails.emailAddress || "").replaceAll("'", "''");
       const filter = `mail eq '${address}' or userPrincipalName eq '${address}'`;
-      response = await fetch(
+      response = await diagnosticFetch(
         `https://graph.microsoft.com/v1.0/users?$filter=${encodeURIComponent(filter)}&$select=${encodeURIComponent(select)}&$top=1`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -1706,7 +1770,7 @@ async function loadDelegatedUser(fromDetails) {
     if (!user) {
       const address = String(fromDetails.emailAddress || "").replaceAll("'", "''");
       const filter = `proxyAddresses/any(proxy:proxy eq 'smtp:${address}')`;
-      response = await fetch(
+      response = await diagnosticFetch(
         `https://graph.microsoft.com/v1.0/users?$filter=${encodeURIComponent(filter)}&$select=${encodeURIComponent(select)}&$count=true&$top=1`,
         {
           headers: {
@@ -1812,7 +1876,7 @@ async function loadProfile() {
       "companyName", "city", "streetAddress", "postalCode", "jobTitle",
       "department", "mobilePhone", "businessPhones", "onPremisesExtensionAttributes",
     ].join(",");
-    const response = await fetch(
+    const response = await diagnosticFetch(
       `https://graph.microsoft.com/v1.0/me?$select=${encodeURIComponent(select)}`,
       { headers: { Authorization: `Bearer ${token}` } },
     );
@@ -1957,7 +2021,7 @@ async function initialize() {
     const cachedVipState = SignaturePreferences.getVipAuthorizationState();
     vipAuthorized = cachedVipState === true;
     try {
-      signatureTemplate = await fetch("template.html", { cache: "no-store" }).then((response) => {
+      signatureTemplate = await diagnosticFetch("template.html", { cache: "no-store" }).then((response) => {
         if (!response.ok) throw new Error("template.html konnte nicht geladen werden.");
         return response.text();
       });
@@ -2178,10 +2242,10 @@ async function acquireFeedbackToken() {
   }
   const request = { scopes: ["User.Read", "Mail.Send"], forceRefresh: true };
   try {
-    return await feedbackMsalInstance.acquireTokenSilent(request);
+    return await diagnosticAuth(feedbackMsalInstance, "acquireTokenSilent", request);
   } catch (error) {
     if (!(error instanceof msal.InteractionRequiredAuthError)) throw error;
-    return feedbackMsalInstance.acquireTokenPopup(request);
+    return diagnosticAuth(feedbackMsalInstance, "acquireTokenPopup", request);
   }
 }
 
@@ -2210,7 +2274,7 @@ async function initializeFeedback() {
       return;
     }
     const select = "givenName,surname,displayName,mail,userPrincipalName";
-    const response = await fetch(
+    const response = await diagnosticFetch(
       `https://graph.microsoft.com/v1.0/me?$select=${encodeURIComponent(select)}`,
       { headers: { Authorization: `Bearer ${authentication.accessToken}` } },
     );
@@ -2248,7 +2312,7 @@ form.addEventListener("submit", async (event) => {
     if (!authenticationRoles(authentication).has(REQUIRED_ROLE)) {
       throw new Error("Sie haben kein Zugriff auf dieses Add-In, bitte EDV kontaktieren!");
     }
-    const response = await fetch("https://graph.microsoft.com/v1.0/me/sendMail", {
+    const response = await diagnosticFetch("https://graph.microsoft.com/v1.0/me/sendMail", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${authentication.accessToken}`,
@@ -2993,12 +3057,12 @@ async function acquireGraphToken() {
   }
   const request = { scopes: ["User.Read"], forceRefresh: true };
   try {
-    const result = await msalInstance.acquireTokenSilent(request);
+    const result = await diagnosticAuth(msalInstance, "acquireTokenSilent", request);
     rememberMobileCityChangeRole(result);
     return result.accessToken;
   } catch (error) {
     if (!(error instanceof msal.InteractionRequiredAuthError)) throw error;
-    const result = await msalInstance.acquireTokenPopup(request);
+    const result = await diagnosticAuth(msalInstance, "acquireTokenPopup", request);
     rememberMobileCityChangeRole(result);
     return result.accessToken;
   }
@@ -3021,7 +3085,7 @@ async function loadProfile() {
     "companyName", "city", "streetAddress", "postalCode", "jobTitle",
     "department", "mobilePhone", "businessPhones", "onPremisesExtensionAttributes",
   ].join(",");
-  const response = await fetch(
+  const response = await diagnosticFetch(
     `https://graph.microsoft.com/v1.0/me?$select=${encodeURIComponent(select)}`,
     { headers: { Authorization: `Bearer ${token}` } },
   );
@@ -3264,4 +3328,30 @@ Office.onReady((info) => {
       if (view === "news") document.getElementById("release-history").textContent = "Neuigkeiten konnten nicht geladen werden. Bitte öffnen Sie die Seite später erneut.";
       document.querySelectorAll("[data-release-version]").forEach((element) => { element.textContent = "Versionsinformation derzeit nicht verfügbar."; });
     });
+})();
+
+(function errorLogRoute() {
+  if(new URLSearchParams(window.location.search).get("view")!=="errors") return;
+  Office.onReady(()=>{
+    const output=document.getElementById("error-log");
+    const status=document.getElementById("error-log-status");
+    function render(){
+      const entries=SignatureDiagnostics.read().slice().reverse();
+      output.value=entries.length ? entries.map(entry=>[
+        "Zeit (UTC): "+entry.time,"Outlook: "+entry.client,
+        "Quelle: "+entry.source,entry.status?"HTTP: "+entry.status:"",
+        "Fehlercode: "+(entry.code||"Unbekannt"),"Meldung: "+(entry.message||""),
+        entry.requestId?"Request-ID / Korrelations-ID: "+entry.requestId:"",
+        entry.serverDate?"Serverzeit: "+entry.serverDate:"",
+        entry.challenge?"Anmeldeanforderung: "+entry.challenge:""
+      ].filter(Boolean).join("\n")).join("\n\n--------------------\n\n") : "Noch keine Fehler protokolliert. Öffne die Signatur oder Feedback erneut, um den Fehler zu erfassen.";
+    }
+    render();
+    document.getElementById("refresh-error-log").addEventListener("click",render);
+    document.getElementById("clear-error-log").addEventListener("click",()=>{SignatureDiagnostics.clear();render();status.textContent="Protokoll gelöscht."});
+    document.getElementById("copy-error-log").addEventListener("click",async()=>{
+      try { await navigator.clipboard.writeText(output.value);status.textContent="Protokoll kopiert."; }
+      catch { output.focus();output.select();status.textContent="Markierten Text bitte manuell kopieren."; }
+    });
+  });
 })();

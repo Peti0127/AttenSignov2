@@ -1,6 +1,12 @@
 {
-  "version": "0.9.2",
+  "version": "1.0.0",
   "releases": [
+    {
+      "version": "1.0.0",
+      "changes": [
+        "NEU: Fehlerprotokoll zum Anzeigen und Kopieren von Fehlermeldungen"
+      ]
+    },
     {
       "version": "0.9.1",
       "changes": [

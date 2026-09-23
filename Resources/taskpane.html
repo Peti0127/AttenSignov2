@@ -8,13 +8,13 @@
   <script>
     const route = new URLSearchParams(window.location.search);
     if (route.get("view") === "help") window.location.replace("hilfe.html");
-    document.documentElement.dataset.view = ["settings", "help", "news"].includes(route.get("view")) ? route.get("view") : "taskpane";
+    document.documentElement.dataset.view = ["settings", "help", "news", "errors"].includes(route.get("view")) ? route.get("view") : "taskpane";
     document.documentElement.dataset.mobile = route.get("mobile") === "1" ? "true" : "false";
   </script>
   <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@5.18.0/lib/msal-browser.min.js"></script>
   <script defer src="autorun-classic.js?rev=40"></script>
-  <script defer src="taskpane.js?rev=39"></script>
+  <script defer src="taskpane.js?rev=40"></script>
   <style>
     :root { color-scheme:light; --red:#e10000; --ink:#090909; --muted:#666; --line:#d2d2d2; --paper:#f7f7f7; --surface:#fff; --control-bg:#fff; --control-ink:#090909; --control-border:#aaa; --hover:#f1f1f1; --footer-bg:rgba(255,255,255,.98); --button-bg:#090909; --button-ink:#fff; }
     :root[data-client-theme="dark"] { color-scheme:dark; --ink:#f2f2f2; --muted:#b8b8b8; --line:#4a4a4a; --paper:#111; --surface:#222; --control-bg:#2b2b2b; --control-ink:#f5f5f5; --control-border:#656565; --hover:#333; --footer-bg:rgba(28,28,28,.98); --button-bg:#ededed; --button-ink:#111; }
@@ -27,7 +27,8 @@
     html[data-view="taskpane"] #taskpane-view,
     html[data-view="settings"] #settings-view,
     html[data-view="help"] #help-view,
-    html[data-view="news"] #news-view { display:block; }
+    html[data-view="news"] #news-view,
+    html[data-view="errors"] #errors-view { display:block; }
     header { display:flex; align-items:center; gap:12px; min-height:72px; padding:15px 18px; background:var(--surface); border-bottom:3px solid var(--red); }
     .logo-frame { display:grid; place-items:center; width:38px; height:34px; flex:0 0 auto; padding-right:12px; border-right:1px solid var(--line); }
     .logo { display:block; width:24px; height:24px; object-fit:contain; }
@@ -89,6 +90,9 @@
     .footer-actions { display:flex; justify-content:flex-end; gap:8px; }
     .footer-actions a { display:inline-flex; align-items:center; margin-right:auto; font-weight:700; text-decoration:none; }
     #taskpane-view main { padding-bottom:150px; }
+    .footer-actions #error-log-button { margin-right:0; }
+    #error-log { width:100%; min-height:300px; resize:vertical; font:12px/1.5 monospace; }
+    .error-log-actions { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
     .info-content { max-width:560px; margin:auto; font-size:13px; line-height:1.6; }
     .info-content h2 { font-size:16px; margin:22px 0 8px; }
     .info-content p { margin:8px 0; }
@@ -149,6 +153,7 @@
       <div class="footer-inner">
         <div class="footer-actions">
           <a class="feedback-button" href="taskpane.html?view=news">Neuigkeiten</a>
+          <a id="error-log-button" class="feedback-button" href="taskpane.html?view=errors">Fehler</a>
           <button id="feedback-button" class="feedback-button" type="button" disabled hidden>Feedback</button>
         </div>
         <p id="status" role="status" aria-live="polite">App wird geladen...</p>
@@ -266,6 +271,25 @@
         <button id="close-button" type="button">Fertig</button>
       </div>
     </footer>
+  </section>
+  <section id="errors-view" class="route-view">
+    <header>
+      <div class="logo-frame" aria-hidden="true"><img class="logo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAMAAABEpIrGAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAABKVBMVEUAAADgAADfAAD/AADiAADhAADhAADiAADhAADYAADhAADiAADgAADhAADkAADhAADgAADhAADhAAD/AADiAADhAADgAADlAADhAADhAADgAADhAADgAADhAAD/AADhAADhAADkAADbAADhAADhAADdAADhAADiAADhAADhAADhAADhAADmAADgAADgAADgAADiAADhAADhAADhAADgAADhAADgAADhAADhAADjAADhAADhAADiAADhAADgAADgAADhAADjAADhAADfAADiAADiAADhAADhAADhAADiAADhAADhAADiAADhAADhAADgAADgAADhAADiAADhAADhAADcAADhAADfAADhAADhAADgAAD/AADjAADiAADiAADjAADjAADhAAD///+ZudeEAAAAYXRSTlMAGUAEI/CwlDMN8Zxs9hPTc0PcAq3iSh3740m1hX8B2v4mB+j8HniMXKq77grIZDHQnzv3UqGmd8El/foa3lO3fgmXOINHhvMiUMM8LNaBa8D4aVTyFnAIuZpLAzZGPi0SEn2rxQAAAAFiS0dEYiu5HTwAAAAJcEhZcwAAAdEAAAHRAQyRTPMAAAAHdElNRQflDA8OIxS5I1PQAAABCUlEQVQ4y2NgoDNgZGLGK8/CmsiGVwF7YmIiBx55Ti6gAm48CniA8om8fLgV8IMUJArglBcEyycKCeNSIAKUFQViMRzy4hKJiZJSQAXSOBTIAOVk5eQTExUUscorKScmqqgyqAGVqWNVoAGU4dLU1AJS2jrYFOgmIoAeFnl9JPlEAywKDJEVJBphyPMZA4VNOEDAFMgyw1BgDhS1gDAtrRITrW3Q5IVtgQrsoBx7INuBgRzg6CSOzHV2cUVT4Jbo7uYBU+zplZho5Y0i72MN8qCvoZ+/uXpAINi3QSgKgkMS0YB8KKoV4tzWyNKiYeEYzmQMi4AaIxQZFY3dK9HiMbFx8QlkBQO5AADiCU4jdj6PHwAAACV0RVh0ZGF0ZTpjcmVhdGUAMjAyMS0xMi0xNVQxNDozNToyMCswMDowMJfACAgAAAAldEVYdGRhdGU6bW9kaWZ5ADIwMjEtMTItMTVUMTQ6MzU6MjArMDA6MDDmnbC0AAAAGXRFWHRTb2Z0d2FyZQB3d3cuaW5rc2NhcGUub3Jnm+48GgAAAFd6VFh0UmF3IHByb2ZpbGUgdHlwZSBpcHRjAAB4nOPyDAhxVigoyk/LzEnlUgADIwsuYwsTIxNLkxQDEyBEgDTDZAMjs1Qgy9jUyMTMxBzEB8uASKBKLgDqFxF08kI1lQAAAABJRU5ErkJggg==" alt=""></div>
+      <h1>Fehler</h1>
+      <a class="nav-link" href="taskpane.html" aria-label="Zurück zur Signatur" title="Zurück">&#8592;</a>
+    </header>
+    <main class="info-content">
+      <p>Hier findest du die letzten Fehler dieser Anmeldung. Öffne bei Bedarf zuerst die Signatur oder Feedback, um den Fehler erneut auszulösen.</p>
+      <p>Das Protokoll enthält bis zu 40 Einträge der letzten 24 Stunden. Es bleibt in diesem Outlook-Client und wird nicht automatisch versendet.</p>
+      <label for="error-log">Fehlerprotokoll</label>
+      <textarea id="error-log" readonly spellcheck="false"></textarea>
+      <div class="error-log-actions">
+        <button id="copy-error-log" type="button">Kopieren</button>
+        <button id="refresh-error-log" type="button">Aktualisieren</button>
+        <button id="clear-error-log" type="button">Leeren</button>
+      </div>
+      <p id="error-log-status" role="status"></p>
+    </main>
   </section>
   <section id="news-view" class="route-view">
     <header>
