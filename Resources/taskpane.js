@@ -652,6 +652,40 @@ function readableError(error) {
   });
 })(window);
 
+const COMPUTER_INSERTION_KEY = "attensam.signature.disable-computer-insertion.v1";
+const MOBILE_INSERTION_KEY = "attensam.signature.disable-mobile-insertion.v1";
+function isMobileOutlookClient() {
+  return [Office.PlatformType?.Android, Office.PlatformType?.iOS].filter(Boolean).includes(Office.context?.platform);
+}
+function isComputerOutlookClient() {
+  return [Office.PlatformType?.PC, Office.PlatformType?.OfficeOnline].filter(Boolean).includes(Office.context?.platform);
+}
+function signatureInsertionDisabled() {
+  const key = isMobileOutlookClient() ? MOBILE_INSERTION_KEY : isComputerOutlookClient() ? COMPUTER_INSERTION_KEY : null;
+  return Boolean(key && Office.context.roamingSettings?.get(key) === true);
+}
+async function saveInsertionPreference(checkbox, status) {
+  const mobile = checkbox.id === "disable-mobile-insertion";
+  if (!(mobile ? isMobileOutlookClient() : isComputerOutlookClient()) || !SignaturePreferences.getAccessAuthorized()) return;
+  const key = mobile ? MOBILE_INSERTION_KEY : COMPUTER_INSERTION_KEY;
+  const roaming = Office.context.roamingSettings;
+  const previous = roaming.get(key);
+  const requested = checkbox.checked;
+  checkbox.disabled = true;
+  roaming.set(key, requested);
+  try {
+    await new Promise((resolve, reject) => roaming.saveAsync(result => {
+      if (result.status === Office.AsyncResultStatus.Succeeded) resolve();
+      else reject(new Error(result.error?.message || "Einstellung konnte nicht gespeichert werden."));
+    }));
+    status.textContent = "Einstellungen gespeichert.";
+  } catch (error) {
+    if (previous === undefined) roaming.remove(key); else roaming.set(key, previous);
+    checkbox.checked = previous === true;
+    status.textContent = readableError(error);
+  } finally { checkbox.disabled = false; }
+}
+
 const SENDER_DEFAULTS_KEY = "attensam.signature.sender-defaults.v1";
 function senderDefaultsRecord() {
   const key = "attensam.signature.sender-defaults.v1";
@@ -1853,6 +1887,7 @@ async function subjectExcludesSignature(settings) {
 }
 
 async function insertSignature(customId = "standard") {
+  if (signatureInsertionDisabled()) { setStatus("Signaturen sind für diesen Outlook-Client deaktiviert."); return; }
   if (!accessAuthorized || !profileLoaded || signatureButton.getAttribute("aria-disabled") === "true") return;
   if (cityForSignature(customId) && !cityChangeAuthorized) return;
   const body = Office.context.mailbox.item?.body;
@@ -2271,6 +2306,8 @@ const confidentialityEnglishCheckbox = document.getElementById("confidentiality-
 const autoInsertRepliesCheckbox = document.getElementById("auto-insert-replies");
 const autoInsertForwardsCheckbox = document.getElementById("auto-insert-forwards");
 const autoInsertMeetingsCheckbox = document.getElementById("auto-insert-meetings");
+const disableMobileInsertionCheckbox = document.getElementById("disable-mobile-insertion");
+const disableComputerInsertionCheckbox = document.getElementById("disable-computer-insertion");
 const skipInternalOnlyCheckbox = document.getElementById("skip-internal-only");
 const internalSignatureField = document.getElementById("internal-signature-field");
 const internalSignatureInput = document.getElementById("internal-signature-text");
@@ -2354,6 +2391,10 @@ function setControlsDisabled(disabled) {
   autoInsertRepliesCheckbox.disabled = disabled;
   autoInsertForwardsCheckbox.disabled = disabled;
   autoInsertMeetingsCheckbox.disabled = disabled;
+  document.getElementById("disable-mobile-insertion-field").hidden = !isMobileOutlookClient();
+  disableMobileInsertionCheckbox.disabled = disabled || !isMobileOutlookClient();
+  document.getElementById("disable-computer-insertion-field").hidden = !isComputerOutlookClient();
+  disableComputerInsertionCheckbox.disabled = disabled || !isComputerOutlookClient();
   skipInternalOnlyCheckbox.disabled = disabled;
   internalSignatureInput.disabled = disabled || !skipInternalOnlyCheckbox.checked;
   skipInternalNewMailCheckbox.disabled = disabled || !skipInternalOnlyCheckbox.checked;
@@ -2498,6 +2539,7 @@ function readInsertedSignatureId(existingSignature) {
 }
 
 async function updateInsertedSignature() {
+  if (signatureInsertionDisabled()) return false;
   const body = Office.context.mailbox.item?.body;
   if (!body) return false;
   const cachedRenderData = SignaturePreferences.getValidRenderData();
@@ -2641,6 +2683,8 @@ async function initializeSettings() {
     autoInsertRepliesCheckbox.checked = currentSettings.AutoInsertReplies;
     autoInsertForwardsCheckbox.checked = currentSettings.AutoInsertForwards;
     autoInsertMeetingsCheckbox.checked = currentSettings.AutoInsertMeetings;
+    disableMobileInsertionCheckbox.checked = Office.context.roamingSettings.get(MOBILE_INSERTION_KEY) === true;
+  disableComputerInsertionCheckbox.checked = Office.context.roamingSettings.get(COMPUTER_INSERTION_KEY) === true;
     skipInternalOnlyCheckbox.checked = currentSettings.SkipInternalOnly;
     skipInternalNewMailCheckbox.checked = currentSettings.SkipInternalOnNewMail;
     skipAseEmailsCheckbox.checked = currentSettings.SkipAseEmails;
@@ -2718,6 +2762,8 @@ confidentialityEnglishCheckbox.addEventListener("change", saveSettings);
 autoInsertRepliesCheckbox.addEventListener("change", saveSettings);
 autoInsertForwardsCheckbox.addEventListener("change", saveSettings);
 autoInsertMeetingsCheckbox.addEventListener("change", saveSettings);
+disableMobileInsertionCheckbox.addEventListener("change", () => saveInsertionPreference(disableMobileInsertionCheckbox, settingsStatus));
+disableComputerInsertionCheckbox.addEventListener("change", () => saveInsertionPreference(disableComputerInsertionCheckbox, settingsStatus));
 skipInternalOnlyCheckbox.addEventListener("change", () => {
   updateInternalInsertionVisibility();
   saveSettings();
@@ -2764,6 +2810,8 @@ const confidentialityEnglishCheckbox = document.getElementById("confidentiality-
 const autoInsertRepliesCheckbox = document.getElementById("auto-insert-replies");
 const autoInsertForwardsCheckbox = document.getElementById("auto-insert-forwards");
 const autoInsertMeetingsCheckbox = document.getElementById("auto-insert-meetings");
+const disableMobileInsertionCheckbox = document.getElementById("disable-mobile-insertion");
+const disableComputerInsertionCheckbox = document.getElementById("disable-computer-insertion");
 const skipInternalOnlyCheckbox = document.getElementById("skip-internal-only");
 const internalSignatureField = document.getElementById("internal-signature-field");
 const internalSignatureInput = document.getElementById("internal-signature-text");
@@ -2811,6 +2859,10 @@ function setControlsDisabled(disabled) {
   autoInsertRepliesCheckbox.disabled = disabled;
   autoInsertForwardsCheckbox.disabled = disabled;
   autoInsertMeetingsCheckbox.disabled = disabled;
+  document.getElementById("disable-mobile-insertion-field").hidden = !isMobileOutlookClient();
+  disableMobileInsertionCheckbox.disabled = disabled || !isMobileOutlookClient();
+  document.getElementById("disable-computer-insertion-field").hidden = !isComputerOutlookClient();
+  disableComputerInsertionCheckbox.disabled = disabled || !isComputerOutlookClient();
   skipInternalOnlyCheckbox.disabled = disabled;
   internalSignatureInput.disabled = disabled || !skipInternalOnlyCheckbox.checked;
   skipInternalNewMailCheckbox.disabled = disabled || !skipInternalOnlyCheckbox.checked;
@@ -2897,6 +2949,8 @@ function showSettings(settings, department, titleAttributes) {
   autoInsertRepliesCheckbox.checked = settings.AutoInsertReplies;
   autoInsertForwardsCheckbox.checked = settings.AutoInsertForwards;
   autoInsertMeetingsCheckbox.checked = settings.AutoInsertMeetings;
+  disableMobileInsertionCheckbox.checked = Office.context.roamingSettings.get(MOBILE_INSERTION_KEY) === true;
+  disableComputerInsertionCheckbox.checked = Office.context.roamingSettings.get(COMPUTER_INSERTION_KEY) === true;
   skipInternalOnlyCheckbox.checked = settings.SkipInternalOnly;
   skipInternalNewMailCheckbox.checked = settings.SkipInternalOnNewMail;
   skipAseEmailsCheckbox.checked = settings.SkipAseEmails;
@@ -3128,6 +3182,8 @@ confidentialityEnglishCheckbox.addEventListener("change", saveSettings);
 autoInsertRepliesCheckbox.addEventListener("change", saveSettings);
 autoInsertForwardsCheckbox.addEventListener("change", saveSettings);
 autoInsertMeetingsCheckbox.addEventListener("change", saveSettings);
+disableMobileInsertionCheckbox.addEventListener("change", () => saveInsertionPreference(disableMobileInsertionCheckbox, settingsStatus));
+disableComputerInsertionCheckbox.addEventListener("change", () => saveInsertionPreference(disableComputerInsertionCheckbox, settingsStatus));
 skipInternalOnlyCheckbox.addEventListener("change", () => {
   updateInternalInsertionVisibility();
   saveSettings();
