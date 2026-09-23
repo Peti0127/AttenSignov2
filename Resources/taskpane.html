@@ -101,8 +101,8 @@
     html[data-mobile="true"] #settings-view main { max-width:560px; margin:0 auto; padding-bottom:110px; }
     html[data-mobile="true"] #settings-back { display:none; }
     html[data-mobile="true"] #close-button { display:block; }
-    .status-footer .easter-egg { display:none; margin:8px 0 0 auto; max-width:50ch; color:var(--muted); font-size:12px; line-height:1.5; text-align:right; white-space:pre-line; word-break:normal; overflow-wrap:normal; hyphens:none; }
-    #signature-main[hidden] ~ .status-footer .easter-egg { display:none; }
+    .easter-egg { display:none; align-self:flex-end; flex-shrink:0; margin:auto 0 0 auto; padding-top:24px; max-width:min(50ch,100%); color:var(--muted); font-size:12px; line-height:1.5; text-align:right; white-space:pre-line; word-break:normal; overflow-wrap:normal; hyphens:none; }
+    #signature-main:not([hidden]) { display:flex; flex-direction:column; min-height:calc(100vh - 72px); }
     @media (min-width:480px) {
       html[data-view="taskpane"] .easter-egg:not(:empty) { display:block; }
     }
@@ -140,6 +140,7 @@
           <button id="delete-custom-signature" type="button" role="menuitem">Signatur löschen</button>
         </div>
       </section>
+      <p id="easter-egg" class="easter-egg"></p>
     </main>
     <main id="taskpane-access-denied" hidden>
       <p class="access-denied">Sie haben kein Zugriff auf dieses Add-In, bitte EDV kontaktieren!</p>
@@ -152,7 +153,6 @@
         </div>
         <p id="status" role="status" aria-live="polite">App wird geladen...</p>
       </div>
-      <p id="easter-egg" class="easter-egg"></p>
     </footer>
   </section>
 
@@ -281,10 +281,18 @@
       if (document.documentElement.dataset.view !== "taskpane") return;
       const element = document.getElementById("easter-egg");
       if (!element) return;
-      const footer = element.closest("footer");
+      const footer = document.querySelector("#taskpane-view .status-footer");
+      const header = document.querySelector("#taskpane-view header");
       const main = document.getElementById("signature-main");
-      const reserveFooterSpace = () => { main.style.paddingBottom = `${footer.getBoundingClientRect().height + 20}px`; };
-      if (typeof ResizeObserver === "function") new ResizeObserver(reserveFooterSpace).observe(footer);
+      const reserveFooterSpace = () => {
+        main.style.paddingBottom = `${footer.getBoundingClientRect().height + 20}px`;
+        main.style.minHeight = `calc(100vh - ${header.getBoundingClientRect().height}px)`;
+      };
+      if (typeof ResizeObserver === "function") {
+        const layoutObserver = new ResizeObserver(reserveFooterSpace);
+        layoutObserver.observe(footer);
+        layoutObserver.observe(header);
+      }
       else window.addEventListener("resize", reserveFooterSpace);
       function wrapMessage(text) {
         const lines = []; let line = "";
