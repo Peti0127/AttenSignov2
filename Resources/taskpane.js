@@ -1226,6 +1226,13 @@ function scaleSignaturePreview() {
 }
 
 function buildSignature(templateHtml = signatureTemplate, settings = signatureSettings, signatureId = "standard", delegation = currentDelegation) {
+  const domainAddress = signatureId === "own-standard" ? profile.email : currentDelegationAddress || delegation?.fromAddress || delegation?.email || profile.email;
+  if (AttensamSignatureRuntime.isImmometricSender(domainAddress)) {
+    const isOwn = [profile.email, Office.context.mailbox.userProfile?.emailAddress].map(normalizeEmail).includes(normalizeEmail(domainAddress));
+    const selectedProfile = isOwn ? profile : delegation;
+    const html = AttensamSignatureRuntime.immometricSignature(signatureTemplate, domainAddress, selectedProfile);
+    return { html, previewHtml: html || "Signaturdaten des ausgewählten Absenders sind nicht verfügbar.", signatureProfile: selectedProfile || profile, renderSettings: settings, isPreset: true };
+  }
   const preset = AttensamSignatureRuntime.presetSignature(signatureTemplate, delegation?.email || profile.email);
   if (preset) {
     const html = AttensamSignatureRuntime.presetMarkup(preset);
@@ -1342,7 +1349,8 @@ function renderOwnSignatureCard(showOwnSignature = hasOnBehalfChoice()) {
   standardSignatureTitle.hidden = false;
   const fromAddress = currentDelegationAddress || currentDelegation?.email || "";
   const isOnBehalf = currentDelegation && !isFirstNameOnlyProfile(currentDelegation)
-    && !AttensamSignatureRuntime.presetSignature(signatureTemplate, fromAddress);
+    && !AttensamSignatureRuntime.presetSignature(signatureTemplate, fromAddress)
+    && !AttensamSignatureRuntime.isImmometricSender(fromAddress);
   standardSignatureTitle.innerHTML = escapeHtml(isOnBehalf ? "Im Auftrag von" : `Signatur: ${fromAddress}`)
     + (!ownDefault ? '<span class="default-badge">Standard</span>' : '');
   ownSignatureElement.innerHTML = '<div class="custom-signature-title">Eigene Signatur' + (ownDefault ? '<span class="default-badge">Standard</span>' : '') + '</div><div class="preview ready" role="button" tabindex="0" aria-label="Eigene Signatur einfügen"><div class="signature-preview-content"></div></div>';
@@ -1750,9 +1758,10 @@ async function refreshDelegationForCurrentFrom() {
   ].filter(Boolean));
   if (!fromEmail || ownEmails.has(fromEmail)) {
     currentDelegation = null;
-    currentDelegationAddress = "";
+    currentDelegationAddress = AttensamSignatureRuntime.isImmometricSender(fromEmail) ? fromEmail : "";
     return;
   }
+  currentDelegationAddress = fromEmail;
   currentDelegation = await loadDelegatedUser(fromDetails);
   if (
     !String(currentDelegation.firstName || "").trim()
@@ -1765,8 +1774,8 @@ async function refreshDelegationForCurrentFrom() {
     return;
   }
   if (currentDelegation.id && profile.id && currentDelegation.id === profile.id) {
-    currentDelegation = null;
-    currentDelegationAddress = "";
+    currentDelegation = AttensamSignatureRuntime.isImmometricSender(fromEmail) ? { ...profile, fromAddress: fromEmail } : null;
+    currentDelegationAddress = AttensamSignatureRuntime.isImmometricSender(fromEmail) ? fromEmail : "";
     return;
   }
   currentDelegationAddress = fromEmail;
@@ -1917,6 +1926,7 @@ async function insertSignature(customId = "standard") {
     : cityForSignature(customId)
     ? buildSignature(signatureTemplate, signatureSettings, customId).html
     : item ? buildSignature(item.html, item.settings || signatureSettings, item.id).html : buildSignature().html;
+  if (!html) { setStatus("Signaturdaten des ausgewählten Absenders sind nicht verfügbar."); return; }
   const callback = (result) => {
     if (result.status === Office.AsyncResultStatus.Succeeded) {
       setStatus("Signatur wurde eingefügt.");
@@ -2588,7 +2598,7 @@ async function updateInsertedSignature() {
   const delegation = await new Promise((resolve) => {
     AttensamSignatureRuntime.resolveDelegation(renderData, resolve);
   });
-  const verifiedDelegation = delegation?.id ? delegation : null;
+  const verifiedDelegation = delegation?.id || AttensamSignatureRuntime.isImmometricSender(delegation?.fromAddress) ? delegation : null;
   const customRecord = await SignaturePreferences.getCustomSignatures();
   const renderCustomRecord = SETTINGS_SIGNATURE_ID === "standard"
     ? customRecord
@@ -2611,6 +2621,7 @@ async function updateInsertedSignature() {
     renderCustomRecord,
     renderSignatureId,
   );
+  if (!html) return false;
   if (typeof body.setSignatureAsync === "function") {
     await setCurrentSignature(body, html);
     return true;
